@@ -2,6 +2,40 @@
 
 Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/).
 
+## [1.1.2] — 2026-07-09
+
+### Ajouté
+
+- Configuration **VS Code** complète : tâches `CMake: Build (MinGW)`,
+  `SiteWatch: Run`, nettoyage, extensions recommandées et réglages CMake Tools.
+- Guide débutant dédié : `docs/BUILD_FOR_BEGINNERS.md`, avec installation
+  MSYS2, compilation VS Code, erreurs fréquentes et lien vers le guide utilisateur.
+
+### Modifié
+
+- Version du projet lue depuis le fichier `VERSION` par CMake.
+- Reconfiguration automatique quand `VERSION` change, puis recompilation avec la
+  bonne valeur `SITEWATCH_VERSION`.
+- CMake déclare aussi les headers du projet, y compris les headers Qt avec
+  `Q_OBJECT`, pour fiabiliser `AUTOMOC` et l'indexation dans VS Code.
+- Script `scripts/package-win.ps1` aligné sur `VERSION` : les dossiers et ZIP de
+  distribution utilisent maintenant la version courante par défaut.
+- Documentation utilisateur harmonisée en style neutre, sans tutoiement ni
+  chemins personnels.
+
+### Supprimé
+
+- Ancienne voie Windows **MSVC/vcpkg** : suppression du preset CMake associé et
+  de `vcpkg.json`. La voie Windows officielle est maintenant **MSYS2/MinGW**.
+
+## [1.1.1] — 2026-07-09
+
+### Modifié
+
+- Première simplification de la compilation Windows autour de **MSYS2/MinGW**.
+- Documentation de compilation enrichie dans le README.
+- Nettoyage des références de version figées dans les notes de distribution.
+
 ## [1.1.0] — 2026-07-09
 
 ### Ajouté
@@ -58,5 +92,5 @@ Première version complète.
 
 ### Portabilité
 
-- Compile sous **Windows** (MSVC) et **Linux** (GCC/Clang) — couche socket portable.
+- Compile sous **Windows** (MSYS2/MinGW) et **Linux** (GCC/Clang) — couche socket portable.
 - Support d'**autres hébergeurs** (jeton pare-feu optionnel, filtre de logs avancé).

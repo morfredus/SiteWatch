@@ -1,8 +1,8 @@
-# SiteWatch 1.1.0 — Notes de version
+# SiteWatch 1.1.2 — Notes de version
 
-Première version publique de **SiteWatch**, analyseur de logs Apache/LiteSpeed
-pour l'administration et la supervision de sites web hébergés sur o2switch
-(et compatible avec d'autres hébergeurs SSH).
+Version de maintenance et de simplification de **SiteWatch**, analyseur de logs
+Apache/LiteSpeed pour l'administration et la supervision de sites web hébergés
+sur o2switch (et compatible avec d'autres hébergeurs SSH).
 
 > La question à laquelle SiteWatch répond n'est pas « combien de visiteurs ? »
 > mais **« que s'est-il réellement passé sur mon serveur ? »**
@@ -34,9 +34,21 @@ pour l'administration et la supervision de sites web hébergés sur o2switch
 - **Nettoyage du cache** par site, en totalité ou par mois.
 - **Configuration entièrement graphique** (aucune édition manuelle de JSON).
 
+## Nouveautés depuis 1.1.0
+
+- Compilation depuis **VS Code** prête à l'emploi avec MSYS2/MinGW.
+- Guide débutant ajouté dans `docs/BUILD_FOR_BEGINNERS.md`.
+- Version du programme centralisée dans le fichier `VERSION`.
+- Packaging Windows aligné sur `VERSION` : l'archive générée porte le bon numéro
+  de version.
+- Documentation nettoyée : voie Windows unique **MSYS2/MinGW**, suppression de
+  l'ancien chemin MSVC/vcpkg et des chemins personnels.
+- CMake fiabilisé pour mieux suivre les changements de sources, headers,
+  ressources et version.
+
 ## Installation
 
-- **Version portable** : décompressez `SiteWatch-1.1.0-win64.zip` et lancez
+- **Version portable** : décompresser `SiteWatch-<version>-win64.zip` et lancer
   `SiteWatch.exe` — aucune installation, aucune dépendance à installer.
 - **Compilation depuis les sources** : voir [README.md](README.md)
   (MSYS2/MinGW, WSL2, ou Linux natif).

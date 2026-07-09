@@ -2,6 +2,8 @@
 
 Ce guide explique la configuration et l'utilisation quotidienne de SiteWatch.
 Pour l'installation/compilation, voir le [README](README.md).
+Pour débuter, suivre plutôt le guide
+[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md).
 
 ---
 
@@ -24,7 +26,7 @@ Le mot de passe et le jeton d'API ne sont stockés **que** dans ce fichier local
 
 ## 2. Configuration d'un site
 
-Ouvre **Fichier → Configuration…** (raccourci `Ctrl+,`).
+Ouvrir **Fichier → Configuration…** (raccourci `Ctrl+,`).
 
 ### Emplacement des données
 
@@ -34,7 +36,7 @@ l'emplacement recommandé.
 
 ### Ajouter un site
 
-Clique **+ Ajouter**, puis renseigne :
+Cliquer **+ Ajouter**, puis renseigner :
 
 | Champ | Description |
 |---|---|
@@ -63,7 +65,7 @@ Dernière connexion : 06/07/2026 22:10
 
 En cas d'échec, le message indique l'étape fautive (pare-feu, connexion, auth).
 
-Clique **Enregistrer** pour valider.
+Cliquer **Enregistrer** pour valider.
 
 ---
 
@@ -77,7 +79,8 @@ o2switch exige une **clé SSH autorisée** et l'**ouverture du pare-feu**.
    automatiquement si elle est absente.
 2. **Jeton d'API cPanel** — dans le cPanel : *Sécurité → Gérer les jetons d'API*.
    Crée un jeton et colle-le dans le champ *Jeton d'API cPanel*. SiteWatch s'en
-   sert pour autoriser ton IP publique (souvent dynamique) avant chaque synchro.
+   sert pour autoriser l'IP publique locale (souvent dynamique) avant chaque
+   synchro.
 
 > Sans jeton, le port SSH reste fermé par le pare-feu o2switch et la connexion
 > échoue (« Connexion TCP impossible »).
@@ -103,7 +106,7 @@ se recalculent** selon la période choisie.
 
 | Onglet | Contenu |
 |---|---|
-| **Santé** | Verdict global 🟢/🟠/🔴 + indicateurs. **Double-clique** un indicateur pour sauter à l'onglet concerné (avec le bon filtre). |
+| **Santé** | Verdict global 🟢/🟠/🔴 + indicateurs. **Double-cliquer** un indicateur pour sauter à l'onglet concerné (avec le bon filtre). |
 | **Robots** | Robots par catégorie (IA / moteurs / SEO / divers) avec %, donut de répartition et top robots. |
 | **Sécurité** | Tentatives d'attaque + erreurs 404/403/500, avec pastilles 🔴/🟠. |
 | **Activité WP** | Activité WordPress légitime (admin-ajax, REST, wp-login, wp-admin) avec %. |
@@ -115,7 +118,7 @@ se recalculent** selon la période choisie.
 
 ### Détail au double-clic (tous les onglets)
 
-**Double-clique** n'importe quelle ligne des onglets **Sécurité**, **Activité
+**Double-cliquer** n'importe quelle ligne des onglets **Sécurité**, **Activité
 WP**, **Top pages**, **Référents**, **URLs** ou **Recherche** : une fenêtre
 affiche le détail des entrées correspondantes — IP, User-Agents, codes HTTP,
 URLs, référents, répartition horaire et évolution par jour. Le **site concerné**
@@ -152,7 +155,7 @@ SiteWatch cible o2switch mais reste ouvert :
 
 1. **Pare-feu** : laisse le champ *Jeton d'API cPanel* **vide** → connexion SSH
    directe, sans étape d'autorisation.
-2. **Nommage des logs** : si ton hébergeur nomme ses fichiers autrement, renseigne
+2. **Nommage des logs** : si l'hébergeur nomme ses fichiers autrement, renseigner
    le champ **Filtre des logs (avancé)** avec un motif que le nom de fichier doit
    **contenir** (ex. `monsite.fr` ou `access`). Cela remplace la détection
    automatique o2switch.

@@ -1,15 +1,23 @@
 # SiteWatch
 
-**Analyseur de logs Apache/LiteSpeed** pour administrer et superviser plusieurs
-sites web hébergés sur **o2switch** (et compatible avec d'autres hébergeurs SSH).
 
-Outil personnel, léger et rapide, orienté administration système et sécurité.
+**Analyseur de logs Apache/LiteSpeed** pour administrer et superviser plusieurs sites web 
+hébergés sur **o2switch** (et compatible avec d'autres hébergeurs SSH).
+
+Application légère dédiée à l'administration système et à la supervision de sites web.
 Aucune base SQL, aucune dépendance WordPress : lecture directe des fichiers `.gz`.
 
-> La question à laquelle SiteWatch répond n'est pas « combien de visiteurs ? »
-> mais **« que s'est-il réellement passé sur mon serveur ? »**
+Pour l'utilisation pas à pas, voir le **[Guide utilisateur](GUIDE.md)**.
+Pour compiler facilement depuis VS Code, voir
+**[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md)**.
 
-👉 Pour l'utilisation pas à pas, voir le **[Guide utilisateur](GUIDE.md)**.
+## Why SiteWatch?
+
+Les outils classiques répondent à : **« Combien de visiteurs ? »**
+SiteWatch répond à : **« Pourquoi cette URL reçoit-elle des 404 ? »**
+**« Quel robot scanne mon site ? »**
+**« Pourquoi Google demande cette ressource ? »**
+**« Quelle extension provoque cette activité ? »**
 
 ## Fonctionnalités
 
@@ -55,9 +63,9 @@ SiteWatch est **développé et optimisé pour l'hébergement
 
 L'architecture reste ouverte. Pour un hébergeur non-o2switch :
 
-- **Pas de pare-feu à ouvrir** : laissez le champ *Jeton d'API cPanel* **vide**
+- **Pas de pare-feu à ouvrir** : laisser le champ *Jeton d'API cPanel* **vide**
   (l'étape d'autorisation est ignorée, connexion SSH directe).
-- **Nommage de logs différent** : renseignez le champ **« Filtre des logs (avancé) »**
+- **Nommage de logs différent** : renseigner le champ **« Filtre des logs (avancé) »**
   dans la configuration du site — un fichier est retenu si son nom **contient** ce
   motif (ex. `monsite.fr`), ce qui remplace la détection automatique o2switch.
 
@@ -67,32 +75,39 @@ des hébergeurs proposant un accès SSH.
 ## Compilation
 
 Le code est portable et se compile avec des **paquets déjà précompilés** — pas
-besoin de tout construire soi-même. Choisis la voie qui te convient :
+besoin de tout construire soi-même.
+
+Pour débuter ou compiler depuis VS Code, commencer par le guide
+**[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md)**.
 
 | Voie | Pour qui | Chaîne |
 |---|---|---|
 | **A. MSYS2 / MinGW** (Windows) | Débutants, la plus simple | GCC + Qt via `pacman` |
 | **B. WSL2 / Ubuntu** (Windows) | À l'aise avec Linux | apt + WSLg |
 | **C. Linux natif** | Utilisateurs Linux | apt |
-| **Avancé. MSVC + vcpkg** (Windows) | Toolchain « pro » Windows | MSVC + vcpkg |
 
 Dépendances communes (fournies par le gestionnaire de paquets) : **Qt 6** (Widgets,
 Charts, Network), **zlib**, **nlohmann-json**, **libssh2**, plus **CMake** et **Ninja**.
 
+> Pourquoi pas MSVC/vcpkg ? Le projet garde une voie Windows officielle :
+> **MSYS2/MinGW**. Ce n'est pas une régression, mais une simplification :
+> un seul environnement à documenter, tester et dépanner, avec toutes les
+> dépendances installées par `pacman`.
+
 ### A — Windows avec MSYS2 / MinGW (recommandé)
 
-1. Installe **[MSYS2](https://www.msys2.org)** (ou `winget install MSYS2.MSYS2`).
-2. Ouvre le raccourci **« MSYS2 MINGW64 »** (menu Démarrer), puis mets à jour :
+1. Installer **[MSYS2](https://www.msys2.org)** (ou `winget install MSYS2.MSYS2`).
+2. Ouvrir le raccourci **« MSYS2 MINGW64 »** (menu Démarrer), puis mettre à jour :
    ```bash
-   pacman -Syu        # relance le shell si demandé, puis re-lance la commande
+   pacman -Syu        # relancer le shell si demandé, puis relancer la commande
    ```
-3. Installe la chaîne et les dépendances (précompilées) :
+3. Installer la chaîne et les dépendances (précompilées) :
    ```bash
    pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
      mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-charts \
      mingw-w64-x86_64-libssh2 mingw-w64-x86_64-zlib mingw-w64-x86_64-nlohmann-json
    ```
-4. Compile (les chemins Windows `C:\...` s'écrivent `/c/...` dans MSYS2) :
+4. Compiler (les chemins Windows `C:\...` s'écrivent `/c/...` dans MSYS2) :
    ```bash
    cd /c/chemin/vers/SiteWatch
    cmake --preset mingw
@@ -105,12 +120,29 @@ Charts, Network), **zlib**, **nlohmann-json**, **libssh2**, plus **CMake** et **
 > donc `build-mingw\SiteWatch.exe` se lance aussi bien depuis l'Explorateur
 > (double-clic) que depuis le shell.
 
+#### Compilation depuis VS Code
+
+Le dépôt fournit une configuration `.vscode/` prête à l'emploi pour Windows +
+MSYS2/MinGW :
+
+1. Ouvrir le dossier du projet dans VS Code.
+2. Installer les extensions recommandées si VS Code les propose, notamment
+   **CMake Tools**.
+3. Lancer **Terminal > Run Build Task...** ou `Ctrl+Shift+B`, puis choisir
+   `CMake: Build (MinGW)`.
+4. Pour lancer l'application compilée depuis VS Code, exécuter la tâche
+   `SiteWatch: Run`.
+
+La tâche passe par `scripts/vscode-mingw.ps1`, qui trouve MSYS2 via
+`MSYS2_ROOT` ou `C:\msys64`, initialise l'environnement `MINGW64`, puis utilise
+le preset CMake `mingw`.
+
 ### B — Windows avec WSL2 (Ubuntu)
 
 Sous Windows 11, WSL affiche les fenêtres graphiques nativement (WSLg).
 
 1. Dans un PowerShell **administrateur** : `wsl --install` puis redémarre.
-2. Dans le terminal Ubuntu, suis simplement la voie **C** ci-dessous.
+2. Dans le terminal Ubuntu, suivre simplement la voie **C** ci-dessous.
 
 ### C — Linux natif
 
@@ -128,28 +160,13 @@ cmake --build --preset linux
 Sur Linux, la config va dans `~/.config/SiteWatch` et le cache dans
 `~/.local/share/SiteWatch`.
 
-### Avancé — Windows avec MSVC + vcpkg
-
-Nécessite **Visual Studio 2022 Build Tools**, **CMake**, **Ninja**, **Qt 6 (MSVC
-2022 64-bit)** et **vcpkg**. Ajuste les chemins de `CMakePresets.json`
-(`CMAKE_TOOLCHAIN_FILE`, `CMAKE_PREFIX_PATH`), puis depuis un terminal
-**x64 Native Tools Command Prompt for VS 2022** :
-
-```powershell
-cmake --preset default
-cmake --build --preset default
-```
-
-> ⚠️ Terminal en **x64** obligatoire (sinon Qt 64-bit est rejeté). Ferme
-> l'application avant chaque recompilation (Windows verrouille l'exe).
-
 ## Premier démarrage
 
-1. Lance `SiteWatch`.
-2. Menu **Fichier → Configuration…** : ajoute tes sites (serveur SFTP, utilisateur,
+1. Lancer `SiteWatch`.
+2. Menu **Fichier → Configuration…** : ajouter les sites (serveur SFTP, utilisateur,
    clé SSH, jeton d'API cPanel pour o2switch, nom du site).
-3. Clique **Synchroniser** : SiteWatch ouvre le pare-feu, télécharge les logs et
-   analyse. Choisis la **période** en haut à droite.
+3. Cliquer **Synchroniser** : SiteWatch ouvre le pare-feu, télécharge les logs et
+   analyse. Choisir la **période** en haut à droite.
 
 La configuration et le cache sont rangés dans `%LOCALAPPDATA%\SiteWatch` sous
 Windows (`~/.config` et `~/.local/share` sous Linux). Voir le

@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(SiteWatch VERSION 1.1.0 LANGUAGES CXX)
+set(SITEWATCH_VERSION_FILE "${CMAKE_SOURCE_DIR}/VERSION")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${SITEWATCH_VERSION_FILE}")
+file(STRINGS "${SITEWATCH_VERSION_FILE}" SITEWATCH_VERSION_FROM_FILE LIMIT_COUNT 1)
+string(STRIP "${SITEWATCH_VERSION_FROM_FILE}" SITEWATCH_VERSION_FROM_FILE)
+
+project(SiteWatch VERSION "${SITEWATCH_VERSION_FROM_FILE}" LANGUAGES CXX)
 
 # --- Standard C++ ---------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
@@ -20,7 +25,7 @@ find_package(ZLIB REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 # libssh2 : connexion SSH/SFTP. Le nom du package/cible varie selon la chaine
-# (vcpkg, MSYS2/MinGW, paquets systeme) -> detection robuste, repli pkg-config.
+# (MSYS2/MinGW, paquets systeme) -> detection robuste, repli pkg-config.
 find_package(libssh2 CONFIG QUIET)
 if(NOT TARGET libssh2::libssh2 AND NOT TARGET Libssh2::libssh2)
     find_package(Libssh2 CONFIG QUIET)
@@ -48,6 +53,18 @@ set(CORE_SOURCES
     src/core/net/SftpClient.cpp
 )
 
+set(CORE_HEADERS
+    src/config/Config.h
+    src/core/io/GzReader.h
+    src/core/parser/ApacheLogParser.h
+    src/core/analytics/BotDetector.h
+    src/core/analytics/StatsEngine.h
+    src/core/cache/CacheManager.h
+    src/core/net/SftpClient.h
+    src/core/model/LogEntry.h
+    src/core/model/Stats.h
+)
+
 # L'interface (ui/) est le SEUL endroit qui depend de Qt.
 set(UI_SOURCES
     src/main.cpp
@@ -59,13 +76,28 @@ set(UI_SOURCES
     src/ui/CacheCleanupDialog.cpp
 )
 
+set(UI_HEADERS
+    src/ui/MainWindow.h
+    src/ui/SettingsDialog.h
+    src/ui/DetailDialog.h
+    src/ui/UrlReport.h
+    src/ui/ComparisonDialog.h
+    src/ui/CacheCleanupDialog.h
+)
+
 # Ressources : icone Qt (barre de titre) + .rc Windows (icone de l'exe).
 set(APP_RESOURCES resources/app.qrc)
 if(WIN32)
     list(APPEND APP_RESOURCES resources/app.rc)
 endif()
 
-add_executable(SiteWatch WIN32 ${CORE_SOURCES} ${UI_SOURCES} ${APP_RESOURCES})
+add_executable(SiteWatch WIN32
+    ${CORE_SOURCES}
+    ${CORE_HEADERS}
+    ${UI_SOURCES}
+    ${UI_HEADERS}
+    ${APP_RESOURCES}
+)
 
 target_include_directories(SiteWatch PRIVATE src)
 

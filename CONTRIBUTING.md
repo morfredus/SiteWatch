@@ -1,7 +1,7 @@
 # Contribuer à SiteWatch
 
-Merci de l'intérêt que vous portez à SiteWatch ! Ce document explique comment
-compiler le projet, signaler un bug, proposer une modification, et les
+Merci pour l'intérêt porté à SiteWatch. Ce document explique comment compiler
+le projet, signaler un bug, proposer une modification, et les
 conventions de code à respecter.
 
 ---
@@ -22,35 +22,35 @@ cmake --preset mingw
 cmake --build --preset mingw
 ```
 
-Les autres voies (WSL2, Linux natif, MSVC + vcpkg) sont décrites dans le README.
-Le code doit rester **portable** : il compile sous Windows (MinGW/MSVC) et Linux.
+Les autres voies (WSL2, Linux natif) sont décrites dans le README.
+Le code doit rester **portable** : il compile sous Windows (MinGW) et Linux.
 
 ---
 
 ## Signaler un bug
 
-Ouvrez une **issue** sur le dépôt GitHub du projet en incluant :
+Ouvrir une **issue** sur le dépôt GitHub du projet en incluant :
 
 - la **version** de SiteWatch (menu *Aide → À propos*, ou le fichier `VERSION`) ;
-- votre **système** (Windows 10/11, Linux + distribution) ;
+- le **système** utilisé (Windows 10/11, Linux + distribution) ;
 - les **étapes pour reproduire** le problème ;
 - le **comportement attendu** et le comportement observé ;
 - si possible une **capture d'écran** et le message d'erreur exact.
 
-⚠️ Ne joignez **jamais** votre `config.json`, mots de passe, clés SSH ou jetons
-d'API — anonymisez toute donnée sensible.
+⚠️ Ne jamais joindre `config.json`, mots de passe, clés SSH ou jetons d'API.
+Anonymiser toute donnée sensible.
 
 ---
 
 ## Proposer une modification (Pull Request)
 
-1. **Forkez** le dépôt et créez une branche descriptive
+1. **Forker** le dépôt et créer une branche descriptive
    (`fix/erreur-parseur`, `feat/export-json`…).
-2. **Compilez et testez** votre modification (au moins la voie MinGW).
-3. Faites des **commits clairs** (une idée par commit, message à l'impératif :
+2. **Compiler et tester** la modification (au moins la voie MinGW).
+3. Faire des **commits clairs** (une idée par commit, message à l'impératif :
    « Ajoute le filtre par code HTTP »).
-4. Respectez l'**architecture** et les **conventions de code** ci-dessous.
-5. Ouvrez la **Pull Request** vers la branche principale avec une description de
+4. Respecter l'**architecture** et les **conventions de code** ci-dessous.
+5. Ouvrir la **Pull Request** vers la branche principale avec une description de
    ce que fait le changement et pourquoi.
 
 Chaque nouveau fichier source doit porter l'en-tête de licence :
@@ -63,8 +63,7 @@ Chaque nouveau fichier source doit porter l'en-tête de licence :
  */
 ```
 
-En contribuant, vous acceptez que votre contribution soit distribuée sous la
-licence du projet (**GNU GPL v3.0**).
+Toute contribution est distribuée sous la licence du projet (**GNU GPL v3.0**).
 
 ---
 

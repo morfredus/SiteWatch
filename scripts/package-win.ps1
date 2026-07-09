@@ -5,13 +5,25 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1
 param(
     [string]$BuildDir = "build-mingw",
-    [string]$Version  = "1.1.0"
+    [string]$Version
 )
 $ErrorActionPreference = "Stop"
 $root  = Split-Path -Parent $PSScriptRoot          # racine du projet
 $build = Join-Path $root $BuildDir
 if (-not (Test-Path (Join-Path $build "SiteWatch.exe"))) {
     throw "SiteWatch.exe introuvable dans $build. Compile d'abord (cmake --build --preset mingw)."
+}
+
+if (-not $Version) {
+    $versionFile = Join-Path $root "VERSION"
+    if (-not (Test-Path $versionFile)) {
+        throw "Fichier VERSION introuvable a la racine du projet."
+    }
+
+    $Version = (Get-Content -Path $versionFile -TotalCount 1).Trim()
+    if (-not $Version) {
+        throw "Le fichier VERSION est vide."
+    }
 }
 
 $name = "SiteWatch-$Version-win64"

@@ -3,17 +3,6 @@
   "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
   "configurePresets": [
     {
-      "name": "default",
-      "displayName": "SiteWatch (MSVC + vcpkg + Qt)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
-      }
-    },
-    {
       "name": "linux",
       "displayName": "SiteWatch (Linux, paquets système)",
       "generator": "Ninja",
@@ -25,11 +14,21 @@
       "displayName": "SiteWatch (Windows, MSYS2/MinGW)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-mingw",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "environment": {
+        "MSYSTEM": "MINGW64",
+        "CHERE_INVOKING": "1",
+        "MSYS2_PATH_TYPE": "inherit",
+        "PATH": "C:/msys64/mingw64/bin;C:/msys64/usr/bin;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "C:/msys64/mingw64/bin/c++.exe",
+        "CMAKE_MAKE_PROGRAM": "C:/msys64/mingw64/bin/ninja.exe",
+        "CMAKE_PREFIX_PATH": "C:/msys64/mingw64"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "default", "configurePreset": "default" },
     { "name": "linux", "configurePreset": "linux" },
     { "name": "mingw", "configurePreset": "mingw" }
   ]
