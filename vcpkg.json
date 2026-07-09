@@ -1,0 +1,10 @@
+{
+  "name": "sitewatch",
+  "version": "0.1.0",
+  "description": "Analyseur de logs Apache/LiteSpeed pour plusieurs sites o2switch.",
+  "dependencies": [
+    "zlib",
+    "nlohmann-json",
+    "libssh2"
+  ]
+}

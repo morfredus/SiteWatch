@@ -1,0 +1,36 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "SiteWatch (MSVC + vcpkg + Qt)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
+      }
+    },
+    {
+      "name": "linux",
+      "displayName": "SiteWatch (Linux, paquets système)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "mingw",
+      "displayName": "SiteWatch (Windows, MSYS2/MinGW)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-mingw",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "default", "configurePreset": "default" },
+    { "name": "linux", "configurePreset": "linux" },
+    { "name": "mingw", "configurePreset": "mingw" }
+  ]
+}

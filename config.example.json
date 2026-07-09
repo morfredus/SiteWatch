@@ -1,0 +1,16 @@
+{
+  "cacheRoot": "C:/Users/mon-utilisateur/AppData/Local/SiteWatch",
+  "sites": [
+    {
+      "name": "monsite.fr",
+      "host": "serveur.hebergeur.net",
+      "protocol": "sftp",
+      "user": "monutilisateur",
+      "password": "",
+      "keyFile": "C:/Users/mon-utilisateur/.ssh/ma_cle_privee",
+      "remoteLogDir": "/home/monutilisateur/logs",
+      "cpanelToken": "JETON_API_CPANEL_POUR_AUTORISATION_PARE_FEU",
+      "logMatch": ""
+    }
+  ]
+}

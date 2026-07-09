@@ -1,0 +1,46 @@
+# Assemble une distribution Windows autonome de SiteWatch (exe + DLL + plugins Qt)
+# dans dist/SiteWatch-<version>-win64/ et produit le ZIP correspondant.
+#
+# Usage (depuis n'importe où) :
+#   powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1
+param(
+    [string]$BuildDir = "build-mingw",
+    [string]$Version  = "1.1.0"
+)
+$ErrorActionPreference = "Stop"
+$root  = Split-Path -Parent $PSScriptRoot          # racine du projet
+$build = Join-Path $root $BuildDir
+if (-not (Test-Path (Join-Path $build "SiteWatch.exe"))) {
+    throw "SiteWatch.exe introuvable dans $build. Compile d'abord (cmake --build --preset mingw)."
+}
+
+$name = "SiteWatch-$Version-win64"
+$dist = Join-Path $root "dist\$name"
+if (Test-Path $dist) { Remove-Item -Recurse -Force $dist }
+New-Item -ItemType Directory -Force -Path $dist | Out-Null
+
+# Exécutable + DLL déployées
+Copy-Item (Join-Path $build "SiteWatch.exe") $dist
+Copy-Item (Join-Path $build "*.dll") $dist
+
+# Dossiers de plugins Qt
+foreach ($d in 'platforms','styles','imageformats','tls','networkinformation','generic','iconengines') {
+    $src = Join-Path $build $d
+    if (Test-Path $src) { Copy-Item $src $dist -Recurse }
+}
+
+# Documents
+foreach ($f in 'LICENSE','README.md','GUIDE.md','CHANGELOG.md',
+               'RELEASE_NOTES.md','CONTRIBUTING.md','AUTHORS','VERSION') {
+    $src = Join-Path $root $f
+    if (Test-Path $src) { Copy-Item $src $dist }
+}
+
+# Archive ZIP
+$zip = Join-Path $root "dist\$name.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $zip
+
+$size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+Write-Output "OK - $zip ($size Mo)"
+Write-Output "Dossier : $dist"
