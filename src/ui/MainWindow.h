@@ -46,7 +46,6 @@ private slots:
     void onSync();           // telecharge les nouveaux logs distants (SFTP)
     void onOpenSettings();   // ouvre la fenetre de configuration
     void onSearch();         // recherche dans les entrees (IP/URL/robot/date/code)
-    void onCompareSites();   // comparaison des sites configures
     void onCleanCache();     // suppression de logs telecharges
     void onHelp();           // fenetre d'aide
     void onAbout();          // fenetre a propos
@@ -71,6 +70,7 @@ private:
     void buildUi();
     void loadConfiguration();
     void displayStats(const Stats& stats);
+    void refreshSitesOverview();
     void fillHealth(const Stats& stats);
     void fillUrls();         // remplit l'onglet URLs selon la catégorie choisie
     void fillRobotsTree(const Stats& stats);
@@ -94,7 +94,7 @@ private:
                                             const std::vector<int>& rows) const;
 
     QWidget* makeKpiCard(const QString& emoji, const QString& title,
-                         const QString& color, Kpi& out);
+                         const QString& subRole, Kpi& out);
 
     Config  config_;
     QString configError_;
@@ -114,6 +114,10 @@ private:
     // --- Onglets ---
     QTabWidget*   tabs_          = nullptr;
     QWidget*      healthTab_     = nullptr;
+    QWidget*      sitesTab_      = nullptr;
+    QTableWidget* sitesTable_    = nullptr;
+    QLabel*       sitesSummary_  = nullptr;
+    QWidget*      previousDetailTab_ = nullptr;
     QLabel*       verdictLabel_  = nullptr;
     QVBoxLayout*  healthList_    = nullptr;
     QWidget*      robotsTab_     = nullptr;

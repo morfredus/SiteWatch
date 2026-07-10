@@ -146,7 +146,7 @@ DetailDialog::DetailDialog(const QString& title, const QString& site,
                 "   —   clic droit sur un tableau pour copier / exporter")
             .arg(site.isEmpty() ? QStringLiteral("—") : site)
             .arg(a.total).arg(a.ips.size()).arg(a.uas.size()).arg(a.urls.size()));
-    sub->setStyleSheet("color:#6b7280; padding-bottom:6px;");
+    sub->setProperty("muted", true);
     sub->setWordWrap(true);
     root->addWidget(sub);
 

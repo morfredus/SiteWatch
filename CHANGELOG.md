@@ -2,6 +2,57 @@
 
 Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/).
 
+## [1.3.1] — 2026-07-10
+
+### Corrigé
+
+- **Compilation sous Linux avec Qt < 6.5** (Qt système de certaines
+  distributions) : les API `QStyleHints::colorScheme()` / `setColorScheme()` et
+  l'énumération `Qt::ColorScheme` (introduites en Qt 6.5 / 6.8) sont désormais
+  protégées par des gardes de version, avec repli sur la détection du thème via
+  la palette de l'application. Le mode « Système » suit l'OS à chaud dès Qt 6.5 ;
+  sur Qt plus ancien, le thème est déterminé au démarrage et via le menu.
+  Aucun changement de comportement côté Windows.
+
+## [1.3.0] — 2026-07-10
+
+### Ajouté
+
+- **Thèmes clair / sombre / système** (menu **Affichage → Thème**). Le mode
+  Système suit automatiquement l'apparence de l'OS (Windows et Linux) et réagit
+  à ses changements ; le choix est mémorisé.
+- Feuille de style **externalisée** dans `resources/themes/` (`app.qss` à jetons
+  + palettes `light.theme` / `dark.theme`), plus maintenable et sans couleur
+  codée en dur dans le C++.
+- Déploiement **Linux** : `scripts/linux/install.sh` (crée l'icône
+  d'application et copie les fichiers dans les dossiers standards, en mode
+  utilisateur ou `--system`) et `scripts/linux/package-appimage.sh` (produit une
+  **AppImage** autonome à joindre aux releases, sans compilation côté
+  utilisateur).
+
+### Modifié
+
+- Réorganisation du dossier `scripts/` en sous-dossiers `windows/` et `linux/`.
+
+### Corrigé
+
+- En-têtes de tableaux : séparateurs de colonnes désormais visibles (la poignée
+  de redimensionnement de l'onglet **Sites** était invisible avec le thème
+  Windows par défaut). Contrastes revus pour rester lisibles en clair et sombre.
+
+## [1.2.0] — 2026-07-09
+
+### Ajouté
+
+- Nouvel onglet permanent **Sites** : supervision globale multi-sites, état,
+  points d'attention, action recommandée, synthèse et double-clic vers l'analyse
+  détaillée.
+
+### Supprimé
+
+- Ancien dialogue **Comparer les sites…** du menu Outils, remplacé par l'onglet
+  permanent **Sites**.
+
 ## [1.1.2] — 2026-07-09
 
 ### Ajouté
@@ -87,7 +138,6 @@ Première version complète.
 
 ### Outils
 
-- **Comparaison de sites** sur une même période.
 - **Nettoyage du cache** par site, en totalité ou par période (au mois).
 
 ### Portabilité

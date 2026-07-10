@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=SiteWatch
+GenericName=Analyseur de logs
+GenericName[en]=Log analyzer
+Comment=Analyse de logs Apache/LiteSpeed, détection de robots et d'attaques
+Comment[en]=Apache/LiteSpeed log analysis, bot and attack detection
+Exec=sitewatch
+Icon=sitewatch
+Terminal=false
+Categories=Utility;System;Network;Monitor;
+Keywords=logs;apache;litespeed;analytics;seo;robots;o2switch;
+StartupNotify=true
+StartupWMClass=SiteWatch

@@ -73,8 +73,11 @@ CMakeUserPresets.json
 # =============================================================================
 # 4. COMPILATION DE L'INTERFACE WEB & DISTRIBUTION
 # =============================================================================
-# Distribution (artefacts générés par scripts/package-win.ps1)
+# Distribution (artefacts générés par les scripts de packaging Windows/Linux)
 /dist/
+
+# Outils de packaging Linux téléchargés à la demande (linuxdeploy, plugin Qt)
+/.cache/appimage-tools/
 
 # Interface web générée (web_src/ -> web/ -> src/generated/)
 # Jamais éditée à la main, régénérée automatiquement avant chaque compilation

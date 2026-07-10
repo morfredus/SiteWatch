@@ -1,0 +1,16 @@
+# Normalisation des fins de ligne, indépendamment de core.autocrlf local.
+
+# Par défaut : Git décide (LF en dépôt, conversion au checkout si configuré).
+* text=auto
+
+# Scripts et fichiers destinés à Linux : TOUJOURS en LF, sinon ils cassent
+# (shebang illisible, .desktop invalide) après un checkout sous Windows.
+*.sh            text eol=lf
+*.desktop       text eol=lf
+
+# Scripts PowerShell : CRLF (convention Windows).
+*.ps1           text eol=crlf
+
+# Fichiers binaires : jamais de conversion.
+*.png           binary
+*.ico           binary

@@ -100,7 +100,7 @@ void CacheCleanupDialog::buildUi() {
     // --- Boutons ---
     auto* buttons = new QDialogButtonBox;
     deleteBtn_ = buttons->addButton("Supprimer", QDialogButtonBox::AcceptRole);
-    deleteBtn_->setStyleSheet("background:#dc2626;");
+    deleteBtn_->setObjectName("dangerButton");
     buttons->addButton("Fermer", QDialogButtonBox::RejectRole);
     root->addWidget(buttons);
 

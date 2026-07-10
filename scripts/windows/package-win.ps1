@@ -2,13 +2,13 @@
 # dans dist/SiteWatch-<version>-win64/ et produit le ZIP correspondant.
 #
 # Usage (depuis n'importe où) :
-#   powershell -ExecutionPolicy Bypass -File scripts\package-win.ps1
+#   powershell -ExecutionPolicy Bypass -File scripts\windows\package-win.ps1
 param(
     [string]$BuildDir = "build-mingw",
     [string]$Version
 )
 $ErrorActionPreference = "Stop"
-$root  = Split-Path -Parent $PSScriptRoot          # racine du projet
+$root  = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)   # racine (scripts/windows/ -> ../..)
 $build = Join-Path $root $BuildDir
 if (-not (Test-Path (Join-Path $build "SiteWatch.exe"))) {
     throw "SiteWatch.exe introuvable dans $build. Compile d'abord (cmake --build --preset mingw)."

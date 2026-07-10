@@ -1,207 +1,669 @@
 # SiteWatch
 
+[![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
+![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
+![Build](https://img.shields.io/badge/CMake-3.20+-064F8C?logo=cmake)
+![Status](https://img.shields.io/badge/Status-Active-success)
 
-**Analyseur de logs Apache/LiteSpeed** pour administrer et superviser plusieurs sites web 
-hébergés sur **o2switch** (et compatible avec d'autres hébergeurs SSH).
+> ✅ **Compilation et fonctionnement vérifiés** sous **Windows 11** (MSYS2/MinGW, Qt 6.11)
+> et **Linux Mint 22.3 « Zena »** — base Ubuntu 24.04 LTS « Noble », Qt 6.4.
 
-Application légère dédiée à l'administration système et à la supervision de sites web.
-Aucune base SQL, aucune dépendance WordPress : lecture directe des fichiers `.gz`.
+**Desktop investigation tool for Apache and LiteSpeed access logs**
 
-Pour l'utilisation pas à pas, voir le **[Guide utilisateur](GUIDE.md)**.
-Pour compiler facilement depuis VS Code, voir
-**[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md)**.
+SiteWatch est une application de bureau dédiée à l'administration et à la supervision de sites web.
 
-## Why SiteWatch?
+Contrairement aux outils de statistiques traditionnels, SiteWatch n'a pas pour objectif de compter les visiteurs ou de produire des rapports marketing.
 
-Les outils classiques répondent à : **« Combien de visiteurs ? »**
-SiteWatch répond à : **« Pourquoi cette URL reçoit-elle des 404 ? »**
-**« Quel robot scanne mon site ? »**
-**« Pourquoi Google demande cette ressource ? »**
-**« Quelle extension provoque cette activité ? »**
+Son objectif est beaucoup plus simple :
 
-## Fonctionnalités
+> **Comprendre ce qui s'est réellement passé sur un serveur web.**
 
-- **Téléchargement SFTP** des logs (libssh2) : seuls les fichiers nouveaux ou
-  modifiés sont récupérés, avec barre de progression.
-- **Ouverture automatique du pare-feu** o2switch (API cPanel) avant connexion.
-- **Filtrage par site** : chaque site ne traite que ses propres logs (préfixe
-  déduit automatiquement du nom de domaine, sous-domaines exclus).
-- **Filtre de période** (jour, 7/30 jours, mois, année, personnalisé) —
-  recalcule tous les onglets.
-- **Résumé permanent** : total, humains, robots, erreurs 404 / 403 / 500.
-- **Tableau de santé** 🟢/🟠/🔴 avec indicateurs cliquables (500, attaques,
-  404, activité Google, robots IA) qui renvoient vers l'onglet concerné.
-- **Détection de robots** classés par catégorie (IA, moteurs, SEO, divers) avec
-  pourcentages et **donut** de répartition.
-- **Sécurité** : distinction entre activité WordPress légitime et vraies
-  tentatives d'attaque (anti-faux-positifs).
-- **Onglet URLs** avec catégories : toutes, attaques probables, fonctionnement
-  WordPress, erreurs 404, requêtes système.
-- **Top pages, référents, graphiques** d'évolution.
-- **Recherche** par IP, URL, robot, date ou code HTTP.
-- **Onglets interactifs** : double-clic sur n'importe quelle ligne (Sécurité,
-  Activité WP, Top pages, Référents, URLs, Recherche) pour son détail (IP,
-  User-Agents, URLs, référents, horaires, codes, évolution) ; copie / export CSV
-  d'une ou plusieurs lignes depuis chaque onglet.
-- **Comparaison de sites** côte à côte sur une même période.
-- **Nettoyage du cache** : suppression des logs par site, en totalité ou par
-  période (au mois).
-- **Configuration graphique** complète (aucune édition manuelle de JSON).
+L'application télécharge les journaux Apache ou LiteSpeed via SFTP, les analyse localement et présente les résultats sous une forme immédiatement exploitable.
 
-## Hébergement
+Aucune base SQL.
 
-SiteWatch est **développé et optimisé pour l'hébergement
-[o2switch](https://www.o2switch.fr)** :
+Aucune dépendance WordPress.
 
-- **Pare-feu SSH** : autorisation automatique de l'IP publique via l'API cPanel
-  (`SshWhitelist`, port 2083) avant chaque connexion — nécessite un *jeton d'API cPanel*.
-- **Nommage des logs** : o2switch découpe les logs **mensuellement** et nomme le
-  fichier du domaine principal `<domaine sans points>.<compte>.odns.fr-Mois-Année.gz`.
-  Le préfixe de filtrage est déduit automatiquement du « nom du site ».
+Aucun plugin à installer sur les sites.
 
-### Utiliser un autre hébergeur
+Lecture directe des fichiers de logs compressés (`.gz`).
 
-L'architecture reste ouverte. Pour un hébergeur non-o2switch :
+SiteWatch fonctionne avec tout hébergeur proposant un accès SSH/SFTP et dispose d'une intégration avancée pour **o2switch** (ouverture automatique du pare-feu via l'API cPanel).
 
-- **Pas de pare-feu à ouvrir** : laisser le champ *Jeton d'API cPanel* **vide**
-  (l'étape d'autorisation est ignorée, connexion SSH directe).
-- **Nommage de logs différent** : renseigner le champ **« Filtre des logs (avancé) »**
-  dans la configuration du site — un fichier est retenu si son nom **contient** ce
-  motif (ex. `monsite.fr`), ce qui remplace la détection automatique o2switch.
+---
 
-Seule la connexion reste en **SFTP standard** (libssh2) — compatible avec la plupart
-des hébergeurs proposant un accès SSH.
+## Pourquoi SiteWatch ?
 
-## Compilation
+Les outils classiques répondent généralement à des questions comme :
 
-Le code est portable et se compile avec des **paquets déjà précompilés** — pas
-besoin de tout construire soi-même.
+- Combien ai-je eu de visiteurs ?
+- Quelle est ma page la plus consultée ?
+- Quelle est la provenance de mon trafic ?
 
-Pour débuter ou compiler depuis VS Code, commencer par le guide
-**[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md)**.
+SiteWatch répond plutôt à :
 
-| Voie | Pour qui | Chaîne |
-|---|---|---|
-| **A. MSYS2 / MinGW** (Windows) | Débutants, la plus simple | GCC + Qt via `pacman` |
-| **B. WSL2 / Ubuntu** (Windows) | À l'aise avec Linux | apt + WSLg |
-| **C. Linux natif** | Utilisateurs Linux | apt |
+- Pourquoi cette URL retourne-t-elle autant de 404 ?
+- Quel robot scanne actuellement mon site ?
+- Pourquoi Google demande-t-il cette ressource ?
+- Cette activité WordPress est-elle normale ?
+- Est-ce une vraie attaque ou un faux positif ?
+- Quel site nécessite mon intervention aujourd'hui ?
 
-Dépendances communes (fournies par le gestionnaire de paquets) : **Qt 6** (Widgets,
-Charts, Network), **zlib**, **nlohmann-json**, **libssh2**, plus **CMake** et **Ninja**.
+SiteWatch est conçu comme un **outil d'investigation** destiné aux administrateurs de sites web.
 
-> Pourquoi pas MSVC/vcpkg ? Le projet garde une voie Windows officielle :
-> **MSYS2/MinGW**. Ce n'est pas une régression, mais une simplification :
-> un seul environnement à documenter, tester et dépanner, avec toutes les
-> dépendances installées par `pacman`.
+---
 
-### A — Windows avec MSYS2 / MinGW (recommandé)
+## Documentation
 
-1. Installer **[MSYS2](https://www.msys2.org)** (ou `winget install MSYS2.MSYS2`).
-2. Ouvrir le raccourci **« MSYS2 MINGW64 »** (menu Démarrer), puis mettre à jour :
-   ```bash
-   pacman -Syu        # relancer le shell si demandé, puis relancer la commande
-   ```
-3. Installer la chaîne et les dépendances (précompilées) :
-   ```bash
-   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
-     mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-charts \
-     mingw-w64-x86_64-libssh2 mingw-w64-x86_64-zlib mingw-w64-x86_64-nlohmann-json
-   ```
-4. Compiler (les chemins Windows `C:\...` s'écrivent `/c/...` dans MSYS2) :
-   ```bash
-   cd /c/chemin/vers/SiteWatch
-   cmake --preset mingw
-   cmake --build --preset mingw
-   ./build-mingw/SiteWatch.exe
-   ```
+- 📖 **Guide utilisateur** : `GUIDE.md`
+- 🐧 **Installer et lancer sous Linux** : `docs/INSTALL_LINUX.md`
+- 🛠 **Compiler SiteWatch quand on débute (Windows)** : `docs/BUILD_FOR_BEGINNERS.md`
+- 📚 **Études de cas** : `docs/CASE_STUDIES.md`
+- 🗺 **Roadmap** : `ROADMAP.md`
+- 🤝 **Contribuer** : `CONTRIBUTING.md`
+- 📝 **Journal des versions** : `CHANGELOG.md`
 
-> Toutes les DLL nécessaires (Qt **et** non-Qt : libssh2, freetype, runtime gcc…)
-> sont copiées à côté de l'exe à la compilation (via `scripts/deploy-mingw.sh`),
-> donc `build-mingw\SiteWatch.exe` se lance aussi bien depuis l'Explorateur
-> (double-clic) que depuis le shell.
+---
 
-#### Compilation depuis VS Code
+# Aperçu
 
-Le dépôt fournit une configuration `.vscode/` prête à l'emploi pour Windows +
-MSYS2/MinGW :
+## Tableau de bord
 
-1. Ouvrir le dossier du projet dans VS Code.
-2. Installer les extensions recommandées si VS Code les propose, notamment
-   **CMake Tools**.
-3. Lancer **Terminal > Run Build Task...** ou `Ctrl+Shift+B`, puis choisir
-   `CMake: Build (MinGW)`.
-4. Pour lancer l'application compilée depuis VS Code, exécuter la tâche
-   `SiteWatch: Run`.
+Après chaque synchronisation ou analyse, SiteWatch affiche automatiquement une vue globale de l'ensemble des sites configurés.
 
-La tâche passe par `scripts/vscode-mingw.ps1`, qui trouve MSYS2 via
-`MSYS2_ROOT` ou `C:\msys64`, initialise l'environnement `MINGW64`, puis utilise
-le preset CMake `mingw`.
+L'objectif est de permettre à l'administrateur d'identifier en quelques secondes les sites qui nécessitent une attention particulière avant d'accéder aux analyses détaillées.
 
-### B — Windows avec WSL2 (Ubuntu)
+Le tableau de bord affiche notamment :
 
-Sous Windows 11, WSL affiche les fenêtres graphiques nativement (WSLg).
+- état global de chaque site ;
+- indicateurs principaux ;
+- points d'attention ;
+- action recommandée ;
+- date de la dernière synchronisation.
 
-1. Dans un PowerShell **administrateur** : `wsl --install` puis redémarre.
-2. Dans le terminal Ubuntu, suivre simplement la voie **C** ci-dessous.
+Un double-clic sur un site le sélectionne automatiquement et ouvre immédiatement son analyse détaillée.
 
-### C — Linux natif
+![Tableau de bord](docs/pictures/dashboard.png)
+
+---
+
+## Santé
+
+Le tableau Santé synthétise les principaux indicateurs du site sélectionné.
+
+Les anomalies sont immédiatement visibles grâce à un système d'états 🟢 🟠 🔴 et permettent d'accéder directement à l'onglet concerné.
+
+![Santé](docs/pictures/health.png)
+
+---
+
+## Robots
+
+SiteWatch classe automatiquement les robots par catégorie :
+
+- Intelligence artificielle
+- Moteurs de recherche
+- SEO
+- Robots divers
+
+Le graphique permet d'obtenir instantanément une vision de leur répartition.
+
+![Robots](docs/pictures/robots.png)
+
+---
+
+## Sécurité
+
+Les requêtes suspectes sont regroupées automatiquement afin de distinguer rapidement l'activité normale des véritables tentatives d'attaque.
+
+Les faux positifs liés au fonctionnement normal de WordPress sont éliminés autant que possible.
+
+![Sécurité](docs/pictures/security.png)
+
+---
+
+## Activité WordPress
+
+SiteWatch identifie automatiquement les principales activités liées à WordPress afin de distinguer le fonctionnement normal d'un site des comportements inhabituels.
+
+Sont notamment reconnus :
+
+- Administration (`/wp-admin/`)
+- Connexion (`wp-login.php`)
+- REST API
+- `admin-ajax.php`
+- XML-RPC
+- Cron WordPress
+- Uploads
+- Plugins
+- Thèmes
+
+L'objectif n'est pas de compter les requêtes WordPress mais de comprendre leur origine et leur impact.
+
+![Activité WordPress](docs/pictures/wordpress-activity.png)
+
+---
+
+## Top Pages
+
+Les pages les plus demandées sont regroupées afin d'identifier rapidement :
+
+- les contenus les plus consultés ;
+- les fichiers statiques les plus sollicités ;
+- les ressources anormalement demandées.
+
+Un double-clic ouvre une analyse complète de la ressource sélectionnée.
+
+![Top Pages](docs/pictures/top-pages.png)
+
+---
+
+## Référents
+
+Les référents sont automatiquement regroupés afin de distinguer :
+
+- moteurs de recherche ;
+- réseaux sociaux ;
+- accès directs ;
+- autres sites web.
+
+Cette vue permet notamment de détecter rapidement des référents inhabituels ou des campagnes de liens.
+
+![Référents](docs/pictures/referrers.png)
+
+---
+
+## Analyse des URLs
+
+Toutes les URLs peuvent être explorées ou filtrées selon plusieurs catégories.
+
+Par exemple :
+
+- Toutes les URLs
+- Attaques probables
+- Erreurs 404
+- WordPress
+- Robots
+- Système
+
+Chaque ligne représente une URL unique regroupant l'ensemble des accès correspondants.
+
+Un double-clic ouvre une fenêtre d'analyse détaillée.
+
+![URLs](docs/pictures/urls.png)
+
+---
+
+## Fenêtres de détail
+
+La plupart des listes présentes dans SiteWatch sont interactives.
+
+Un double-clic ouvre une fenêtre regroupant toutes les informations concernant l'élément sélectionné.
+
+Selon le contexte, cette fenêtre peut afficher :
+
+- adresses IP ;
+- User-Agents ;
+- codes HTTP ;
+- référents ;
+- répartition horaire ;
+- évolution quotidienne ;
+- fréquence d'apparition ;
+- sites concernés.
+
+Toutes les listes disposent des mêmes fonctionnalités :
+
+- copie dans le presse-papiers ;
+- export CSV ;
+- tri des colonnes ;
+- sélection multiple.
+
+L'objectif est d'offrir une navigation cohérente dans toute l'application.
+
+![Fenêtre de détail](docs/pictures/detail-window.png)
+
+---
+
+## Graphiques
+
+Plusieurs graphiques permettent de suivre l'évolution des principaux indicateurs sur la période analysée.
+
+Ils facilitent la détection de tendances ou de changements importants.
+
+Les graphiques portent notamment sur :
+
+- trafic humain ;
+- robots ;
+- robots IA ;
+- Google ;
+- erreurs HTTP ;
+- activité WordPress.
+
+![Graphiques](docs/pictures/graph.png)
+
+---
+
+# Fonctionnalités principales
+
+- Analyse locale des journaux Apache et LiteSpeed
+- Téléchargement incrémental via SFTP
+- Gestion de plusieurs sites
+- Tableau de bord multi-sites
+- Tableau de santé interactif
+- Détection automatique des robots
+- Détection des robots d'intelligence artificielle
+- Analyse des moteurs de recherche
+- Détection des attaques courantes
+- Analyse de l'activité WordPress
+- Analyse des URLs
+- Analyse des référents
+- Top Pages
+- Recherche avancée
+- Fenêtres de détail interactives
+- Copie des résultats
+- Export CSV
+- Cache local
+- Nettoyage du cache
+- Configuration graphique
+- Thèmes clair / sombre / système (suivi automatique de l'apparence de l'OS)
+- Journalisation
+- API o2switch pour l'ouverture automatique du pare-feu
+
+---
+
+# Hébergement
+
+SiteWatch fonctionne avec tout hébergeur proposant un accès SSH/SFTP.
+
+Une intégration spécifique est disponible pour **o2switch**, permettant notamment l'ouverture automatique du pare-feu via l'API cPanel avant le téléchargement des journaux.
+
+---
+
+# Installation
+
+Aucun composant n'est à installer sur les serveurs analysés.
+
+SiteWatch fonctionne exclusivement à partir des journaux Apache ou LiteSpeed téléchargés via SFTP.
+
+Le logiciel est portable.
+
+### Windows
+
+Il suffit d'extraire l'archive `SiteWatch-<version>-win64.zip` et d'exécuter :
+
+```
+SiteWatch.exe
+```
+
+Aucune installation n'est nécessaire.
+
+### Linux
+
+La solution la plus simple est l'**AppImage** : un fichier unique et autonome,
+sans compilation ni dépendance à installer. Après téléchargement depuis les
+releases :
 
 ```bash
-# Debian / Ubuntu
+chmod +x SiteWatch-<version>-x86_64.AppImage
+./SiteWatch-<version>-x86_64.AppImage
+```
+
+Pour ajouter l'icône au menu des applications, ou pour compiler puis intégrer
+SiteWatch au bureau, voir le guide dédié :
+**[docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md)**.
+
+---
+
+# Premier démarrage
+
+## 1. Ajouter un site
+
+Créer un nouveau site en renseignant :
+
+- Nom du site
+- Adresse du serveur
+- Port SSH
+- Nom d'utilisateur
+- Méthode d'authentification (mot de passe ou clé SSH)
+- Répertoire contenant les journaux
+
+Pour les hébergements **o2switch**, il est possible d'activer automatiquement l'ouverture du pare-feu via l'API cPanel avant chaque synchronisation.
+
+---
+
+## 2. Synchroniser les journaux
+
+Une synchronisation télécharge uniquement les nouveaux fichiers ou les nouvelles données disponibles.
+
+Les téléchargements sont incrémentaux afin de limiter les transferts.
+
+Les journaux sont ensuite stockés dans le cache local de SiteWatch.
+
+---
+
+## 3. Choisir une période
+
+Une fois les journaux disponibles, sélectionner la période souhaitée.
+
+Par exemple :
+
+- Aujourd'hui
+- Hier
+- Les 7 derniers jours
+- Les 30 derniers jours
+- Période personnalisée
+
+Toutes les analyses utilisent automatiquement cette période.
+
+---
+
+## 4. Lancer l'analyse
+
+Après analyse, SiteWatch affiche automatiquement le tableau de bord multi-sites.
+
+Cette vue permet d'identifier immédiatement :
+
+- les sites nécessitant une attention ;
+- les anomalies importantes ;
+- les actions recommandées.
+
+Un double-clic ouvre directement l'analyse détaillée du site sélectionné.
+
+---
+
+# Workflow recommandé
+
+Le fonctionnement normal de SiteWatch est volontairement simple.
+
+1. Synchroniser les journaux.
+2. Consulter le tableau de bord.
+3. Identifier les sites nécessitant une intervention.
+4. Ouvrir l'analyse détaillée.
+5. Explorer les informations grâce aux doubles-clics.
+6. Exporter les résultats si nécessaire.
+
+Cette approche permet de passer rapidement d'une vue globale à une investigation très précise.
+
+---
+
+# Recherche
+
+L'onglet Recherche permet de retrouver rapidement une information dans l'ensemble des journaux analysés.
+
+Selon les versions, il est possible de rechercher notamment :
+
+- une adresse IP ;
+- une URL ;
+- un User-Agent ;
+- un référent ;
+- un code HTTP ;
+- un mot-clé.
+
+Les résultats peuvent ensuite être explorés grâce aux fenêtres de détail.
+
+---
+
+# Export
+
+La plupart des tableaux de SiteWatch proposent deux fonctions communes :
+
+## Copier
+
+Copie la sélection dans le presse-papiers afin de pouvoir la coller directement dans un rapport, un courriel ou un document.
+
+## Export CSV
+
+Exporte les lignes sélectionnées au format CSV compatible avec Excel, LibreOffice Calc ou tout autre tableur.
+
+Les exports utilisent un format international afin de faciliter leur réutilisation.
+
+---
+
+# Configuration
+
+L'ensemble de la configuration est accessible depuis l'interface graphique.
+
+Elle permet notamment de gérer :
+
+- les sites surveillés ;
+- les paramètres SSH ;
+- les clés privées ;
+- les options o2switch ;
+- le répertoire du cache ;
+- les préférences de l'application.
+
+Aucune modification manuelle des fichiers de configuration n'est normalement nécessaire.
+
+---
+
+# Compilation
+
+## Windows
+
+La méthode officielle repose sur **MSYS2**, **MinGW** et **VS Code**.
+
+L'installation des dépendances s'effectue avec une seule commande :
+
+```bash
+pacman -S --needed mingw-w64-x86_64-{gcc,cmake,ninja,qt6-base,qt6-charts,libssh2,zlib,nlohmann-json}
+```
+
+Compilation :
+
+```bash
+cmake --preset mingw
+cmake --build --preset mingw
+```
+
+Exécution :
+
+```bash
+./build-mingw/SiteWatch.exe
+```
+
+Le guide détaillé est disponible dans :
+
+```
+docs/BUILD_FOR_BEGINNERS.md
+```
+
+---
+
+## Linux
+
+La compilation native Linux est fonctionnelle. Elle s'appuie sur :
+
+- GCC ou Clang
+- CMake + Ninja
+- Qt6 (base + charts)
+- libssh2
+- zlib
+- nlohmann-json
+
+Installation des dépendances (exemple Debian/Ubuntu) puis compilation :
+
+```bash
 sudo apt install build-essential cmake ninja-build \
-     qt6-base-dev qt6-charts-dev \
-     libssh2-1-dev zlib1g-dev nlohmann-json3-dev
+  qt6-base-dev qt6-charts-dev qt6-base-dev-tools \
+  libssh2-1-dev zlib1g-dev nlohmann-json3-dev
 
 cmake --preset linux
 cmake --build --preset linux
 ./build/SiteWatch
 ```
 
-Sur Linux, la config va dans `~/.config/SiteWatch` et le cache dans
-`~/.local/share/SiteWatch`.
+Pour intégrer SiteWatch au bureau (icône + raccourci) ou produire une AppImage
+autonome, le guide pas à pas couvre chaque distribution :
+**[docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md)**.
 
-## Premier démarrage
+---
 
-1. Lancer `SiteWatch`.
-2. Menu **Fichier → Configuration…** : ajouter les sites (serveur SFTP, utilisateur,
-   clé SSH, jeton d'API cPanel pour o2switch, nom du site).
-3. Cliquer **Synchroniser** : SiteWatch ouvre le pare-feu, télécharge les logs et
-   analyse. Choisir la **période** en haut à droite.
+# Architecture
 
-La configuration et le cache sont rangés dans `%LOCALAPPDATA%\SiteWatch` sous
-Windows (`~/.config` et `~/.local/share` sous Linux). Voir le
-**[Guide utilisateur](GUIDE.md)** pour le détail.
+SiteWatch est organisé autour d'un moteur d'analyse indépendant de l'interface graphique.
 
-## Architecture
+Cette séparation permet de faire évoluer le logiciel sans impacter les différents composants et a facilité le portage Linux, désormais disponible.
 
-Le projet sépare strictement le **cœur** (portable) de l'**interface** (Qt).
+L'architecture repose sur plusieurs couches :
 
 ```
-src/
-├─ config/            Lecture/écriture de config.json (nlohmann-json)
-├─ core/              CŒUR — indépendant de Qt
-│  ├─ model/          Structures de données (LogEntry, Stats)
-│  ├─ io/             GzReader — lecture des .gz (zlib)
-│  ├─ parser/         ApacheLogParser — format "combined"
-│  ├─ analytics/      BotDetector + StatsEngine
-│  ├─ cache/          CacheManager — dossier local des logs
-│  └─ net/            SftpClient — téléchargement SSH/SFTP (libssh2)
-└─ ui/                Interface Qt (MainWindow, dialogues)
++------------------------------------------------------+
+|                    Interface Qt                      |
++------------------------------------------------------+
+|        Présentation des analyses et graphiques       |
++------------------------------------------------------+
+|           Moteur d'analyse des journaux              |
++------------------------------------------------------+
+|     Téléchargement SFTP / Décompression / Cache      |
++------------------------------------------------------+
+|           Apache / LiteSpeed Access Logs             |
++------------------------------------------------------+
 ```
 
-Le cœur ne connaît ni Qt ni le format d'affichage ; il compile aussi bien sous
-Windows que sous Linux. Seule la couche réseau contient un `#ifdef` de plateforme.
+Le moteur d'analyse ne dépend pas directement de l'interface graphique.
 
-## Crédits
+Cette organisation facilite :
 
-Développé par **morfredus**.
+- les évolutions fonctionnelles ;
+- les tests ;
+- le support multiplateforme (Windows et Linux) ;
+- une éventuelle interface CLI ou service en arrière-plan.
 
-Construit avec [Qt 6](https://www.qt.io), [libssh2](https://www.libssh2.org)
-et [zlib](https://zlib.net).
+---
 
-## Licence
+# Dépendances principales
 
-Copyright (C) 2026 morfredus
+SiteWatch utilise principalement :
 
-Ce projet est distribué sous les termes de la **GNU General Public License v3.0**.
-Voir le fichier [`LICENSE`](LICENSE) pour le texte complet.
+- Qt 6
+- C++17
+- CMake
+- libssh2
+- zlib
+- nlohmann-json
+
+Sous Windows, la chaîne de compilation officielle repose sur :
+
+- MSYS2
+- MinGW-w64
+- GCC
+- Ninja
+
+---
+
+# Philosophie
+
+SiteWatch n'est pas un logiciel de statistiques.
+
+Il ne cherche pas à remplacer Google Analytics, Matomo ou AWStats.
+
+Son objectif est d'aider à comprendre ce qui s'est réellement passé sur un serveur web.
+
+Pour cela, il privilégie :
+
+- une lecture directe des journaux ;
+- des analyses orientées administration système ;
+- une navigation rapide grâce aux doubles-clics ;
+- des vues synthétiques permettant d'identifier immédiatement les anomalies ;
+- une approche multi-sites pensée pour les administrateurs.
+
+Le logiciel est développé à partir de besoins réels rencontrés lors de l'administration quotidienne de plusieurs sites WordPress.
+
+Chaque fonctionnalité répond à un problème concret rencontré sur le terrain.
+
+---
+
+# Documentation
+
+Le dépôt contient une documentation complète destinée aussi bien aux utilisateurs qu'aux développeurs.
+
+| Document | Description |
+|----------|-------------|
+| `README.md` | Présentation générale du projet |
+| `GUIDE.md` | Guide utilisateur |
+| `CHANGELOG.md` | Historique des versions |
+| `ROADMAP.md` | Évolutions prévues |
+| `CONTRIBUTING.md` | Guide de contribution |
+| `docs/INSTALL_LINUX.md` | Installer et lancer sous Linux (AppImage, compilation, intégration) |
+| `docs/BUILD_FOR_BEGINNERS.md` | Compilation simplifiée sous Windows |
+| `docs/CASE_STUDIES.md` | Cas pratiques et investigations réelles |
+
+La documentation est mise à jour en parallèle du développement afin de rester cohérente avec les fonctionnalités disponibles.
+
+---
+
+# Feuille de route
+
+Les évolutions actuellement envisagées comprennent notamment :
+
+- amélioration continue de l'analyse des robots ;
+- enrichissement des analyses WordPress ;
+- supervision multi-sites avancée ;
+- amélioration des graphiques ;
+- nouveaux rapports d'investigation ;
+- préparation d'une architecture compatible avec une supervision continue.
+
+Les fonctionnalités prévues sont détaillées dans `ROADMAP.md`.
+
+---
+
+# Contribuer
+
+Les rapports de bugs, suggestions d'amélioration et contributions sont les bienvenus.
+
+Avant de proposer une Pull Request, merci de consulter :
+
+```
+CONTRIBUTING.md
+```
+
+Pour signaler un problème ou proposer une évolution, utilisez les **Issues GitHub**.
+
+---
+
+# Licence
+
+SiteWatch est distribué sous licence **GNU GPL v3.0 only**.
+
+Toute redistribution ou modification doit respecter les termes de cette licence.
+
+Voir le fichier :
+
+```
+LICENSE
+```
+
+pour le texte complet.
+
+---
+
+# Auteur
+
+**morfredus**
+
+Développeur, photographe et créateur d'outils open source.
+
+La plupart de mes projets naissent d'un besoin concret rencontré sur le terrain. Lorsqu'une solution adaptée n'existe pas, je préfère construire la mienne puis la documenter afin qu'elle puisse être utile à d'autres.
+
+---
+
+# Remerciements
+
+Merci à toutes les personnes qui prennent le temps :
+
+- d'utiliser SiteWatch ;
+- de signaler des bugs ;
+- de proposer des améliorations ;
+- de contribuer au projet.
+
+Chaque retour permet de faire évoluer le logiciel dans la bonne direction.
+
+---
+
+## Projet Open Source
+
+© 2026 **morfredus**
+
+Distribué sous licence **GNU GPL v3.0 only**.

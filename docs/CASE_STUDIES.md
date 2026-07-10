@@ -1,4 +1,4 @@
-# SiteWatch - Case Studies
+# Études de cas — SiteWatch
 
 Ce document regroupe des cas réels rencontrés lors de l'utilisation de SiteWatch.
 
@@ -6,7 +6,7 @@ L'objectif n'est pas de démontrer les fonctionnalités de l'application, mais d
 
 ---
 
-# Case #001 - Découverte d'un conflit de gestion des polices WordPress
+## Cas n°001 — Découverte d'un conflit de gestion des polices WordPress
 
 ## Contexte
 

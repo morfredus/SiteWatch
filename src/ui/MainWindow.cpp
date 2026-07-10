@@ -18,6 +18,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QFrame>
+#include <QStyle>
 #include <QCheckBox>
 #include <QDateEdit>
 #include <QMessageBox>
@@ -42,6 +43,7 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QKeySequence>
 #include <QStandardPaths>
 #include <QDir>
@@ -52,6 +54,7 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QPieSeries>
 #include <QtCharts/QPieSlice>
+#include <QtCharts/QValueAxis>
 
 #include <algorithm>
 #include <vector>
@@ -67,9 +70,9 @@
 #include "core/net/SftpClient.h"
 #include "ui/SettingsDialog.h"
 #include "ui/DetailDialog.h"
-#include "ui/ComparisonDialog.h"
 #include "ui/CacheCleanupDialog.h"
 #include "ui/UrlReport.h"
+#include "ui/Theme.h"
 #include <QClipboard>
 #include <QStringList>
 
@@ -97,6 +100,24 @@ const std::vector<RobotCategory> kRobotCategories = {
     {"Divers",               "#9ca3af", {"Facebook", "Autres"}},
 };
 
+class SortItem : public QTableWidgetItem {
+public:
+    explicit SortItem(const QString& text) : QTableWidgetItem(text) {}
+
+    bool operator<(const QTableWidgetItem& other) const override {
+        const QVariant left = data(Qt::UserRole);
+        const QVariant right = other.data(Qt::UserRole);
+        if (left.isValid() && right.isValid()) {
+            bool okL = false, okR = false;
+            const double l = left.toDouble(&okL);
+            const double r = right.toDouble(&okR);
+            if (okL && okR) return l < r;
+            return left.toString() < right.toString();
+        }
+        return text() < other.text();
+    }
+};
+
 // Formatage des entiers avec separateur de milliers a la francaise (96 840).
 QString num(long n) {
     return QLocale(QLocale::French, QLocale::France).toString(static_cast<qlonglong>(n));
@@ -113,6 +134,101 @@ QString humanSize(unsigned long long bytes) {
     if (mo >= 1.0) return QString::number(mo, 'f', 1).replace('.', ',') + " Mo";
     double ko = static_cast<double>(bytes) / 1024.0;
     return QString::number(ko, 'f', 1).replace('.', ',') + " Ko";
+}
+
+long sumAttacks(const Stats& s) {
+    long total = 0;
+    for (const auto& [label, count] : s.attackActivity) total += count;
+    return total;
+}
+
+long botOf(const Stats& s, const char* engine) {
+    auto it = s.botCounts.find(engine);
+    return it != s.botCounts.end() ? it->second : 0L;
+}
+
+long aiBots(const Stats& s) {
+    return botOf(s, "Claude") + botOf(s, "OpenAI") + botOf(s, "Perplexity");
+}
+
+long normalActivityTotal(const Stats& s) {
+    long total = 0;
+    for (const auto& [label, count] : s.normalActivity) total += count;
+    return total;
+}
+
+double ratioOf(long value, long total) {
+    return total > 0 ? 100.0 * static_cast<double>(value) / static_cast<double>(total) : 0.0;
+}
+
+int healthLevel(const Stats& s) {
+    const long total = s.totalRequests;
+    const double attackRatio = ratioOf(sumAttacks(s), total);
+    const double error404Ratio = ratioOf(s.errors404, total);
+
+    int level = 0;
+    level = std::max(level, s.errors500 == 0 ? 0 : (s.errors500 <= 10 ? 1 : 2));
+    level = std::max(level, attackRatio < 1.0 ? 0 : (attackRatio < 5.0 ? 1 : 2));
+    level = std::max(level, error404Ratio < 2.0 ? 0 : (error404Ratio < 10.0 ? 1 : 2));
+    return level;
+}
+
+QString healthLabel(int level) {
+    if (level >= 2) return "🔴 Intervention recommandée";
+    if (level == 1) return "🟠 À surveiller";
+    return "🟢 Normal";
+}
+
+QString attentionSummary(const Stats& s) {
+    QStringList points;
+    const long attacks = sumAttacks(s);
+    auto attack = [&](const char* label) {
+        auto it = s.attackActivity.find(label);
+        return it != s.attackActivity.end() ? it->second : 0L;
+    };
+    const long xmlRpcCount = attack("XML-RPC");
+    const long ai = aiBots(s);
+    const long google = botOf(s, "Google");
+    const long wp = normalActivityTotal(s);
+
+    if (s.errors500 > 0) points << QString("%1 erreur(s) 500").arg(num(s.errors500));
+    if (xmlRpcCount > 0) points << QString("Activité XML-RPC (%1)").arg(num(xmlRpcCount));
+    else if (attacks > 0) points << QString("%1 tentative(s) d'attaque").arg(num(attacks));
+    if (s.errors404 > 0) points << QString("%1 erreur(s) 404").arg(num(s.errors404));
+    if (wp > 0 && ratioOf(wp, s.totalRequests) >= 25.0)
+        points << "Activité WordPress élevée";
+    if (ai > 0) points << QString("%1 robot(s) IA").arg(num(ai));
+    if (s.totalRequests > 0 && google == 0) points << "Google peu actif";
+
+    return points.isEmpty() ? "Rien à signaler" : points.mid(0, 3).join(" · ");
+}
+
+QString recommendedAction(const Stats& s) {
+    const long attacks = sumAttacks(s);
+    const long ai = aiBots(s);
+    const long google = botOf(s, "Google");
+    const long wp = normalActivityTotal(s);
+
+    if (s.errors500 > 0) return "Analyser les erreurs serveur";
+    if (attacks > 0) return "Examiner les attaques";
+    if (s.errors404 > 0) return "Vérifier les erreurs 404";
+    if (wp > 0 && ratioOf(wp, s.totalRequests) >= 25.0) return "Contrôler les plugins WordPress";
+    if (s.totalRequests > 0 && google == 0) return "Vérifier le référencement";
+    if (ai > 0) return "Surveiller les robots IA";
+    return "Rien à signaler";
+}
+
+QTableWidgetItem* textItem(const QString& text, const QVariant& sortValue = {}) {
+    auto* item = new SortItem(text);
+    if (sortValue.isValid()) item->setData(Qt::UserRole, sortValue);
+    return item;
+}
+
+QTableWidgetItem* numberItem(long value) {
+    auto* item = new SortItem(num(value));
+    item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    item->setData(Qt::UserRole, static_cast<qlonglong>(value));
+    return item;
 }
 
 QTableWidget* makeTable(const QString& col1, const QString& col2) {
@@ -149,7 +265,7 @@ void setRows3(QTableWidget* t, const std::vector<std::pair<QString, long>>& rows
         t->setItem(i, 1, v);
         auto* p = new QTableWidgetItem(pct(rows[i].second, total));
         p->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        p->setForeground(QColor("#6b7280"));
+        p->setForeground(QColor(Theme::instance().color("textMuted")));
         t->setItem(i, 2, p);
     }
 }
@@ -267,7 +383,11 @@ void replaceLast(QLayout* layout, QWidget* fresh) {
         if (item->widget()) item->widget()->deleteLater();
         delete item;
     }
-    layout->addWidget(fresh);
+    if (auto* box = qobject_cast<QBoxLayout*>(layout)) {
+        box->addWidget(fresh, 1);
+    } else {
+        layout->addWidget(fresh);
+    }
 }
 
 } // namespace
@@ -281,7 +401,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 }
 
 QWidget* MainWindow::makeKpiCard(const QString& emoji, const QString& title,
-                                 const QString& color, Kpi& out) {
+                                 const QString& subRole, Kpi& out) {
     auto* card = new QFrame;
     card->setObjectName("card");
     card->setMinimumHeight(74);
@@ -304,7 +424,7 @@ QWidget* MainWindow::makeKpiCard(const QString& emoji, const QString& title,
     out.value = new QLabel("-");
     out.value->setObjectName("cardValue");
     out.sub = new QLabel;
-    out.sub->setStyleSheet("color:" + color + "; font-weight:600;");
+    out.sub->setProperty("kpi", subRole);   // teinté par le thème (voir app.qss)
     line->addWidget(out.value);
     line->addWidget(out.sub);
     line->addStretch();
@@ -330,8 +450,26 @@ void MainWindow::buildUi() {
     QMenu* outils = menuBar()->addMenu("Outils");
     QAction* actSync = outils->addAction("Synchroniser maintenant");
     connect(actSync, &QAction::triggered, this, &MainWindow::onSync);
-    QAction* actCompare = outils->addAction("Comparer des sites…");
-    connect(actCompare, &QAction::triggered, this, &MainWindow::onCompareSites);
+
+    // --- Affichage → Thème (Système / Clair / Sombre) ---
+    QMenu* affichage = menuBar()->addMenu("Affichage");
+    QMenu* themeMenu = affichage->addMenu("Thème");
+    auto* themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+    struct { const char* label; Theme::Mode mode; } themes[] = {
+        {"Système", Theme::Mode::System},
+        {"Clair",   Theme::Mode::Light},
+        {"Sombre",  Theme::Mode::Dark},
+    };
+    const Theme::Mode current = Theme::instance().mode();
+    for (const auto& t : themes) {
+        QAction* act = themeMenu->addAction(t.label);
+        act->setCheckable(true);
+        act->setChecked(t.mode == current);
+        themeGroup->addAction(act);
+        const Theme::Mode m = t.mode;
+        connect(act, &QAction::triggered, this, [m] { Theme::instance().apply(m); });
+    }
 
     QMenu* aide = menuBar()->addMenu("Aide");
     QAction* actDoc = aide->addAction("Documentation");
@@ -394,32 +532,86 @@ void MainWindow::buildUi() {
 
     // --- Ligne permanente : site / periode / fichiers / taille ---
     metaHeader_ = new QLabel("Sélectionnez un site puis cliquez sur Analyser.");
-    metaHeader_->setStyleSheet("color:#6b7280; padding:0 2px;");
+    metaHeader_->setProperty("muted", true);
     mainLayout->addWidget(metaHeader_);
 
     // --- Rangee de cartes KPI ---
     auto* cards = new QHBoxLayout;
     cards->setSpacing(10);
-    cards->addWidget(makeKpiCard("📊", "Total requêtes", "#6b7280", kTotal_));
-    cards->addWidget(makeKpiCard("👤", "Humains",        "#16a34a", kHumans_));
-    cards->addWidget(makeKpiCard("🤖", "Robots",         "#6b7280", kRobots_));
-    cards->addWidget(makeKpiCard("⚠️", "Erreurs 404",    "#ea8600", k404_));
-    cards->addWidget(makeKpiCard("🛡️", "Erreurs 403",    "#ca8a04", k403_));
-    cards->addWidget(makeKpiCard("⛔", "Erreurs 500",     "#dc2626", k500_));
+    cards->addWidget(makeKpiCard("📊", "Total requêtes", "neutral", kTotal_));
+    cards->addWidget(makeKpiCard("👤", "Humains",        "good",    kHumans_));
+    cards->addWidget(makeKpiCard("🤖", "Robots",         "neutral", kRobots_));
+    cards->addWidget(makeKpiCard("⚠️", "Erreurs 404",    "warn404", k404_));
+    cards->addWidget(makeKpiCard("🛡️", "Erreurs 403",    "warn403", k403_));
+    cards->addWidget(makeKpiCard("⛔", "Erreurs 500",     "danger",  k500_));
     mainLayout->addLayout(cards);
 
     // --- Onglets ---
     tabs_ = new QTabWidget;
+
+    // Onglet Sites : supervision globale multi-sites.
+    sitesTab_ = new QWidget;
+    auto* sitesLayout = new QVBoxLayout(sitesTab_);
+    sitesLayout->setSpacing(10);
+    auto* sitesIntro = new QLabel(
+        "Vue globale : identifier les sites nécessitant une attention avant l'analyse détaillée.");
+    sitesIntro->setProperty("muted", true);
+    sitesLayout->addWidget(sitesIntro);
+    sitesTable_ = new QTableWidget;
+    sitesTable_->setColumnCount(13);
+    sitesTable_->setHorizontalHeaderLabels({
+        "Site", "État", "Humains", "Robots", "Robots IA", "Google",
+        "Erreurs 404", "Erreurs 500", "Attaques", "Activité WP",
+        "Dernière synchronisation", "Points d'attention", "Action recommandée"
+    });
+    sitesTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    sitesTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    sitesTable_->setSelectionMode(QAbstractItemView::SingleSelection);
+    sitesTable_->setAlternatingRowColors(true);
+    sitesTable_->setShowGrid(false);
+    sitesTable_->setWordWrap(false);
+    sitesTable_->setTextElideMode(Qt::ElideRight);
+    sitesTable_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    sitesTable_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    sitesTable_->verticalHeader()->setVisible(false);
+    auto* sitesHeader = sitesTable_->horizontalHeader();
+    sitesHeader->setSectionResizeMode(QHeaderView::Interactive);
+    sitesHeader->setMinimumSectionSize(56);
+    sitesHeader->setStretchLastSection(false);
+    sitesHeader->setSectionsMovable(true);
+    const QList<int> siteColumnWidths = {
+        150, 125, 80, 80, 85, 80, 95, 95, 85, 100, 155, 260, 230
+    };
+    for (int c = 0; c < siteColumnWidths.size(); ++c)
+        sitesTable_->setColumnWidth(c, siteColumnWidths[c]);
+    sitesTable_->setSortingEnabled(true);
+    sitesTable_->setToolTip(
+        "Double-cliquer un site pour entrer dans son analyse détaillée. "
+        "Les colonnes peuvent être redimensionnées depuis l'en-tête.");
+    connect(sitesTable_, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
+        auto* siteItem = sitesTable_->item(row, 0);
+        if (!siteItem) return;
+        const QString siteName = siteItem->data(Qt::UserRole + 1).toString();
+        const int idx = siteSelector_->findText(siteName);
+        if (idx < 0) return;
+        siteSelector_->setCurrentIndex(idx);
+        tabs_->setCurrentWidget(previousDetailTab_ ? previousDetailTab_ : healthTab_);
+        onAnalyze();
+    });
+    sitesLayout->addWidget(sitesTable_, 1);
+    sitesSummary_ = new QLabel("Synchroniser ou analyser pour afficher la synthèse multi-sites.");
+    sitesSummary_->setWordWrap(true);
+    sitesSummary_->setProperty("muted", true);
+    sitesLayout->addWidget(sitesSummary_);
+    tabs_->addTab(sitesTab_, "Sites");
 
     // Onglet Santé (en premier) : verdict global + indicateurs.
     healthTab_ = new QWidget;
     auto* healthLayout = new QVBoxLayout(healthTab_);
     healthLayout->setSpacing(12);
     verdictLabel_ = new QLabel("Lancez une analyse pour évaluer la santé du site.");
+    verdictLabel_->setObjectName("verdict");
     verdictLabel_->setAlignment(Qt::AlignCenter);
-    verdictLabel_->setStyleSheet(
-        "font-size:20px; font-weight:700; padding:18px; border-radius:10px;"
-        "background:#f5f6f8; color:#6b7280;");
     healthLayout->addWidget(verdictLabel_);
     auto* healthListWidget = new QWidget;
     healthList_ = new QVBoxLayout(healthListWidget);
@@ -450,7 +642,7 @@ void MainWindow::buildUi() {
     donutPanel_->setObjectName("panel");
     auto* donutLayout = new QVBoxLayout(donutPanel_);
     auto* donutTitle = new QLabel("Répartition par catégorie");
-    donutTitle->setStyleSheet("font-weight:600; padding:2px;");
+    donutTitle->setProperty("panelTitle", true);
     donutLayout->addWidget(donutTitle);
     donutLayout->addStretch();            // remplace par le donut a l'analyse
     rightCol->addWidget(donutPanel_, 3);
@@ -460,7 +652,7 @@ void MainWindow::buildUi() {
     topPanel->setObjectName("panel");
     auto* topLayout = new QVBoxLayout(topPanel);
     auto* topTitle = new QLabel("Top robots (toutes catégories)");
-    topTitle->setStyleSheet("font-weight:600; padding:2px;");
+    topTitle->setProperty("panelTitle", true);
     topLayout->addWidget(topTitle);
     topRobotsTable_ = new QTableWidget;
     topRobotsTable_->setColumnCount(3);
@@ -544,7 +736,7 @@ void MainWindow::buildUi() {
     searchBar->addWidget(searchBtn);
     searchLayout->addLayout(searchBar);
     searchInfo_ = new QLabel;
-    searchInfo_->setStyleSheet("color:#6b7280; padding:2px;");
+    searchInfo_->setProperty("muted", true);
     searchLayout->addWidget(searchInfo_);
     searchTable_ = new QTableWidget;
     searchTable_->setColumnCount(7);
@@ -611,6 +803,11 @@ void MainWindow::buildUi() {
         }
     });
     tabs_->addTab(searchTab, "Recherche");
+    previousDetailTab_ = healthTab_;
+    connect(tabs_, &QTabWidget::currentChanged, this, [this](int index) {
+        QWidget* current = tabs_->widget(index);
+        if (current && current != sitesTab_) previousDetailTab_ = current;
+    });
 
     mainLayout->addWidget(tabs_);
     setCentralWidget(central);
@@ -624,6 +821,15 @@ void MainWindow::buildUi() {
     statusBar()->addPermanentWidget(progressBar_);
     statusRight_ = new QLabel;
     statusBar()->addPermanentWidget(statusRight_);
+
+    // Les graphiques (QChart) ne sont pas couverts par le QSS : on les
+    // reconstruit au changement de thème pour ré-accorder textes et séparateurs.
+    connect(&Theme::instance(), &Theme::changed, this, [this] {
+        if (lastStats_.totalRequests > 0) {
+            rebuildDonut(lastStats_);
+            rebuildChart();
+        }
+    });
 }
 
 const SiteConfig* MainWindow::currentSite() const {
@@ -672,6 +878,7 @@ void MainWindow::loadConfiguration() {
     }
     configError_.clear();
     populateSiteSelector();
+    refreshSitesOverview();
     if (config_.sites.empty())
         statusBar()->showMessage("Aucun site défini — Fichier → Configuration…");
 }
@@ -688,6 +895,7 @@ void MainWindow::onOpenSettings() {
     }
     configError_.clear();
     populateSiteSelector();
+    refreshSitesOverview();
     statusBar()->showMessage("Configuration enregistrée : " + configFilePath());
 }
 
@@ -879,6 +1087,8 @@ void MainWindow::onSync() {
             .arg(failed ? QString(", %1 échec(s)").arg(failed) : QString()));
 
     onAnalyze();   // analyse immédiate des logs mis à jour
+    refreshSitesOverview();
+    tabs_->setCurrentWidget(sitesTab_);
 }
 
 void MainWindow::onAnalyze() {
@@ -944,6 +1154,7 @@ void MainWindow::onAnalyze() {
     statusBar()->showMessage("Analyse terminée.");
     statusRight_->setText("Dernière analyse : " +
         QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm:ss") + "  ✓");
+    refreshSitesOverview();
 }
 
 void MainWindow::displayStats(const Stats& s) {
@@ -985,6 +1196,106 @@ void MainWindow::displayStats(const Stats& s) {
     fillUrls();
 
     rebuildChart();
+}
+
+void MainWindow::refreshSitesOverview() {
+    if (!sitesTable_ || !sitesSummary_) return;
+    sitesTable_->setSortingEnabled(false);
+    sitesTable_->setRowCount(0);
+
+    if (configError_.size() > 0 || config_.sites.empty()) {
+        sitesSummary_->setText("Aucun site configuré.");
+        return;
+    }
+
+    const std::string fromStr = fromDate_->date().toString("yyyy-MM-dd").toStdString();
+    const std::string toStr = toDate_->date().toString("yyyy-MM-dd").toStdString();
+    CacheManager cache(config_.cacheRoot);
+
+    struct Row {
+        QString name;
+        Stats stats;
+        int level = 0;
+        QDateTime lastSync;
+    };
+    std::vector<Row> rows;
+    rows.reserve(config_.sites.size());
+
+    for (const auto& site : config_.sites) {
+        Row row;
+        row.name = QString::fromStdString(site.name);
+        row.stats = analyzeSiteStats(config_.cacheRoot, site, fromStr, toStr);
+        row.level = healthLevel(row.stats);
+
+        for (const std::string& file : cache.localLogs(site.name)) {
+            if (!fileBelongsToSite(fs::path(file).filename().string(), site.name, site.logMatch))
+                continue;
+            const QDateTime modified = QFileInfo(QString::fromStdString(file)).lastModified();
+            if (modified.isValid() && (!row.lastSync.isValid() || modified > row.lastSync))
+                row.lastSync = modified;
+        }
+        rows.push_back(row);
+    }
+
+    std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+        if (a.level != b.level) return a.level > b.level;
+        return a.name.toLower() < b.name.toLower();
+    });
+
+    sitesTable_->setRowCount(static_cast<int>(rows.size()));
+    int r = 0;
+    for (const Row& row : rows) {
+        const Stats& s = row.stats;
+        const long attacks = sumAttacks(s);
+        const long ai = aiBots(s);
+        const long google = botOf(s, "Google");
+        const long wp = normalActivityTotal(s);
+
+        auto* name = textItem(row.name, row.name.toLower());
+        name->setData(Qt::UserRole + 1, row.name);
+        sitesTable_->setItem(r, 0, name);
+        sitesTable_->setItem(r, 1, textItem(healthLabel(row.level), row.level));
+        sitesTable_->setItem(r, 2, numberItem(s.humans));
+        sitesTable_->setItem(r, 3, numberItem(s.bots));
+        sitesTable_->setItem(r, 4, numberItem(ai));
+        sitesTable_->setItem(r, 5, numberItem(google));
+        sitesTable_->setItem(r, 6, numberItem(s.errors404));
+        sitesTable_->setItem(r, 7, numberItem(s.errors500));
+        sitesTable_->setItem(r, 8, numberItem(attacks));
+        sitesTable_->setItem(r, 9, numberItem(wp));
+        sitesTable_->setItem(r, 10, textItem(
+            row.lastSync.isValid() ? row.lastSync.toString("dd/MM/yyyy HH:mm") : "Jamais",
+            row.lastSync.isValid() ? row.lastSync.toSecsSinceEpoch() : 0));
+        sitesTable_->setItem(r, 11, textItem(attentionSummary(s)));
+        sitesTable_->setItem(r, 12, textItem(recommendedAction(s)));
+        ++r;
+    }
+    sitesTable_->setSortingEnabled(true);
+
+    auto maxBy = [&](auto getter) -> QString {
+        const Row* best = nullptr;
+        long bestValue = -1;
+        for (const Row& row : rows) {
+            const long value = getter(row.stats);
+            if (value > bestValue) { bestValue = value; best = &row; }
+        }
+        return best && bestValue > 0 ? QString("%1 (%2)").arg(best->name, num(bestValue)) : "Aucun";
+    };
+    const auto bestHealth = std::min_element(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+        if (a.level != b.level) return a.level < b.level;
+        return a.name.toLower() < b.name.toLower();
+    });
+
+    sitesSummary_->setText(QString(
+        "🏆 Site le plus visité : %1   ·   🛡 Site le plus attaqué : %2   ·   "
+        "🤖 Robots IA : %3   ·   ❌ Erreurs 404 : %4   ·   "
+        "📈 Activité Google : %5   ·   ❤️ Meilleur état : %6")
+        .arg(maxBy([](const Stats& s) { return s.humans; }),
+             maxBy([](const Stats& s) { return sumAttacks(s); }),
+             maxBy([](const Stats& s) { return aiBots(s); }),
+             maxBy([](const Stats& s) { return s.errors404; }),
+             maxBy([](const Stats& s) { return botOf(s, "Google"); }),
+             bestHealth != rows.end() ? bestHealth->name : QString("Aucun")));
 }
 
 void MainWindow::fillUrls() {
@@ -1152,30 +1463,6 @@ void MainWindow::onSearch() {
         .arg(matches.size() >= 2000 ? " (limité à 2000)" : ""));
 }
 
-void MainWindow::onCompareSites() {
-    if (config_.sites.size() < 2) {
-        QMessageBox::information(this, "Comparaison",
-            "Configurez au moins deux sites (Fichier → Configuration…).");
-        return;
-    }
-    const std::string fromStr = fromDate_->date().toString("yyyy-MM-dd").toStdString();
-    const std::string toStr   = toDate_->date().toString("yyyy-MM-dd").toStdString();
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    statusBar()->showMessage("Analyse comparative des sites…");
-    QApplication::processEvents();
-
-    std::vector<std::pair<QString, Stats>> results;
-    for (const auto& site : config_.sites)
-        results.emplace_back(QString::fromStdString(site.name),
-                             analyzeSiteStats(config_.cacheRoot, site, fromStr, toStr));
-
-    QApplication::restoreOverrideCursor();
-    statusBar()->showMessage("Comparaison prête.");
-    ComparisonDialog dlg(results, this);
-    dlg.exec();
-}
-
 void MainWindow::onCleanCache() {
     QStringList names;
     for (const auto& s : config_.sites) names << QString::fromStdString(s.name);
@@ -1196,13 +1483,13 @@ void MainWindow::onHelp() {
         "<li><b>Synchroniser</b> télécharge les nouveaux logs puis analyse ; "
         "<b>Analyser</b> traite les logs déjà en cache.</li>"
         "<li>Choisissez la <b>période</b> en haut à droite — tous les onglets se recalculent.</li>"
-        "<li>Onglets : <b>Santé</b>, Robots, Sécurité, Activité WP, Top pages, "
+        "<li>Onglets : <b>Sites</b>, Santé, Robots, Sécurité, Activité WP, Top pages, "
         "Référents, <b>URLs</b> (filtre par catégorie), Graphiques, <b>Recherche</b>.</li>"
+        "<li><b>Sites</b> donne la vue globale : priorité, points d'attention et action recommandée.</li>"
         "<li><b>Double-cliquez</b> n'importe quelle ligne (Sécurité, Activité WP, "
         "Top pages, Référents, URLs, Recherche) pour son détail (IP, User-Agents, "
         "URLs, horaires…) ; <b>clic droit</b> pour copier / exporter la sélection "
         "(presse-papier ou CSV).</li>"
-        "<li><b>Outils → Comparer les sites</b> : tableau comparatif sur la période.</li>"
         "</ol>");
     box.exec();
 }
@@ -1225,14 +1512,9 @@ void MainWindow::onAbout() {
 void MainWindow::fillHealth(const Stats& s) {
     const long total = s.totalRequests;
 
-    long attacks = 0;
-    for (const auto& [k, v] : s.attackActivity) attacks += v;
-    auto bot = [&](const char* engine) {
-        auto it = s.botCounts.find(engine);
-        return it != s.botCounts.end() ? it->second : 0L;
-    };
-    const long google = bot("Google");
-    const long ai = bot("Claude") + bot("OpenAI") + bot("Perplexity");
+    const long attacks = sumAttacks(s);
+    const long google = botOf(s, "Google");
+    const long ai = aiBots(s);
     auto ratio = [&](long n) { return total > 0 ? 100.0 * n / total : 0.0; };
 
     // Un indicateur : état (0 vert, 1 orange, 2 rouge), titre, valeur, remarque.
@@ -1253,34 +1535,35 @@ void MainWindow::fillHealth(const Stats& s) {
           QString("%1 (%2)").arg(num(s.errors404), pct(s.errors404, total)),
           st == 0 ? "Peu de liens cassés" : "Beaucoup de pages introuvables"}); }
 
-    { int st = (google > 0) ? 0 : 1;
+    { int st = 0;
       inds.push_back({st, "Activité Google", num(google) + " requêtes",
           google > 0 ? "Googlebot explore le site" : "Googlebot n'a pas visité le site"}); }
 
     inds.push_back({0, "Robots IA", num(ai) + " requêtes",
                     "Claude, OpenAI, Perplexity (informatif)"});
 
-    // Verdict global = pire état parmi les indicateurs critiques (hors IA).
-    int worst = 0;
-    for (size_t i = 0; i + 1 < inds.size(); ++i) worst = std::max(worst, inds[i].st);
+    // Verdict global = même calcul que l'onglet Sites.
+    const int worst = healthLevel(s);
 
-    QString text, style;
+    QString text, state;
     if (total == 0) {
         text = "Aucune donnée à analyser sur cette période.";
-        style = "background:#f5f6f8; color:#6b7280;";
+        state = "neutral";
     } else if (worst == 2) {
         text = "🔴  Attention — anomalies détectées";
-        style = "background:#fde8e8; color:#b91c1c;";
+        state = "danger";
     } else if (worst == 1) {
         text = "🟠  Quelques anomalies";
-        style = "background:#fef3e2; color:#b45309;";
+        state = "warn";
     } else {
-        text = "🟢  Site en bonne santé";
-        style = "background:#e7f6ec; color:#15803d;";
+        text = "🟢  Aucune anomalie détectée";
+        state = "ok";
     }
     verdictLabel_->setText(text);
-    verdictLabel_->setStyleSheet(
-        "font-size:20px; font-weight:700; padding:18px; border-radius:10px;" + style);
+    // Change l'état puis force la ré-application du QSS (propriété dynamique).
+    verdictLabel_->setProperty("state", state);
+    verdictLabel_->style()->unpolish(verdictLabel_);
+    verdictLabel_->style()->polish(verdictLabel_);
 
     // Reconstruit la liste des indicateurs.
     while (QLayoutItem* item = healthList_->takeAt(0)) {
@@ -1308,7 +1591,7 @@ void MainWindow::fillHealth(const Stats& s) {
         valLbl->setMinimumWidth(140);
         h->addWidget(valLbl);
         auto* noteLbl = new QLabel(ind.note);
-        noteLbl->setStyleSheet("color:#6b7280;");
+        noteLbl->setProperty("muted", true);
         h->addWidget(noteLbl);
         h->addStretch();
         // Les libellés laissent passer les clics vers le cadre (pour le double-clic).
@@ -1391,7 +1674,7 @@ void MainWindow::fillTopRobots(const Stats& s) {
         topRobotsTable_->setItem(i, 1, c);
         auto* p = new QTableWidgetItem("(" + pct(rows[i].second, s.totalRequests) + ")");
         p->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        p->setForeground(QColor("#6b7280"));
+        p->setForeground(QColor(Theme::instance().color("textMuted")));
         topRobotsTable_->setItem(i, 2, p);
     }
 }
@@ -1400,6 +1683,7 @@ void MainWindow::rebuildDonut(const Stats& s) {
     auto* series = new QPieSeries;
     series->setHoleSize(0.42);   // trou plus petit -> anneau plus épais
     series->setPieSize(0.82);    // diamètre plus grand -> donut plus lisible
+    std::vector<QColor> sliceColors;
     for (const auto& cat : kRobotCategories) {
         long subtotal = 0;
         for (const QString& engine : cat.engines) {
@@ -1407,16 +1691,25 @@ void MainWindow::rebuildDonut(const Stats& s) {
             if (it != s.botCounts.end()) subtotal += it->second;
         }
         if (subtotal == 0) continue;
-        auto* slice = series->append(
-            QString("%1 (%2)").arg(cat.name, pct(subtotal, s.totalRequests)),
-            static_cast<double>(subtotal));
-        slice->setColor(QColor(cat.color));
-        slice->setLabelVisible(false);
-        slice->setPen(QPen(Qt::white, 2));   // fine séparation entre les parts
+        series->append(QString("%1 (%2)").arg(cat.name, pct(subtotal, s.totalRequests)),
+                       static_cast<double>(subtotal));
+        sliceColors.emplace_back(cat.color);
     }
 
     auto* chart = new QChart;
+    chart->setTheme(Theme::instance().isDark() ? QChart::ChartThemeDark
+                                               : QChart::ChartThemeLight);
     chart->addSeries(series);
+
+    // Après addSeries : le thème du graphique a pu réattribuer les couleurs.
+    // On (ré)impose les couleurs de catégorie + la séparation ton surface.
+    const QColor sep(Theme::instance().color("surface"));
+    const auto slices = series->slices();
+    for (int i = 0; i < slices.size() && i < static_cast<int>(sliceColors.size()); ++i) {
+        slices[i]->setColor(sliceColors[i]);
+        slices[i]->setLabelVisible(false);
+        slices[i]->setPen(QPen(sep, 2));
+    }
     chart->legend()->setVisible(true);
     chart->legend()->setAlignment(Qt::AlignRight);
     chart->setBackgroundVisible(false);
@@ -1449,23 +1742,50 @@ void MainWindow::rebuildChart() {
         for (const auto& [d, c] : *m) dateSet.insert(d);
     std::vector<std::string> dates(dateSet.begin(), dateSet.end());
 
+    if (dates.empty()) {
+        auto* empty = new QLabel("Aucune donnée à afficher pour ce graphique sur la période sélectionnée.");
+        empty->setAlignment(Qt::AlignCenter);
+        empty->setMinimumHeight(320);
+        empty->setProperty("muted", true);
+        replaceLast(chartTab_->layout(), empty);
+        return;
+    }
+
     auto* chart = new QChart;
+    chart->setTheme(Theme::instance().isDark() ? QChart::ChartThemeDark
+                                               : QChart::ChartThemeLight);
     chart->setTitle(title);
     chart->setBackgroundVisible(false);
+    double maxY = 0.0;
     for (const auto& [name, m] : defs) {
         auto* serie = new QLineSeries;
         serie->setName(name);
+        serie->setPointsVisible(true);
         for (size_t i = 0; i < dates.size(); ++i) {
             auto it = m->find(dates[i]);
-            serie->append(static_cast<double>(i),
-                          it != m->end() ? static_cast<double>(it->second) : 0.0);
+            const double y = it != m->end() ? static_cast<double>(it->second) : 0.0;
+            maxY = std::max(maxY, y);
+            serie->append(static_cast<double>(i), y);
         }
         chart->addSeries(serie);
     }
     chart->createDefaultAxes();
+    if (auto axes = chart->axes(Qt::Horizontal); !axes.empty()) {
+        if (auto* axis = qobject_cast<QValueAxis*>(axes.first())) {
+            axis->setRange(dates.size() == 1 ? -0.5 : 0.0,
+                           dates.size() == 1 ? 0.5 : static_cast<double>(dates.size() - 1));
+            axis->setTickCount(static_cast<int>(std::min<size_t>(dates.size(), 8)) + 1);
+        }
+    }
+    if (auto axes = chart->axes(Qt::Vertical); !axes.empty()) {
+        if (auto* axis = qobject_cast<QValueAxis*>(axes.first())) {
+            axis->setRange(0.0, std::max(1.0, maxY * 1.15));
+        }
+    }
     chart->legend()->setVisible(true);
 
     auto* view = new QChartView(chart);
     view->setRenderHint(QPainter::Antialiasing);
+    view->setMinimumHeight(320);
     replaceLast(chartTab_->layout(), view);
 }

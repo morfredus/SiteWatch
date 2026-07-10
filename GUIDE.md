@@ -2,8 +2,11 @@
 
 Ce guide explique la configuration et l'utilisation quotidienne de SiteWatch.
 Pour l'installation/compilation, voir le [README](README.md).
-Pour débuter, suivre plutôt le guide
+Sous **Linux**, suivre le guide dédié
+[Installer et lancer SiteWatch sous Linux](docs/INSTALL_LINUX.md).
+Sous **Windows**, pour débuter, suivre le guide
 [Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md).
+Pour les évolutions envisagées, consulter la [roadmap](ROADMAP.md).
 
 ---
 
@@ -74,13 +77,13 @@ Cliquer **Enregistrer** pour valider.
 o2switch exige une **clé SSH autorisée** et l'**ouverture du pare-feu**.
 
 1. **Clé SSH** — dans le cPanel : *Sécurité → Accès SSH → Gérer les clés SSH*.
-   Génère (ou importe) une clé, **autorise-la**, télécharge la **clé privée**, et
-   indique son chemin dans le champ *Clé SSH*. La clé publique `.pub` est déduite
+   Générer ou importer une clé, **l'autoriser**, télécharger la **clé privée**,
+   puis indiquer son chemin dans le champ *Clé SSH*. La clé publique `.pub` est déduite
    automatiquement si elle est absente.
 2. **Jeton d'API cPanel** — dans le cPanel : *Sécurité → Gérer les jetons d'API*.
-   Crée un jeton et colle-le dans le champ *Jeton d'API cPanel*. SiteWatch s'en
-   sert pour autoriser l'IP publique locale (souvent dynamique) avant chaque
-   synchro.
+   Créer un jeton et le coller dans le champ *Jeton d'API cPanel*. SiteWatch
+   s'en sert pour autoriser l'IP publique locale (souvent dynamique) avant
+   chaque synchro.
 
 > Sans jeton, le port SSH reste fermé par le pare-feu o2switch et la connexion
 > échoue (« Connexion TCP impossible »).
@@ -106,6 +109,7 @@ se recalculent** selon la période choisie.
 
 | Onglet | Contenu |
 |---|---|
+| **Sites** | Vue globale de tous les sites : état, priorité, points d'attention, action recommandée et synthèse. **Double-cliquer** un site pour ouvrir son analyse détaillée. |
 | **Santé** | Verdict global 🟢/🟠/🔴 + indicateurs. **Double-cliquer** un indicateur pour sauter à l'onglet concerné (avec le bon filtre). |
 | **Robots** | Robots par catégorie (IA / moteurs / SEO / divers) avec %, donut de répartition et top robots. |
 | **Sécurité** | Tentatives d'attaque + erreurs 404/403/500, avec pastilles 🔴/🟠. |
@@ -128,6 +132,11 @@ Selon l'onglet, le détail porte sur : l'URL (Top pages, URLs), la catégorie
 d'attaque ou l'erreur (Sécurité), l'activité WordPress (Activité WP), la
 provenance (Référents), ou l'URL du résultat (Recherche).
 
+Pour un exemple réel d'investigation, lire les
+[études de cas](docs/CASE_STUDIES.md). Le premier cas montre comment des 404
+peu visibles dans les logs bruts ont permis d'identifier une extension WordPress
+devenue inutile.
+
 ### Copier / exporter
 
 **Clic droit** sur une ou plusieurs lignes sélectionnées (Ctrl+clic) de n'importe
@@ -136,13 +145,24 @@ quel onglet : **Copier les infos** (presse-papier) ou **Exporter en CSV…**
 copie/exporte la sélection, et les boutons **Copier tout** / **Exporter tout**
 reprennent l'ensemble.
 
+### Apparence (thème clair / sombre)
+
+Le menu **Affichage → Thème** propose trois choix :
+
+| Choix | Effet |
+|---|---|
+| **Système** *(par défaut)* | Suit automatiquement l'apparence claire ou sombre du système d'exploitation, et s'adapte si celle-ci change. |
+| **Clair** | Force le thème clair, quel que soit le réglage du système. |
+| **Sombre** | Force le thème sombre, quel que soit le réglage du système. |
+
+Le choix est mémorisé et réappliqué au prochain démarrage.
+
 ---
 
 ## 5. Outils
 
-- **Outils → Comparer les sites…** : analyse chaque site configuré sur la période
-  courante et affiche un tableau comparatif (humains, robots, Google, Claude,
-  404, XML-RPC…).
+- **Onglet Sites** : affiche la supervision globale de tous les sites sur la
+  période courante. Double-cliquer un site pour ouvrir son analyse détaillée.
 - **Outils → Effacer des logs téléchargés…** : supprime des `.gz` du cache. Filtre
   par site (ou tous), par étendue (tout / antérieurs à un mois / période), avec
   une liste cochable pour affiner. Confirmation avant suppression.
@@ -153,7 +173,7 @@ reprennent l'ensemble.
 
 SiteWatch cible o2switch mais reste ouvert :
 
-1. **Pare-feu** : laisse le champ *Jeton d'API cPanel* **vide** → connexion SSH
+1. **Pare-feu** : laisser le champ *Jeton d'API cPanel* **vide** → connexion SSH
    directe, sans étape d'autorisation.
 2. **Nommage des logs** : si l'hébergeur nomme ses fichiers autrement, renseigner
    le champ **Filtre des logs (avancé)** avec un motif que le nom de fichier doit

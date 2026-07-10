@@ -32,6 +32,7 @@
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
+#include <QStyle>
 
 #include <cctype>
 
@@ -39,8 +40,6 @@
 
 // ---------------------------------------------------------------------------
 namespace {
-
-const char* kMono = "font-family:'Cascadia Mono','Consolas',monospace; font-size:11px; padding:6px;";
 
 // Assemble un champ de saisie + un widget annexe (bouton / œil).
 QWidget* fieldWith(QLineEdit* edit, QWidget* extra) {
@@ -66,7 +65,7 @@ QToolButton* makeEye(QLineEdit* edit) {
     eye->setCheckable(true);
     eye->setCursor(Qt::PointingHandCursor);
     eye->setToolTip("Afficher / masquer");
-    eye->setStyleSheet("QToolButton{border:none;font-size:15px;padding:2px;}");
+    eye->setObjectName("eye");
     QObject::connect(eye, &QToolButton::toggled, edit, [edit](bool on) {
         edit->setEchoMode(on ? QLineEdit::Normal : QLineEdit::Password);
     });
@@ -177,7 +176,7 @@ void SettingsDialog::buildUi() {
     const QString configBase = QDir::toNativeSeparators(
         QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
     auto* hint = new QLabel("La configuration de SiteWatch est enregistrée dans : " + configBase);
-    hint->setStyleSheet("color:#6b7280; font-size:11px;");
+    hint->setProperty("muted", true);
     hint->setWordWrap(true);
     dataForm->addRow("", hint);
     connect(browseCache, &QPushButton::clicked, this, &SettingsDialog::onBrowseCache);
@@ -204,9 +203,7 @@ void SettingsDialog::buildUi() {
 
     // Résumé sous la liste.
     summaryLabel_ = new QLabel;
-    summaryLabel_->setStyleSheet(
-        "color:#374151; font-size:11px; background:#f5f6f8;"
-        "border:1px solid #e6e8eb; border-radius:6px; padding:8px;");
+    summaryLabel_->setObjectName("summaryBox");
     leftCol->addWidget(summaryLabel_);
     sitesLayout->addLayout(leftCol);
 
@@ -250,7 +247,7 @@ void SettingsDialog::buildUi() {
     testButton_ = new QPushButton("Tester la connexion");
     rightCol->addWidget(testButton_);
     testResult_ = new QLabel;
-    testResult_->setStyleSheet(kMono);
+    testResult_->setObjectName("testResult");
     testResult_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     testResult_->setWordWrap(true);
     rightCol->addWidget(testResult_);
@@ -326,8 +323,12 @@ void SettingsDialog::setFormEnabled(bool on) {
 }
 
 void SettingsDialog::applyResultStyle(int state) {
-    const char* color = state == 1 ? "#16a34a" : state == 2 ? "#dc2626" : "#6b7280";
-    testResult_->setStyleSheet(QString("%1 color:%2;").arg(kMono, color));
+    // 1 = succès (vert), 2 = erreur (rouge), autre = neutre. La couleur vient
+    // du thème via QSS (#testResult[state="…"]).
+    const char* s = state == 1 ? "ok" : state == 2 ? "danger" : "neutral";
+    testResult_->setProperty("state", s);
+    testResult_->style()->unpolish(testResult_);
+    testResult_->style()->polish(testResult_);
 }
 
 void SettingsDialog::loadSiteToForm(int i) {

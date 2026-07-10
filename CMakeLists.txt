@@ -68,20 +68,20 @@ set(CORE_HEADERS
 # L'interface (ui/) est le SEUL endroit qui depend de Qt.
 set(UI_SOURCES
     src/main.cpp
+    src/ui/Theme.cpp
     src/ui/MainWindow.cpp
     src/ui/SettingsDialog.cpp
     src/ui/DetailDialog.cpp
     src/ui/UrlReport.cpp
-    src/ui/ComparisonDialog.cpp
     src/ui/CacheCleanupDialog.cpp
 )
 
 set(UI_HEADERS
+    src/ui/Theme.h
     src/ui/MainWindow.h
     src/ui/SettingsDialog.h
     src/ui/DetailDialog.h
     src/ui/UrlReport.h
-    src/ui/ComparisonDialog.h
     src/ui/CacheCleanupDialog.h
 )
 
@@ -138,6 +138,6 @@ endif()
 # pour rendre l'exe lancable en dehors du shell MSYS2 (double-clic).
 if(WIN32 AND NOT MSVC)
     add_custom_command(TARGET SiteWatch POST_BUILD
-        COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/deploy-mingw.sh" "$<TARGET_FILE_DIR:SiteWatch>"
+        COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/windows/deploy-mingw.sh" "$<TARGET_FILE_DIR:SiteWatch>"
         COMMENT "Copie des DLL MinGW a cote de l'executable")
 endif()

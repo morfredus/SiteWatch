@@ -3,6 +3,10 @@
 Ce guide explique comment compiler SiteWatch sur Windows avec VS Code, sans
 connaissance préalable de CMake, Ninja ou Qt.
 
+> **Sous Linux ?** Ce guide est spécifique à Windows. Pour installer, compiler ou
+> intégrer SiteWatch sous Linux (AppImage prête à l'emploi comprise), suivre
+> plutôt [Installer et lancer SiteWatch sous Linux](INSTALL_LINUX.md).
+
 Le chemin recommandé est :
 
 1. installer MSYS2 ;
@@ -164,8 +168,8 @@ En général, ce n'est pas nécessaire. Pour repartir proprement :
 3. lancer ensuite `CMake: Build (MinGW)`.
 
 Si le dossier de build est vraiment incohérent, le script
-`scripts/vscode-mingw.ps1` sait aussi réinitialiser `build-mingw` quand le cache
-CMake pointe vers un ancien dossier du projet.
+`scripts/windows/vscode-mingw.ps1` sait aussi réinitialiser `build-mingw` quand le
+cache CMake pointe vers un ancien dossier du projet.
 
 ## 8. Erreurs fréquentes
 

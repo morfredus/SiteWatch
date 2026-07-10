@@ -1,8 +1,16 @@
-# SiteWatch 1.1.2 — Notes de version
+# SiteWatch 1.3.1 — Notes de version
 
-Version de maintenance et de simplification de **SiteWatch**, analyseur de logs
-Apache/LiteSpeed pour l'administration et la supervision de sites web hébergés
-sur o2switch (et compatible avec d'autres hébergeurs SSH).
+Version qui ouvre grand **SiteWatch** à Linux (AppImage prête à l'emploi,
+intégration au bureau) et ajoute des **thèmes clair / sombre / système**.
+SiteWatch reste l'analyseur de logs Apache/LiteSpeed pour l'administration et la
+supervision de sites web hébergés sur o2switch (et compatible avec d'autres
+hébergeurs SSH).
+
+## Corrigé dans 1.3.1
+
+- **Compilation sous Linux avec Qt < 6.5** (Qt système de certaines
+  distributions) : la gestion du thème est protégée par des gardes de version,
+  avec repli sur la détection via la palette. Aucun changement côté Windows.
 
 > La question à laquelle SiteWatch répond n'est pas « combien de visiteurs ? »
 > mais **« que s'est-il réellement passé sur mon serveur ? »**
@@ -11,6 +19,10 @@ sur o2switch (et compatible avec d'autres hébergeurs SSH).
 
 ## Points forts
 
+- **Nouvel onglet Sites** : vue globale de tous les sites, priorité de santé,
+  points d'attention, action recommandée et synthèse des sites à surveiller.
+- **Double-clic depuis Sites** : sélectionner immédiatement un site et revenir à
+  son analyse détaillée, en conservant la période courante.
 - **Téléchargement SFTP incrémental** des logs `.gz` (seuls les fichiers
   nouveaux ou modifiés sont récupérés), avec barre de progression.
 - **Ouverture automatique du pare-feu o2switch** via l'API cPanel avant chaque
@@ -29,12 +41,40 @@ sur o2switch (et compatible avec d'autres hébergeurs SSH).
   site concerné rappelé en barre d'info ; **copie** et **export CSV** d'une ou
   plusieurs lignes depuis chaque onglet.
 - **Recherche** par IP, URL, robot, date ou code HTTP.
-- **Comparaison de sites** sur une même période.
 - **Filtre de période** (jour, 7/30 jours, mois, année, personnalisé).
 - **Nettoyage du cache** par site, en totalité ou par mois.
 - **Configuration entièrement graphique** (aucune édition manuelle de JSON).
 
-## Nouveautés depuis 1.1.0
+## Nouveautés depuis 1.2.0
+
+- **Déploiement Linux** : AppImage autonome à télécharger dans les releases
+  (aucune compilation), plus un script d'intégration au bureau
+  (`scripts/linux/install.sh`) qui crée l'icône de lancement et installe le
+  programme dans les dossiers standards. Guide pas à pas :
+  [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
+- **Thèmes clair / sombre / système** (menu **Affichage → Thème**). Le mode
+  Système suit l'apparence de l'OS (Windows et Linux) et réagit à ses
+  changements ; le choix est mémorisé.
+- **Feuille de style externalisée** (`resources/themes/`) : apparence plus
+  maintenable, contrastes revus pour rester lisibles en clair comme en sombre.
+- **Correctif d'ergonomie** : les séparateurs de colonnes des tableaux sont
+  désormais visibles (la poignée de redimensionnement de l'onglet **Sites**
+  était invisible avec le thème Windows par défaut).
+- Réorganisation des scripts de packaging en `scripts/windows/` et
+  `scripts/linux/`.
+
+## Nouveautés depuis 1.1.2
+
+- Remplacement de l'ancien dialogue **Comparer les sites…** par un onglet
+  permanent **Sites**.
+- Classement initial des sites par priorité : intervention recommandée, à
+  surveiller, puis normal.
+- Colonnes synthétiques : état, points d'attention, action recommandée, dernière
+  synchronisation et principaux compteurs.
+- Synthèse automatique : site le plus visité, le plus attaqué, robots IA,
+  erreurs 404, activité Google et meilleur état de santé.
+
+## Rappels depuis 1.1.2
 
 - Compilation depuis **VS Code** prête à l'emploi avec MSYS2/MinGW.
 - Guide débutant ajouté dans `docs/BUILD_FOR_BEGINNERS.md`.
@@ -48,19 +88,30 @@ sur o2switch (et compatible avec d'autres hébergeurs SSH).
 
 ## Installation
 
-- **Version portable** : décompresser `SiteWatch-<version>-win64.zip` et lancer
+- **Windows (portable)** : décompresser `SiteWatch-<version>-win64.zip` et lancer
   `SiteWatch.exe` — aucune installation, aucune dépendance à installer.
+- **Linux (AppImage)** : télécharger `SiteWatch-<version>-x86_64.AppImage`, la
+  rendre exécutable (`chmod +x`) et la lancer — aucune compilation. Détails et
+  intégration au bureau : [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
 - **Compilation depuis les sources** : voir [README.md](README.md)
-  (MSYS2/MinGW, WSL2, ou Linux natif).
+  (Windows MSYS2/MinGW, ou Linux natif).
 
-## Configuration requise (version portable)
+## Configuration requise
 
-- Windows 10 / 11 (64 bits).
+- **Windows** 10 / 11 (64 bits), ou **Linux** 64 bits (x86_64). L'AppImage peut
+  nécessiter FUSE 2 sur certaines distributions récentes (voir le guide Linux).
+
+> Compilation et fonctionnement vérifiés sous **Windows 11** (MSYS2/MinGW,
+> Qt 6.11) et **Linux Mint 22.3 « Zena »** (base Ubuntu 24.04 LTS « Noble »,
+> Qt 6.4).
 - Un accès **SSH/SFTP** à l'hébergement (clé SSH recommandée).
 - Pour o2switch : l'accès SSH activé + un **jeton d'API cPanel** pour
   l'ouverture automatique du pare-feu.
 
 Voir le [Guide utilisateur](GUIDE.md) pour la prise en main pas à pas.
+Voir aussi la [roadmap](ROADMAP.md) pour les évolutions envisagées.
+Pour comprendre l'intérêt concret de l'analyse, consulter les
+[études de cas](docs/CASE_STUDIES.md).
 
 ## Limitations connues
 

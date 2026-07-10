@@ -1,0 +1,49 @@
+# SiteWatch — thème clair.
+# Format : token = valeur. Les lignes vides et celles commençant par # sont
+# ignorées. Ces jetons sont injectés dans resources/themes/app.qss.
+
+# Fonds et surfaces
+bg            = #f5f6f8
+surface       = #ffffff
+surfaceAlt    = #f1f3f5
+alt           = #f7f8fa
+
+# Bordures
+border        = #e6e8eb
+borderStrong  = #d0d5dd
+
+# Texte
+text          = #1f2328
+textStrong    = #111827
+textMuted     = #6b7280
+
+# Accent (bleu principal)
+accent        = #0f6cbd
+accentHover   = #1479cf
+accentPressed = #0c5aa0
+accentText    = #ffffff
+
+# Sélection dans les tableaux
+selectionBg   = #e8f1fb
+selectionText = #111827
+headerText    = #6b7280
+
+# États désactivés
+disabledBg    = #e9ecef
+disabledText  = #9ca3af
+
+# Statuts (santé / verdict)
+ok            = #15803d
+okBg          = #e7f6ec
+warn          = #b45309
+warnBg        = #fef3e2
+danger        = #b91c1c
+dangerBg      = #fde8e8
+dangerHover   = #a11616
+dangerPressed = #8a1212
+
+# Sous-valeurs des cartes KPI
+kpiGood       = #16a34a
+kpi404        = #c2410c
+kpi403        = #a16207
+kpi500        = #dc2626

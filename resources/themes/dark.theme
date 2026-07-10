@@ -1,0 +1,50 @@
+# SiteWatch — thème sombre.
+# Format : token = valeur. Les lignes vides et celles commençant par # sont
+# ignorées. Ces jetons sont injectés dans resources/themes/app.qss.
+# Contrastes vérifiés pour rester lisibles sur fond sombre (WCAG AA).
+
+# Fonds et surfaces
+bg            = #1e1f22
+surface       = #26282c
+surfaceAlt    = #2b2d31
+alt           = #232427
+
+# Bordures
+border        = #3a3d42
+borderStrong  = #4b4f55
+
+# Texte
+text          = #e3e5e8
+textStrong    = #f2f3f5
+textMuted     = #9aa0a6
+
+# Accent (bleu plus clair pour ressortir sur fond sombre)
+accent        = #3b82f6
+accentHover   = #60a5fa
+accentPressed = #2563eb
+accentText    = #ffffff
+
+# Sélection dans les tableaux
+selectionBg   = #2f4a6b
+selectionText = #f2f3f5
+headerText    = #9aa0a6
+
+# États désactivés
+disabledBg    = #303338
+disabledText  = #6b7076
+
+# Statuts (santé / verdict)
+ok            = #4ade80
+okBg          = #14351f
+warn          = #fbbf24
+warnBg        = #3a2c10
+danger        = #f87171
+dangerBg      = #3a1618
+dangerHover   = #ef4444
+dangerPressed = #dc2626
+
+# Sous-valeurs des cartes KPI
+kpiGood       = #4ade80
+kpi404        = #fb923c
+kpi403        = #facc15
+kpi500        = #f87171
