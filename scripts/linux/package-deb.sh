@@ -129,6 +129,10 @@ rm -rf "$PKGDIR"
 install -Dm755 "$BINARY" "$PKGDIR/usr/bin/$CMD"
 
 # .desktop : on fige le chemin absolu du binaire installé.
+# On crée le dossier parent AVANT la redirection : bash n'ouvrira pas un
+# fichier en écriture dans un dossier inexistant (sinon : "No such file or
+# directory" et set -e arrête le script, donc pas de .deb produit).
+install -d "$PKGDIR/usr/share/applications"
 sed "s|^Exec=.*|Exec=/usr/bin/$CMD|" "$SCRIPT_DIR/sitewatch.desktop" \
     > "$PKGDIR/usr/share/applications/$CMD.desktop"
 chmod 644 "$PKGDIR/usr/share/applications/$CMD.desktop"
