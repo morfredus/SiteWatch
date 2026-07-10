@@ -9,7 +9,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 - **Debian packaging script** `scripts/linux/package-deb.sh`: builds a `.deb`
   from a native Linux build (x86_64 or ARM64 / Raspberry Pi), with automatic
   dependency detection, for a clean install/removal via apt. Documented in
-  `docs/fr/INSTALL_LINUX.md` (Part D).
+  `docs/fr/INSTALL_LINUX.md` (Part D). The build directory is now auto-detected
+  (`build/` then `build-arm64/`), so no `--build` flag is needed on Raspberry Pi.
+  The package also explicitly declares `libxcb-cursor0` — required by the Qt xcb
+  platform plugin since Qt 6.5 but loaded via `dlopen`, so invisible to `ldd`;
+  without it the application refused to start on Raspberry Pi OS.
 
 ## [1.4.2] — 2026-07-10
 

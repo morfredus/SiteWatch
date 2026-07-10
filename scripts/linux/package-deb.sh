@@ -18,7 +18,8 @@
 #
 # Usage :
 #   scripts/linux/package-deb.sh [options]
-#     --build <dossier>       Dossier de compilation (défaut : build)
+#     --build <dossier>       Dossier de compilation (défaut : auto, cherche
+#                             build/ puis build-arm64/)
 #     --maintainer "Nom <email>"  Champ Maintainer du paquet
 #     --depends "pkg, pkg…"   Force la liste des dépendances (sinon détection auto)
 #     -h, --help              Affiche cette aide
@@ -30,9 +31,13 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 APP_NAME="SiteWatch"     # nom du binaire compilé
 CMD="sitewatch"          # nom du paquet / de la commande / du .desktop / de l'icône
-BUILD_DIR="$ROOT/build"
+BUILD_DIR=""             # vide = détection auto (build, build-arm64…)
 MAINTAINER="${DEB_MAINTAINER:-morfredus <morfredus@users.noreply.github.com>}"
 DEPENDS_OVERRIDE=""
+
+# Dossiers de compilation natifs candidats, dans l'ordre d'essai. Le préfixe
+# native x86_64 va dans build/ ; le natif ARM64 (Raspberry Pi) dans build-arm64/.
+BUILD_CANDIDATES=("$ROOT/build" "$ROOT/build-arm64" "$ROOT/build-arm64-cross")
 
 die() { printf 'Erreur : %s\n' "$1" >&2; exit 1; }
 
@@ -45,7 +50,8 @@ while [ $# -gt 0 ]; do
             cat <<'EOF'
 SiteWatch — construction d'un paquet Debian (.deb).
 Usage : scripts/linux/package-deb.sh [options]
-  --build <dossier>            Dossier de compilation (défaut : build)
+  --build <dossier>            Dossier de compilation
+                               (défaut : auto — build/ puis build-arm64/)
   --maintainer "Nom <email>"   Champ Maintainer du paquet
   --depends "pkg, pkg…"        Force les dépendances (sinon détection auto)
   -h, --help                   Affiche cette aide
@@ -59,13 +65,31 @@ done
 [ "$(uname -s)" = "Linux" ] || die "ce script doit être exécuté sous Linux."
 command -v dpkg-deb >/dev/null 2>&1 || die "dpkg-deb introuvable (paquet 'dpkg')."
 
-BINARY="$BUILD_DIR/$APP_NAME"
-[ -x "$BINARY" ] || die \
+# --- Localisation du binaire ----------------------------------------------
+# Sans --build, on cherche le binaire dans les dossiers candidats (build,
+# build-arm64…) : ainsi le même script fonctionne sur un build x86_64 comme
+# sur un build ARM64 natif (Raspberry Pi), sans option à préciser.
+if [ -n "$BUILD_DIR" ]; then
+    BINARY="$BUILD_DIR/$APP_NAME"
+    [ -x "$BINARY" ] || die \
 "binaire introuvable : $BINARY
+  Compile d'abord ce dossier, ou indique le bon :  --build <dossier>"
+else
+    for dir in "${BUILD_CANDIDATES[@]}"; do
+        if [ -x "$dir/$APP_NAME" ]; then
+            BUILD_DIR="$dir"
+            BINARY="$dir/$APP_NAME"
+            break
+        fi
+    done
+    [ -n "$BUILD_DIR" ] || die \
+"binaire introuvable dans : ${BUILD_CANDIDATES[*]}
   Compile d'abord (build natif) :
     cmake --preset linux        && cmake --build --preset linux        (x86_64)
     cmake --preset linux-arm64  && cmake --build --preset linux-arm64  (ARM64)
   ou indique le dossier :  scripts/linux/package-deb.sh --build <dossier>"
+fi
+echo "Binaire : $BINARY"
 
 VERSION="$(head -n1 "$ROOT/VERSION" | tr -d '[:space:]')"
 [ -n "$VERSION" ] || die "fichier VERSION vide ou absent."
@@ -88,6 +112,15 @@ if [ -n "$DEPENDS_OVERRIDE" ]; then
 else
     DEPENDS="$(detect_depends || true)"
     [ -n "$DEPENDS" ] || DEPENDS="libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6network6, libqt6charts6, zlib1g, libssh2-1"
+
+    # Le plugin de plate-forme Qt « xcb » est chargé dynamiquement (dlopen) au
+    # démarrage : ldd ne le voit pas, donc la détection auto ci-dessus le rate.
+    # Depuis Qt 6.5 il exige libxcb-cursor0, sinon l'appli refuse de démarrer
+    # (« xcb-cursor0 or libxcb-cursor0 is needed »). On l'ajoute explicitement.
+    case ", $DEPENDS," in
+        *", libxcb-cursor0,"*) : ;;
+        *) DEPENDS="$DEPENDS, libxcb-cursor0" ;;
+    esac
 fi
 
 # --- Arborescence du paquet ------------------------------------------------
