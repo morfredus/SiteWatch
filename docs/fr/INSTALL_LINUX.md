@@ -306,5 +306,5 @@ inhabituelle : dans la grande majorité des cas, un cache propre suffit.
 
 ## Et ensuite ?
 
-SiteWatch démarre correctement ? Passer au [Guide utilisateur](../GUIDE.md) pour
+SiteWatch démarre correctement ? Passer au [Guide utilisateur](GUIDE.md) pour
 configurer un premier site, synchroniser les journaux et lancer l'analyse.

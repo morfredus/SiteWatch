@@ -1,59 +1,59 @@
-# Contribuer à SiteWatch
+# Contributing to SiteWatch
 
-Merci pour l'intérêt porté à SiteWatch. Ce document explique comment compiler
-le projet, signaler un bug, proposer une modification, et les
-conventions de code à respecter.
+Thanks for your interest in SiteWatch. This document explains how to build the
+project, report a bug, propose a change, and the coding conventions to follow.
 
 ---
 
-## Compiler le projet
+## Building the project
 
-Le détail complet est dans le [README](README.md). En résumé, sous Windows la
-voie la plus simple est **MSYS2 / MinGW** :
+The full details are in the [README](README.md) and in
+[docs/fr/COMPILATION.md](docs/fr/COMPILATION.md). In short, on Windows the
+simplest path is **MSYS2 / MinGW**:
 
 ```bash
-# dans le shell « MSYS2 MINGW64 »
+# in the "MSYS2 MINGW64" shell
 pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
   mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-charts \
   mingw-w64-x86_64-libssh2 mingw-w64-x86_64-zlib mingw-w64-x86_64-nlohmann-json
 
-cd /c/chemin/vers/SiteWatch
+cd /c/path/to/SiteWatch
 cmake --preset mingw
 cmake --build --preset mingw
 ```
 
-Les autres voies (WSL2, Linux natif) sont décrites dans le README.
-Le code doit rester **portable** : il compile sous Windows (MinGW) et Linux.
+Other paths (WSL2, native Linux) are described in the documentation.
+The code must stay **portable**: it builds on Windows (MinGW) and Linux.
 
 ---
 
-## Signaler un bug
+## Reporting a bug
 
-Ouvrir une **issue** sur le dépôt GitHub du projet en incluant :
+Open an **issue** on the project's GitHub repository, including:
 
-- la **version** de SiteWatch (menu *Aide → À propos*, ou le fichier `VERSION`) ;
-- le **système** utilisé (Windows 10/11, Linux + distribution) ;
-- les **étapes pour reproduire** le problème ;
-- le **comportement attendu** et le comportement observé ;
-- si possible une **capture d'écran** et le message d'erreur exact.
+- the **version** of SiteWatch (menu *Help → About*, or the `VERSION` file);
+- the **operating system** used (Windows 10/11, Linux + distribution);
+- the **steps to reproduce** the problem;
+- the **expected** behavior versus the observed behavior;
+- if possible, a **screenshot** and the exact error message.
 
-⚠️ Ne jamais joindre `config.json`, mots de passe, clés SSH ou jetons d'API.
-Anonymiser toute donnée sensible.
+⚠️ Never attach `config.json`, passwords, SSH keys or API tokens.
+Anonymize any sensitive data.
 
 ---
 
-## Proposer une modification (Pull Request)
+## Proposing a change (Pull Request)
 
-1. **Forker** le dépôt et créer une branche descriptive
-   (`fix/erreur-parseur`, `feat/export-json`…).
-2. **Compiler et tester** la modification (au moins la voie MinGW).
-3. Faire des **commits clairs** (une idée par commit, message à l'impératif :
-   « Ajoute le filtre par code HTTP »).
-4. Respecter l'**architecture** et les **conventions de code** ci-dessous.
-5. Ouvrir la **Pull Request** vers la branche principale avec une description de
-   ce que fait le changement et pourquoi.
+1. **Fork** the repository and create a descriptive branch
+   (`fix/parser-error`, `feat/json-export`…).
+2. **Build and test** the change (at least the MinGW path).
+3. Make **clear commits** (one idea per commit, imperative message:
+   "Add filtering by HTTP code").
+4. Respect the **architecture** and the **coding conventions** below.
+5. Open the **Pull Request** against the main branch with a description of what
+   the change does and why.
 
-Chaque nouveau fichier source doit porter l'en-tête de licence :
+Every new source file must carry the license header:
 
 ```cpp
 /*
@@ -63,38 +63,37 @@ Chaque nouveau fichier source doit porter l'en-tête de licence :
  */
 ```
 
-Toute contribution est distribuée sous la licence du projet (**GNU GPL v3.0**).
+Every contribution is distributed under the project's license (**GNU GPL v3.0**).
 
 ---
 
-## Conventions de code
+## Coding conventions
 
-**Architecture** — la séparation est stricte :
+**Architecture** — the separation is strict:
 
-- `src/core/` : le **cœur** métier (parseur, statistiques, cache, réseau). Il ne
-  doit **jamais** inclure Qt ni dépendre de l'interface — il reste portable.
-- `src/config/` : lecture/écriture de la configuration.
-- `src/ui/` : l'**interface** (Qt). Seul endroit autorisé à utiliser Qt.
+- `src/core/`: the business **core** (parser, statistics, cache, network). It must
+  **never** include Qt or depend on the interface — it stays portable.
+- `src/config/`: reading/writing the configuration.
+- `src/ui/`: the **interface** (Qt). The only place allowed to use Qt.
 
-**Langage & style**
+**Language & style**
 
 - **C++17**, CMake ≥ 3.21.
-- Indentation : **4 espaces**, pas de tabulations.
-- Accolades façon K&R (accolade ouvrante sur la même ligne).
-- Nommage : classes en `PascalCase`, méthodes et variables en `camelCase`,
-  **membres suffixés par `_`** (ex. `siteSelector_`), constantes `kMaConstante`.
-- **Commentaires en français**, concis et utiles (le « pourquoi », pas le « quoi »).
-- Fichiers sources encodés en **UTF-8** ; les chaînes visibles sont en français.
-- Préférer les types et conteneurs de la bibliothèque standard dans `core/`,
-  et les types Qt dans `ui/`.
+- Indentation: **4 spaces**, no tabs.
+- K&R-style braces (opening brace on the same line).
+- Naming: classes in `PascalCase`, methods and variables in `camelCase`,
+  **members suffixed with `_`** (e.g. `siteSelector_`), constants `kMyConstant`.
+- **Comments in French**, concise and useful (the "why", not the "what").
+- Source files encoded in **UTF-8**; user-visible strings are in French.
+- Prefer standard-library types and containers in `core/`, and Qt types in `ui/`.
 
-**Qualité**
+**Quality**
 
-- Une classe = une responsabilité ; chaque module doit pouvoir évoluer seul.
-- Pas de secret en dur dans le code (mots de passe, jetons) : tout passe par
-  `config.json` (ignoré par Git).
-- Le projet doit continuer à compiler **sans avertissement** sur MinGW.
+- One class = one responsibility; each module must be able to evolve on its own.
+- No hard-coded secret in the code (passwords, tokens): everything goes through
+  `config.json` (ignored by Git).
+- The project must keep building **without warnings** on MinGW.
 
 ---
 
-*Développé par morfredus.*
+*Developed by morfredus.*

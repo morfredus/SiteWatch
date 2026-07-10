@@ -1,176 +1,212 @@
-# Journal des versions — SiteWatch
+# Changelog — SiteWatch
 
-Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/).
+The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
+
+## [1.4.1] — 2026-07-10
+
+Tooling and documentation release; no application code change.
+
+### Added
+
+- **Build presets for more Linux targets** (`CMakePresets.json`): `linux-arm64`
+  (native ARM64, e.g. Raspberry Pi) and `linux-arm64-cross` (ARM64
+  cross-compiled from x86_64, kept as a base for future CI automation). Added the
+  ARM64 cross toolchain file under `cmake/toolchains/` and documented the targets
+  in `docs/fr/COMPILATION.md`. No application code change.
+
+### Changed — build strategy
+
+- Simplified the cross-compilation strategy: building Linux x86_64 **from
+  Windows** now relies on **WSL2** (native build with the `linux` preset) instead
+  of a complex cross toolchain. Removed the `linux-x86_64-cross` preset and its
+  toolchain file. Windows keeps a single official path, **MinGW** (MSVC is not
+  supported).
+
+### Changed
+
+- **Documentation restructured and made bilingual.** The root project files
+  (`README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`, `AUTHORS`,
+  `ROADMAP.md`) are now in **English**; a French README is available as
+  `README.fr.md`.
+- The **README was shortened** (presentation, screenshots, features, installation,
+  badges + a new version badge); the remaining content was moved into `docs/`.
+- The **French user documentation moved under `docs/fr/`**, and an English index
+  is prepared under `docs/en/` (translations in progress). Added
+  `docs/fr/ARCHITECTURE.md` (architecture, dependencies, philosophy) and
+  `docs/fr/COMPILATION.md` (build from source).
+- Fixed internal documentation links (including two previously broken links to
+  the user guide).
 
 ## [1.4.0] — 2026-07-10
 
-### Ajouté
+### Added
 
-- **Assistant intelligent de téléchargement des logs.** Lors du clic sur
-  **Télécharger les logs**, SiteWatch distingue désormais clairement les
-  situations et l'explique dans une **bannière intégrée** (non bloquante, à la
-  place des anciennes fenêtres d'alerte) :
-  - **échec de connexion** (hôte, identifiants ou clé SSH) ;
-  - **pare-feu o2switch** refusé (jeton d'API cPanel) ;
-  - **dossier distant illisible** ;
-  - **aucun log présent** sur le serveur ;
-  - **des logs présents mais aucun ne correspond au filtre** actuel.
-- **Détection automatique du filtre.** Quand des fichiers existent mais qu'aucun
-  ne correspond, SiteWatch analyse les noms présents, en déduit le préfixe
-  commun (ex. `tabacclaouey.fr` à partir de `tabacclaouey.fr.ssl.log-…`) et
-  propose un bouton **« Utiliser ce filtre »** qui l'enregistre et relance
-  aussitôt le téléchargement.
-- **Bannières de succès** après un téléchargement (fichiers récupérés / déjà à
-  jour), cohérentes avec les thèmes clair / sombre / système.
+- **Smart log download assistant.** When clicking **Download logs**, SiteWatch now
+  clearly distinguishes the different situations and explains them in an
+  **inline banner** (non-blocking, replacing the old alert dialogs):
+  - **connection failure** (host, credentials or SSH key);
+  - **o2switch firewall** refused (cPanel API token);
+  - **unreadable remote directory**;
+  - **no log present** on the server;
+  - **logs present but none matching the current filter**.
+- **Automatic filter detection.** When files exist but none match, SiteWatch
+  analyzes the present names, infers the common prefix (e.g. `tabacclaouey.fr`
+  from `tabacclaouey.fr.ssl.log-…`) and offers a **“Use this filter”** button
+  that saves it and immediately restarts the download.
+- **Success banners** after a download (files fetched / already up to date),
+  consistent with the light / dark / system themes.
 
-### Modifié
+### Changed
 
-- Nouveau module cœur **`LogDiscovery`** (C++17 pur, sans Qt ni réseau,
-  testable) : logique d'appartenance d'un fichier à un site et détection du
-  filtre, partagée entre le téléchargement et l'analyse.
-- **Réorganisation de la documentation** : le guide utilisateur passe de
-  `GUIDE.md` à **`docs/GUIDE.md`** ; ajout d'un index **`docs/README.md`** et
-  d'un guide de dépannage **`docs/DEPANNAGE_LOGS.md`**.
+- New core module **`LogDiscovery`** (pure C++17, no Qt, no network, testable):
+  file-to-site matching and filter detection, shared between download and
+  analysis.
+- **Documentation reorganization**: the user guide moved from `GUIDE.md` to
+  **`docs/GUIDE.md`**; added an index **`docs/README.md`** and a troubleshooting
+  guide **`docs/DEPANNAGE_LOGS.md`**.
 
 ## [1.3.1] — 2026-07-10
 
-### Corrigé
+### Fixed
 
-- **Compilation sous Linux avec Qt < 6.5** (Qt système de certaines
-  distributions) : les API `QStyleHints::colorScheme()` / `setColorScheme()` et
-  l'énumération `Qt::ColorScheme` (introduites en Qt 6.5 / 6.8) sont désormais
-  protégées par des gardes de version, avec repli sur la détection du thème via
-  la palette de l'application. Le mode « Système » suit l'OS à chaud dès Qt 6.5 ;
-  sur Qt plus ancien, le thème est déterminé au démarrage et via le menu.
-  Aucun changement de comportement côté Windows.
+- **Linux build with Qt < 6.5** (system Qt on some distributions): the
+  `QStyleHints::colorScheme()` / `setColorScheme()` APIs and the
+  `Qt::ColorScheme` enum (introduced in Qt 6.5 / 6.8) are now protected by
+  version guards, falling back to theme detection via the application palette.
+  The “System” mode follows the OS live from Qt 6.5; on older Qt, the theme is
+  determined at startup and via the menu. No behavior change on Windows.
 
 ## [1.3.0] — 2026-07-10
 
-### Ajouté
+### Added
 
-- **Thèmes clair / sombre / système** (menu **Affichage → Thème**). Le mode
-  Système suit automatiquement l'apparence de l'OS (Windows et Linux) et réagit
-  à ses changements ; le choix est mémorisé.
-- Feuille de style **externalisée** dans `resources/themes/` (`app.qss` à jetons
-  + palettes `light.theme` / `dark.theme`), plus maintenable et sans couleur
-  codée en dur dans le C++.
-- Déploiement **Linux** : `scripts/linux/install.sh` (crée l'icône
-  d'application et copie les fichiers dans les dossiers standards, en mode
-  utilisateur ou `--system`) et `scripts/linux/package-appimage.sh` (produit une
-  **AppImage** autonome à joindre aux releases, sans compilation côté
-  utilisateur).
+- **Light / dark / system themes** (menu **View → Theme**). The System mode
+  automatically follows the OS appearance (Windows and Linux) and reacts to its
+  changes; the choice is remembered.
+- Stylesheet **externalized** into `resources/themes/` (`app.qss` with tokens
+  + `light.theme` / `dark.theme` palettes), more maintainable and with no color
+  hard-coded in the C++.
+- **Linux** deployment: `scripts/linux/install.sh` (creates the application icon
+  and copies files into the standard directories, in user or `--system` mode)
+  and `scripts/linux/package-appimage.sh` (produces a self-contained **AppImage**
+  to attach to releases, with no build required from the user).
 
-### Modifié
+### Changed
 
-- Réorganisation du dossier `scripts/` en sous-dossiers `windows/` et `linux/`.
+- Reorganized the `scripts/` folder into `windows/` and `linux/` subfolders.
 
-### Corrigé
+### Fixed
 
-- En-têtes de tableaux : séparateurs de colonnes désormais visibles (la poignée
-  de redimensionnement de l'onglet **Sites** était invisible avec le thème
-  Windows par défaut). Contrastes revus pour rester lisibles en clair et sombre.
+- Table headers: column separators are now visible (the resize handle of the
+  **Sites** tab was invisible with the default Windows theme). Contrasts revised
+  to stay readable in light and dark.
 
 ## [1.2.0] — 2026-07-09
 
-### Ajouté
+### Added
 
-- Nouvel onglet permanent **Sites** : supervision globale multi-sites, état,
-  points d'attention, action recommandée, synthèse et double-clic vers l'analyse
-  détaillée.
+- New permanent **Sites** tab: global multi-site monitoring, state, points of
+  attention, recommended action, summary and double-click to the detailed
+  analysis.
 
-### Supprimé
+### Removed
 
-- Ancien dialogue **Comparer les sites…** du menu Outils, remplacé par l'onglet
-  permanent **Sites**.
+- Old **Compare sites…** dialog in the Tools menu, replaced by the permanent
+  **Sites** tab.
 
 ## [1.1.2] — 2026-07-09
 
-### Ajouté
+### Added
 
-- Configuration **VS Code** complète : tâches `CMake: Build (MinGW)`,
-  `SiteWatch: Run`, nettoyage, extensions recommandées et réglages CMake Tools.
-- Guide débutant dédié : `docs/BUILD_FOR_BEGINNERS.md`, avec installation
-  MSYS2, compilation VS Code, erreurs fréquentes et lien vers le guide utilisateur.
+- Complete **VS Code** configuration: `CMake: Build (MinGW)`, `SiteWatch: Run`
+  and cleanup tasks, recommended extensions and CMake Tools settings.
+- Dedicated beginner guide: `docs/BUILD_FOR_BEGINNERS.md`, with MSYS2
+  installation, VS Code build, common errors and a link to the user guide.
 
-### Modifié
+### Changed
 
-- Version du projet lue depuis le fichier `VERSION` par CMake.
-- Reconfiguration automatique quand `VERSION` change, puis recompilation avec la
-  bonne valeur `SITEWATCH_VERSION`.
-- CMake déclare aussi les headers du projet, y compris les headers Qt avec
-  `Q_OBJECT`, pour fiabiliser `AUTOMOC` et l'indexation dans VS Code.
-- Script `scripts/package-win.ps1` aligné sur `VERSION` : les dossiers et ZIP de
-  distribution utilisent maintenant la version courante par défaut.
-- Documentation utilisateur harmonisée en style neutre, sans tutoiement ni
-  chemins personnels.
+- Project version read from the `VERSION` file by CMake.
+- Automatic reconfiguration when `VERSION` changes, then rebuild with the correct
+  `SITEWATCH_VERSION` value.
+- CMake also declares the project headers, including Qt headers with `Q_OBJECT`,
+  to make `AUTOMOC` and indexing in VS Code more reliable.
+- `scripts/package-win.ps1` aligned with `VERSION`: the distribution folders and
+  ZIP now use the current version by default.
+- User documentation harmonized in a neutral style, without informal address or
+  personal paths.
 
-### Supprimé
+### Removed
 
-- Ancienne voie Windows **MSVC/vcpkg** : suppression du preset CMake associé et
-  de `vcpkg.json`. La voie Windows officielle est maintenant **MSYS2/MinGW**.
+- Old Windows **MSVC/vcpkg** path: removed the associated CMake preset and
+  `vcpkg.json`. The official Windows path is now **MSYS2/MinGW**.
 
 ## [1.1.1] — 2026-07-09
 
-### Modifié
+### Changed
 
-- Première simplification de la compilation Windows autour de **MSYS2/MinGW**.
-- Documentation de compilation enrichie dans le README.
-- Nettoyage des références de version figées dans les notes de distribution.
+- First simplification of the Windows build around **MSYS2/MinGW**.
+- Expanded build documentation in the README.
+- Cleaned up frozen version references in the distribution notes.
 
 ## [1.1.0] — 2026-07-09
 
-### Ajouté
+### Added
 
-- **Onglets interactifs** — chaque onglet tabulaire (Sécurité, Activité WP,
-  Top pages, Référents, URLs, Recherche) réagit au **double-clic** sur une
-  ligne : une fenêtre de détail agrège IP, codes HTTP, User-Agents, URLs,
-  référents, répartition horaire et évolution par jour.
-- **Copier / exporter** une ou plusieurs lignes de n'importe quel onglet
-  (presse-papier ou CSV international), sur le modèle de l'onglet URLs.
-- Le **site concerné** est rappelé dans la barre d'info de chaque fenêtre de détail.
+- **Interactive tabs** — each tabular tab (Security, WP Activity, Top pages,
+  Referrers, URLs, Search) reacts to a **double-click** on a row: a detail window
+  aggregates IPs, HTTP codes, user-agents, URLs, referrers, hourly breakdown and
+  daily evolution.
+- **Copy / export** one or several rows from any tab (clipboard or international
+  CSV), on the model of the URLs tab.
+- The **relevant site** is shown in the info bar of every detail window.
 
-### Modifié
+### Changed
 
-- Détail unifié : la fenêtre spécifique aux URLs est remplacée par une fenêtre
-  générique commune à tous les onglets. Les classifieurs du cœur
-  (`classifyActivity`, `classifyReferer`) sont réutilisés pour retrouver les
-  entrées d'une catégorie ou d'un référent — aucune logique dupliquée.
+- Unified detail view: the URL-specific window is replaced by a generic window
+  shared by all tabs. The core classifiers (`classifyActivity`,
+  `classifyReferer`) are reused to find the entries of a category or referrer —
+  no duplicated logic.
 
 ## [1.0.0] — 2026-07-07
 
-Première version complète.
+First complete release.
 
-### Analyse
+### Analysis
 
-- Lecture directe des logs Apache/LiteSpeed compressés (`.gz`) au format « combined ».
-- Détection de robots classés par catégorie (IA, moteurs de recherche, SEO, divers).
-- Distinction entre activité WordPress légitime et vraies tentatives d'attaque
-  (anti-faux-positifs), et filtrage des ressources techniques dans le Top pages.
-- Filtre de période (jour, 7/30 jours, mois, année, personnalisé) appliqué à tout.
+- Direct reading of compressed Apache/LiteSpeed logs (`.gz`) in the “combined”
+  format.
+- Bot detection classified by category (AI, search engines, SEO, other).
+- Distinction between legitimate WordPress activity and real attack attempts
+  (false-positive resistant), and filtering of technical resources in Top pages.
+- Period filter (day, 7/30 days, month, year, custom) applied everywhere.
 
 ### Interface
 
-- Style Windows 11, cartes KPI (total, humains, robots, 404/403/500).
-- **Tableau de santé** 🟢/🟠/🔴 avec indicateurs cliquables (navigation vers l'onglet concerné).
-- Onglets : Santé, Robots (donut + %), Sécurité, Activité WP, Top pages,
-  Référents, URLs (catégories), Graphiques, Recherche.
-- **Détail au double-clic** d'une URL (IP, User-Agents, horaires, référents, codes, évolution).
-- **Recherche** par IP, URL, robot, date ou code HTTP.
+- Windows 11 style, KPI cards (total, humans, bots, 404/403/500).
+- **Health table** 🟢/🟠/🔴 with clickable indicators (navigation to the relevant
+  tab).
+- Tabs: Health, Bots (donut + %), Security, WP Activity, Top pages, Referrers,
+  URLs (categories), Charts, Search.
+- **Double-click detail** of a URL (IPs, user-agents, hours, referrers, codes,
+  evolution).
+- **Search** by IP, URL, bot, date or HTTP code.
 
-### Réseau & configuration
+### Network & configuration
 
-- **Téléchargement SFTP** (libssh2) : incrémental, filtré par site, barre de progression.
-- **Ouverture automatique du pare-feu** o2switch via l'API cPanel.
-- Authentification par **clé SSH** (repli automatique sur mot de passe).
-- **Fenêtre de configuration graphique** complète (sites, cache, test de connexion).
-- Configuration et cache rangés dans l'emplacement standard du système
-  (`%LOCALAPPDATA%\SiteWatch`, `~/.config` sous Linux).
+- **SFTP download** (libssh2): incremental, filtered by site, with a progress
+  bar.
+- **Automatic firewall opening** on o2switch via the cPanel API.
+- **SSH key** authentication (automatic fallback to password).
+- Complete **graphical configuration window** (sites, cache, connection test).
+- Configuration and cache stored in the standard system location
+  (`%LOCALAPPDATA%\SiteWatch`, `~/.config` on Linux).
 
-### Outils
+### Tools
 
-- **Nettoyage du cache** par site, en totalité ou par période (au mois).
+- **Cache cleanup** by site, entirely or by period (by month).
 
-### Portabilité
+### Portability
 
-- Compile sous **Windows** (MSYS2/MinGW) et **Linux** (GCC/Clang) — couche socket portable.
-- Support d'**autres hébergeurs** (jeton pare-feu optionnel, filtre de logs avancé).
+- Builds on **Windows** (MSYS2/MinGW) and **Linux** (GCC/Clang) — portable socket
+  layer.
+- Support for **other hosts** (optional firewall token, advanced log filter).

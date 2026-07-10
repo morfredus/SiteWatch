@@ -1,147 +1,157 @@
-# SiteWatch 1.4.0 — Notes de version
+# SiteWatch 1.4.1 — Release Notes
 
-Version qui rend le **téléchargement des logs beaucoup plus intelligent** :
-SiteWatch explique désormais clairement ce qui se passe et vous guide au lieu de
-laisser un simple message discret. SiteWatch reste l'analyseur de logs
-Apache/LiteSpeed pour l'administration et la supervision de sites web hébergés
-sur o2switch (et compatible avec d'autres hébergeurs SSH).
+A **tooling and documentation** release: no change to the application itself, but
+a simpler and clearer build strategy, plus a reorganized bilingual documentation.
+SiteWatch remains the Apache/LiteSpeed log analyzer for the administration and
+monitoring of websites hosted on o2switch (and compatible with other SSH hosts).
 
-## Nouveautés dans 1.4.0
+## What's new in 1.4.1
 
-- **Assistant de téléchargement des logs.** SiteWatch distingue maintenant les
-  différentes causes d'un problème et les affiche dans une **bannière intégrée**
-  (plus de fenêtre bloquante) : connexion impossible, pare-feu o2switch refusé,
-  dossier distant illisible, aucun log présent, ou logs présents mais ne
-  correspondant pas au filtre.
-- **Filtre déduit automatiquement.** Quand des fichiers existent mais qu'aucun ne
-  correspond, SiteWatch lit les noms présents, propose le bon **filtre** (ex.
-  `tabacclaouey.fr`) et un bouton **« Utiliser ce filtre »** qui l'applique et
-  relance le téléchargement — sans passer par la documentation.
-- **Messages rassurants** en cas de succès (fichiers téléchargés ou déjà à jour),
-  adaptés aux thèmes clair / sombre / système.
+- **Simplified compilation chains.** Building Linux x86_64 **from Windows** no
+  longer uses a fragile cross-compilation: you now use **WSL2** and build
+  natively with the `linux` preset. The `linux-x86_64-cross` preset and its Qt
+  sysroot toolchain were removed.
+- **Kept build presets**: `mingw` (official Windows path), `linux` (x86_64,
+  native or via WSL2), `linux-arm64` (native Raspberry Pi build) and
+  `linux-arm64-cross` (ARM64 cross-compilation, kept as a base for future CI
+  automation). MSVC is not supported.
+- **Documentation restructured and bilingual.** Root files are now in English,
+  with a French `README.fr.md`; the README was shortened and the rest moved under
+  `docs/` (`docs/fr/` for the French guides, `docs/en/` prepared for English).
 
-Guide pas à pas : [docs/DEPANNAGE_LOGS.md](docs/DEPANNAGE_LOGS.md).
+Build details (French): [docs/fr/COMPILATION.md](docs/fr/COMPILATION.md).
 
-## Rappel — corrigé dans 1.3.1
+## Reminder — what's new in 1.4.0
 
-- **Compilation sous Linux avec Qt < 6.5** (Qt système de certaines
-  distributions) : la gestion du thème est protégée par des gardes de version,
-  avec repli sur la détection via la palette. Aucun changement côté Windows.
+- **Log download assistant.** SiteWatch now distinguishes the different causes of
+  a problem and shows them in an **inline banner** (no more blocking dialog):
+  connection impossible, o2switch firewall refused, unreadable remote directory,
+  no log present, or logs present but not matching the filter.
+- **Automatically inferred filter.** When files exist but none match, SiteWatch
+  reads the present names, proposes the right **filter** (e.g. `tabacclaouey.fr`)
+  and a **“Use this filter”** button that applies it and restarts the download —
+  without going through the documentation.
+- **Reassuring messages** on success (files downloaded or already up to date),
+  adapted to the light / dark / system themes.
 
-> La question à laquelle SiteWatch répond n'est pas « combien de visiteurs ? »
-> mais **« que s'est-il réellement passé sur mon serveur ? »**
+Step-by-step guide (French): [docs/fr/DEPANNAGE_LOGS.md](docs/fr/DEPANNAGE_LOGS.md).
+
+## Reminder — fixed in 1.3.1
+
+- **Linux build with Qt < 6.5** (system Qt on some distributions): theme handling
+  is protected by version guards, with a fallback to palette-based detection. No
+  change on Windows.
+
+> The question SiteWatch answers is not “how many visitors?” but
+> **“what really happened on my server?”**
 
 ---
 
-## Points forts
+## Highlights
 
-- **Nouvel onglet Sites** : vue globale de tous les sites, priorité de santé,
-  points d'attention, action recommandée et synthèse des sites à surveiller.
-- **Double-clic depuis Sites** : sélectionner immédiatement un site et revenir à
-  son analyse détaillée, en conservant la période courante.
-- **Téléchargement SFTP incrémental** des logs `.gz` (seuls les fichiers
-  nouveaux ou modifiés sont récupérés), avec barre de progression.
-- **Ouverture automatique du pare-feu o2switch** via l'API cPanel avant chaque
-  connexion (jeton d'API) — optionnelle pour les autres hébergeurs.
-- **Tableau de santé** 🟢/🟠/🔴 avec indicateurs cliquables (erreurs 500,
-  attaques, 404, activité Google, robots IA) menant à l'onglet concerné.
-- **Détection de robots** par catégorie (IA, moteurs, SEO, divers) avec donut
-  de répartition et pourcentages.
-- **Sécurité** : distinction entre activité WordPress légitime et vraies
-  tentatives d'attaque (anti-faux-positifs).
-- **Analyse des URLs** par catégorie : toutes, attaques probables, fonctionnement
-  WordPress, erreurs 404, requêtes système.
-- **Onglets interactifs** : **double-clic** sur n'importe quelle ligne (Sécurité,
-  Activité WP, Top pages, Référents, URLs, Recherche) pour son détail complet
-  (IP, User-Agents, URLs, référents, codes HTTP, horaires, évolution), avec le
-  site concerné rappelé en barre d'info ; **copie** et **export CSV** d'une ou
-  plusieurs lignes depuis chaque onglet.
-- **Recherche** par IP, URL, robot, date ou code HTTP.
-- **Filtre de période** (jour, 7/30 jours, mois, année, personnalisé).
-- **Nettoyage du cache** par site, en totalité ou par mois.
-- **Configuration entièrement graphique** (aucune édition manuelle de JSON).
+- **Sites tab**: a global view of all sites, health priority, points of attention,
+  recommended action and a summary of the sites to watch.
+- **Double-click from Sites**: immediately select a site and go back to its
+  detailed analysis, keeping the current period.
+- **Incremental SFTP download** of `.gz` logs (only new or changed files are
+  fetched), with a progress bar.
+- **Automatic o2switch firewall opening** via the cPanel API before each
+  connection (API token) — optional for other hosts.
+- **Health table** 🟢/🟠/🔴 with clickable indicators (500 errors, attacks, 404s,
+  Google activity, AI bots) leading to the relevant tab.
+- **Bot detection** by category (AI, search engines, SEO, other) with a
+  distribution donut and percentages.
+- **Security**: distinction between legitimate WordPress activity and real attack
+  attempts (false-positive resistant).
+- **URL analysis** by category: all, probable attacks, WordPress operation, 404
+  errors, system requests.
+- **Interactive tabs**: **double-click** any row (Security, WP Activity, Top
+  pages, Referrers, URLs, Search) for its full detail (IPs, user-agents, URLs,
+  referrers, HTTP codes, hours, evolution), with the relevant site shown in the
+  info bar; **copy** and **CSV export** of one or several rows from each tab.
+- **Search** by IP, URL, bot, date or HTTP code.
+- **Period filter** (day, 7/30 days, month, year, custom).
+- **Cache cleanup** by site, entirely or by month.
+- **Fully graphical configuration** (no manual JSON editing).
 
-## Nouveautés depuis 1.2.0
+## New since 1.2.0
 
-- **Déploiement Linux** : AppImage autonome à télécharger dans les releases
-  (aucune compilation), plus un script d'intégration au bureau
-  (`scripts/linux/install.sh`) qui crée l'icône de lancement et installe le
-  programme dans les dossiers standards. Guide pas à pas :
-  [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
-- **Thèmes clair / sombre / système** (menu **Affichage → Thème**). Le mode
-  Système suit l'apparence de l'OS (Windows et Linux) et réagit à ses
-  changements ; le choix est mémorisé.
-- **Feuille de style externalisée** (`resources/themes/`) : apparence plus
-  maintenable, contrastes revus pour rester lisibles en clair comme en sombre.
-- **Correctif d'ergonomie** : les séparateurs de colonnes des tableaux sont
-  désormais visibles (la poignée de redimensionnement de l'onglet **Sites**
-  était invisible avec le thème Windows par défaut).
-- Réorganisation des scripts de packaging en `scripts/windows/` et
-  `scripts/linux/`.
+- **Linux deployment**: a self-contained AppImage to download from the releases
+  (no build required), plus a desktop-integration script
+  (`scripts/linux/install.sh`) that creates the launcher icon and installs the
+  program into the standard directories. Step-by-step guide (French):
+  [docs/fr/INSTALL_LINUX.md](docs/fr/INSTALL_LINUX.md).
+- **Light / dark / system themes** (menu **View → Theme**). The System mode
+  follows the OS appearance (Windows and Linux) and reacts to its changes; the
+  choice is remembered.
+- **Externalized stylesheet** (`resources/themes/`): more maintainable
+  appearance, contrasts revised to stay readable in both light and dark.
+- **Ergonomics fix**: table column separators are now visible (the resize handle
+  of the **Sites** tab was invisible with the default Windows theme).
+- Reorganized packaging scripts into `scripts/windows/` and `scripts/linux/`.
 
-## Nouveautés depuis 1.1.2
+## New since 1.1.2
 
-- Remplacement de l'ancien dialogue **Comparer les sites…** par un onglet
-  permanent **Sites**.
-- Classement initial des sites par priorité : intervention recommandée, à
-  surveiller, puis normal.
-- Colonnes synthétiques : état, points d'attention, action recommandée, dernière
-  synchronisation et principaux compteurs.
-- Synthèse automatique : site le plus visité, le plus attaqué, robots IA,
-  erreurs 404, activité Google et meilleur état de santé.
+- Replaced the old **Compare sites…** dialog with a permanent **Sites** tab.
+- Initial ranking of sites by priority: recommended intervention, to watch, then
+  normal.
+- Summary columns: state, points of attention, recommended action, last
+  synchronization and the main counters.
+- Automatic summary: most visited site, most attacked, AI bots, 404 errors,
+  Google activity and best health state.
 
-## Rappels depuis 1.1.2
+## Reminders since 1.1.2
 
-- Compilation depuis **VS Code** prête à l'emploi avec MSYS2/MinGW.
-- Guide débutant ajouté dans `docs/BUILD_FOR_BEGINNERS.md`.
-- Version du programme centralisée dans le fichier `VERSION`.
-- Packaging Windows aligné sur `VERSION` : l'archive générée porte le bon numéro
-  de version.
-- Documentation nettoyée : voie Windows unique **MSYS2/MinGW**, suppression de
-  l'ancien chemin MSVC/vcpkg et des chemins personnels.
-- CMake fiabilisé pour mieux suivre les changements de sources, headers,
-  ressources et version.
+- Ready-to-use build from **VS Code** with MSYS2/MinGW.
+- Beginner guide added in `docs/fr/BUILD_FOR_BEGINNERS.md`.
+- Program version centralized in the `VERSION` file.
+- Windows packaging aligned with `VERSION`: the generated archive carries the
+  correct version number.
+- Documentation cleaned up: single Windows path **MSYS2/MinGW**, removal of the
+  old MSVC/vcpkg path and of personal paths.
+- CMake made more reliable to better track changes in sources, headers, resources
+  and version.
 
 ## Installation
 
-- **Windows (portable)** : décompresser `SiteWatch-<version>-win64.zip` et lancer
-  `SiteWatch.exe` — aucune installation, aucune dépendance à installer.
-- **Linux (AppImage)** : télécharger `SiteWatch-<version>-x86_64.AppImage`, la
-  rendre exécutable (`chmod +x`) et la lancer — aucune compilation. Détails et
-  intégration au bureau : [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
-- **Compilation depuis les sources** : voir [README.md](README.md)
-  (Windows MSYS2/MinGW, ou Linux natif).
+- **Windows (portable)**: unzip `SiteWatch-<version>-win64.zip` and run
+  `SiteWatch.exe` — no installation, no dependency to install.
+- **Linux (AppImage)**: download `SiteWatch-<version>-x86_64.AppImage`, make it
+  executable (`chmod +x`) and run it — no build. Details and desktop integration:
+  [docs/fr/INSTALL_LINUX.md](docs/fr/INSTALL_LINUX.md).
+- **Build from source**: see [README.md](README.md) (Windows MSYS2/MinGW, or
+  native Linux).
 
-## Configuration requise
+## Requirements
 
-- **Windows** 10 / 11 (64 bits), ou **Linux** 64 bits (x86_64). L'AppImage peut
-  nécessiter FUSE 2 sur certaines distributions récentes (voir le guide Linux).
+- **Windows** 10 / 11 (64-bit), or **Linux** 64-bit (x86_64). The AppImage may
+  require FUSE 2 on some recent distributions (see the Linux guide).
 
-> Compilation et fonctionnement vérifiés sous **Windows 11** (MSYS2/MinGW,
-> Qt 6.11) et **Linux Mint 22.3 « Zena »** (base Ubuntu 24.04 LTS « Noble »,
-> Qt 6.4).
-- Un accès **SSH/SFTP** à l'hébergement (clé SSH recommandée).
-- Pour o2switch : l'accès SSH activé + un **jeton d'API cPanel** pour
-  l'ouverture automatique du pare-feu.
+> Build and runtime verified on **Windows 11** (MSYS2/MinGW, Qt 6.11) and
+> **Linux Mint 22.3 “Zena”** (Ubuntu 24.04 LTS “Noble” base, Qt 6.4).
+- **SSH/SFTP** access to the hosting (SSH key recommended).
+- For o2switch: SSH access enabled + a **cPanel API token** for automatic firewall
+  opening.
 
-Voir le [Guide utilisateur](docs/GUIDE.md) pour la prise en main pas à pas.
-Voir aussi la [roadmap](ROADMAP.md) pour les évolutions envisagées.
-Pour comprendre l'intérêt concret de l'analyse, consulter les
-[études de cas](docs/CASE_STUDIES.md).
+See the [user guide](docs/fr/GUIDE.md) for a step-by-step introduction.
+See also the [roadmap](ROADMAP.md) for planned changes.
+To understand the concrete value of the analysis, read the
+[case studies](docs/fr/CASE_STUDIES.md).
 
-## Limitations connues
+## Known limitations
 
-- Les statistiques par visiteur « marketing » ne sont volontairement pas
-  couvertes (l'outil est orienté administration / sécurité).
-- Le téléchargement SFTP s'exécute dans le fil principal : l'interface se fige
-  brièvement pendant le transfert de gros fichiers.
-- Détection de robots et classification d'attaques basées sur des motifs
-  connus : susceptibles d'évoluer.
+- Per-visitor “marketing” statistics are intentionally not covered (the tool is
+  administration / security oriented).
+- The SFTP download runs on the main thread: the interface freezes briefly during
+  the transfer of large files.
+- Bot detection and attack classification are based on known patterns: subject to
+  change.
 
-## Licence
+## License
 
-SiteWatch est distribué sous licence **GNU GPL v3.0** — voir [LICENSE](LICENSE).
+SiteWatch is distributed under the **GNU GPL v3.0** license — see
+[LICENSE](LICENSE).
 
 ---
 
-*Développé par morfredus.*
+*Developed by morfredus.*

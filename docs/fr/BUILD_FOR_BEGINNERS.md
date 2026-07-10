@@ -244,5 +244,5 @@ devient :
 ## 10. Et maintenant ?
 
 SiteWatch démarre correctement ?
-Passer maintenant au [Guide utilisateur](../GUIDE.md) pour configurer un
+Passer maintenant au [Guide utilisateur](GUIDE.md) pour configurer un
 premier site, synchroniser les journaux et commencer l'analyse.

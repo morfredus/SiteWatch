@@ -1,14 +1,15 @@
 # Guide utilisateur — SiteWatch
 
 Ce guide explique la configuration et l'utilisation quotidienne de SiteWatch.
-Pour l'installation/compilation, voir le [README](../README.md).
+Pour l'installation, voir le [README](../../README.md) ; pour compiler depuis les
+sources, voir [Compiler depuis les sources](COMPILATION.md).
 Sous **Linux**, suivre le guide dédié
 [Installer et lancer SiteWatch sous Linux](INSTALL_LINUX.md).
 Sous **Windows**, pour débuter, suivre le guide
 [Compiler SiteWatch quand on débute](BUILD_FOR_BEGINNERS.md).
 En cas de message « aucun log trouvé », voir le
 [guide de dépannage du téléchargement](DEPANNAGE_LOGS.md).
-Pour les évolutions envisagées, consulter la [roadmap](../ROADMAP.md).
+Pour les évolutions envisagées, consulter la [roadmap](../../ROADMAP.md).
 
 ---
 
@@ -215,4 +216,4 @@ SiteWatch cible o2switch mais reste ouvert :
 Copyright (C) 2026 morfredus
 
 Ce projet est distribué sous les termes de la **GNU General Public License v3.0**.
-Voir le fichier [`LICENSE`](../LICENSE) pour le texte complet.
+Voir le fichier [`LICENSE`](../../LICENSE) pour le texte complet.

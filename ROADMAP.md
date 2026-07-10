@@ -1,59 +1,54 @@
 # Roadmap — SiteWatch
 
-Cette roadmap décrit les évolutions possibles de SiteWatch. Elle n'est pas une
-promesse de date : elle sert à garder une direction claire pour les prochaines
-versions.
+This roadmap describes possible directions for SiteWatch. It is not a promise of
+dates: it exists to keep a clear direction for the next versions.
 
 ## Vision
 
-SiteWatch doit aider à décider rapidement où intervenir.
+SiteWatch should help you quickly decide where to intervene.
 
-L'objectif n'est pas d'ajouter toujours plus de statistiques, mais de rendre les
-signaux importants immédiatement visibles : erreurs serveur, attaques, robots,
-activité WordPress inhabituelle, comportement de Google et problèmes d'URLs.
+The goal is not to add ever more statistics, but to make the important signals
+immediately visible: server errors, attacks, bots, unusual WordPress activity,
+Google behavior and URL problems.
 
-## Court terme
+## Short term
 
-- Améliorer l'onglet **Sites** comme tableau de bord principal après une
-  synchronisation.
-- Ajouter une synchronisation globale explicite pour tous les sites configurés.
-- Rendre les points d'attention plus précis sans introduire d'IA : règles
-  simples, compréhensibles et vérifiables.
-- Ajouter davantage de messages d'aide dans l'interface quand aucun log ou aucune
-  donnée n'est disponible.
+- Improve the **Sites** tab as the main dashboard after a synchronization.
+- Add an explicit global synchronization for all configured sites.
+- Make the points of attention more precise without introducing AI: simple,
+  understandable and verifiable rules.
+- Add more in-app help messages when no log or no data is available.
 
-## Moyen terme
+## Medium term
 
-- Comparer une période avec la période précédente, par exemple les 30 derniers
-  jours contre les 30 jours précédents.
-- Afficher les variations importantes : humains, robots IA, attaques, erreurs
-  404, erreurs 500, activité Google.
-- Afficher un petit historique de l'état d'un site sur les dernières
-  synchronisations.
-- Conserver les synthèses de santé pour suivre l'évolution d'un site dans le
-  temps.
+- Compare a period with the previous one, for example the last 30 days against
+  the 30 days before.
+- Show significant variations: humans, AI bots, attacks, 404 errors, 500 errors,
+  Google activity.
+- Show a small history of a site's state over the last synchronizations.
+- Keep health summaries to track a site's evolution over time.
 
-## Alertes possibles
+## Possible alerts
 
-- Nouveau site en état rouge.
-- Forte hausse des attaques.
-- Explosion des erreurs 404.
-- Baisse importante de l'activité Google.
-- Hausse inhabituelle des robots IA.
-- Activité WordPress anormale.
+- New site in a red state.
+- Sharp rise in attacks.
+- Surge of 404 errors.
+- Significant drop in Google activity.
+- Unusual increase in AI bots.
+- Abnormal WordPress activity.
 
-## Exploitation et maintenance
+## Operation and maintenance
 
-- Mieux documenter les cas d'hébergeurs non-o2switch.
-- Faciliter l'export des données utiles pour un diagnostic.
-- Continuer à simplifier la compilation Windows autour de MSYS2/MinGW.
-- Maintenir le déploiement Linux (AppImage + intégration au bureau) et le tenir
-  à jour avec les nouvelles versions de Qt.
-- Garder une architecture où les règles de santé sont centralisées et
-  réutilisables par l'onglet Santé, l'onglet Sites et les futures alertes.
+- Better document non-o2switch hosting cases.
+- Make it easier to export the data useful for diagnostics.
+- Keep simplifying the Windows build around MSYS2/MinGW.
+- Maintain the Linux deployment (AppImage + desktop integration) and keep it up
+  to date with new Qt versions.
+- Keep an architecture where health rules are centralized and reusable by the
+  Health tab, the Sites tab and future alerts.
 
-## Hors objectif
+## Out of scope
 
-SiteWatch n'a pas vocation à remplacer un outil marketing de mesure d'audience.
-La priorité reste l'administration, la supervision technique et la compréhension
-des événements réellement présents dans les logs serveur.
+SiteWatch is not meant to replace a marketing audience-measurement tool. The
+priority remains administration, technical monitoring and understanding the
+events actually present in the server logs.

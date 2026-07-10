@@ -118,11 +118,11 @@ détection est automatique.
 - Relisez le [Guide utilisateur](GUIDE.md), section « Télécharger les logs ».
 - Sous Linux, vérifiez l'[installation](INSTALL_LINUX.md).
 - Vous pouvez ouvrir une question sur le dépôt du projet (voir le
-  [README](../README.md)).
+  [README](../../README.md)).
 
 ---
 
 ## Licence
 
 Copyright (C) 2026 morfredus — distribué sous **GNU GPL v3.0**
-(voir [`LICENSE`](../LICENSE)).
+(voir [`LICENSE`](../../LICENSE)).
