@@ -152,6 +152,9 @@ chmod +x SiteWatch-<version>-x86_64.AppImage
 ./SiteWatch-<version>-x86_64.AppImage
 ```
 
+Sous **Debian / Ubuntu / Raspberry Pi OS**, vous pouvez aussi produire un paquet
+`.deb` (`scripts/linux/package-deb.sh`) qui s'installe proprement via apt.
+
 Pour ajouter l'icône au menu des applications, ou pour compiler puis intégrer
 SiteWatch au bureau, voir le guide dédié :
 **[docs/fr/INSTALL_LINUX.md](docs/fr/INSTALL_LINUX.md)**.

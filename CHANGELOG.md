@@ -2,6 +2,15 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [Unreleased]
+
+### Added
+
+- **Debian packaging script** `scripts/linux/package-deb.sh`: builds a `.deb`
+  from a native Linux build (x86_64 or ARM64 / Raspberry Pi), with automatic
+  dependency detection, for a clean install/removal via apt. Documented in
+  `docs/fr/INSTALL_LINUX.md` (Part D).
+
 ## [1.4.2] — 2026-07-10
 
 ### Fixed

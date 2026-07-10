@@ -215,6 +215,46 @@ automatiquement dans le fichier `VERSION`.
 
 ---
 
+## Partie D — Produire un paquet Debian (.deb)
+
+Sur **Debian, Ubuntu ou Raspberry Pi OS**, on peut produire un paquet `.deb`
+qui s'intègre proprement au système (menu, désinstallation via apt). Contrairement
+à l'AppImage (autonome), le `.deb` utilise le **Qt du système** : il déclare ses
+dépendances et apt les installe automatiquement.
+
+Prérequis : SiteWatch compilé **nativement** sur la même famille de distribution
+(voir [B.1](#b1-installer-les-dépendances) et [B.2](#b2-compiler)).
+
+```bash
+# x86_64
+cmake --preset linux       && cmake --build --preset linux
+# … ou ARM64 (Raspberry Pi)
+cmake --preset linux-arm64 && cmake --build --preset linux-arm64 && \
+  scripts/linux/package-deb.sh --build build-arm64
+
+# x86_64 : le dossier build/ par défaut suffit
+scripts/linux/package-deb.sh
+```
+
+Le résultat est produit dans `dist/`, avec l'architecture dans le nom :
+
+```text
+dist/sitewatch_1.4.2_amd64.deb        (ou _arm64.deb sur Raspberry Pi)
+```
+
+Installation puis désinstallation :
+
+```bash
+sudo apt install ./dist/sitewatch_1.4.2_amd64.deb
+sudo apt remove sitewatch
+```
+
+Les dépendances (Qt6, libssh2, zlib…) sont **détectées automatiquement** à partir
+du binaire ; on peut les forcer avec `--depends "…"` et fixer le mainteneur avec
+`--maintainer "Nom <email>"`.
+
+---
+
 ## Où SiteWatch range ses données
 
 Quelle que soit la méthode, la configuration et le cache sont stockés dans les
