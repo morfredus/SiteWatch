@@ -75,6 +75,7 @@
 #include "ui/CacheCleanupDialog.h"
 #include "ui/UrlReport.h"
 #include "ui/Theme.h"
+#include "ui/Icons.h"
 #include <QClipboard>
 #include <QStringList>
 
@@ -175,10 +176,16 @@ int healthLevel(const Stats& s) {
     return level;
 }
 
+// Couleur (thème) d'un niveau de gravité : 0 = ok, 1 = avertissement, 2 = danger.
+QString stateHex(int level) {
+    return Theme::instance().color(level >= 2 ? "danger" : level == 1 ? "warn" : "ok");
+}
+QColor stateColor(int level) { return QColor(stateHex(level)); }
+
 QString healthLabel(int level) {
-    if (level >= 2) return "🔴 Intervention recommandée";
-    if (level == 1) return "🟠 À surveiller";
-    return "🟢 Normal";
+    if (level >= 2) return "Intervention recommandée";
+    if (level == 1) return "À surveiller";
+    return "Normal";
 }
 
 QString attentionSummary(const Stats& s) {
@@ -286,12 +293,12 @@ QTableWidget* makeTable3(const QString& c1, const QString& c2, const QString& c3
     return t;
 }
 
-// Pastille de gravite pour l'onglet Securite.
-QString sevDot(const QString& label) {
+// Gravite d'une categorie de l'onglet Securite (true = rouge, false = orange).
+bool isSevereLabel(const QString& label) {
     static const QStringList rouge = {
         "XML-RPC", "shells / eval", "phpMyAdmin", "install.php",
         "CGI-BIN", "backup / dump", "Erreurs 500"};
-    return (rouge.contains(label) ? QString("🔴 ") : QString("🟠 ")) + label;
+    return rouge.contains(label);
 }
 
 std::vector<std::pair<QString, long>> sortedByValue(
@@ -393,7 +400,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     loadConfiguration();
 }
 
-QWidget* MainWindow::makeKpiCard(const QString& emoji, const QString& title,
+QWidget* MainWindow::makeKpiCard(icons::Glyph glyph, const QString& title,
                                  const QString& subRole, Kpi& out) {
     auto* card = new QFrame;
     card->setObjectName("card");
@@ -402,8 +409,11 @@ QWidget* MainWindow::makeKpiCard(const QString& emoji, const QString& title,
     h->setContentsMargins(14, 10, 14, 10);
     h->setSpacing(12);
 
-    auto* icon = new QLabel(emoji);
-    icon->setStyleSheet("font-size: 22px;");
+    // Icône de la carte : police d'icônes embarquée, teintée par le thème selon
+    // la nature de l'indicateur (propriété « kpi », cf. app.qss).
+    auto* icon = new QLabel(icons::ch(glyph));
+    icon->setObjectName("cardIcon");
+    icon->setProperty("kpi", subRole);
     h->addWidget(icon);
 
     auto* col = new QVBoxLayout;
@@ -550,7 +560,7 @@ void MainWindow::buildUi() {
     bannerRow->addWidget(bannerAction_, 0, Qt::AlignVCenter);
     bannerClose_ = new QToolButton;
     bannerClose_->setObjectName("bannerClose");
-    bannerClose_->setText("✕");
+    bannerClose_->setText(icons::ch(icons::Glyph::Cross));
     bannerClose_->setToolTip("Masquer ce message");
     bannerClose_->setCursor(Qt::PointingHandCursor);
     connect(bannerClose_, &QToolButton::clicked, this, &MainWindow::hideBanner);
@@ -565,12 +575,12 @@ void MainWindow::buildUi() {
     // --- Rangee de cartes KPI ---
     auto* cards = new QHBoxLayout;
     cards->setSpacing(10);
-    cards->addWidget(makeKpiCard("📊", "Total requêtes", "neutral", kTotal_));
-    cards->addWidget(makeKpiCard("👤", "Humains",        "good",    kHumans_));
-    cards->addWidget(makeKpiCard("🤖", "Robots",         "neutral", kRobots_));
-    cards->addWidget(makeKpiCard("⚠️", "Erreurs 404",    "warn404", k404_));
-    cards->addWidget(makeKpiCard("🛡️", "Erreurs 403",    "warn403", k403_));
-    cards->addWidget(makeKpiCard("⛔", "Erreurs 500",     "danger",  k500_));
+    cards->addWidget(makeKpiCard(icons::Glyph::Chart,  "Total requêtes", "neutral", kTotal_));
+    cards->addWidget(makeKpiCard(icons::Glyph::User,   "Humains",        "good",    kHumans_));
+    cards->addWidget(makeKpiCard(icons::Glyph::Robot,  "Robots",         "neutral", kRobots_));
+    cards->addWidget(makeKpiCard(icons::Glyph::Warn,   "Erreurs 404",    "warn404", k404_));
+    cards->addWidget(makeKpiCard(icons::Glyph::Shield, "Erreurs 403",    "warn403", k403_));
+    cards->addWidget(makeKpiCard(icons::Glyph::Ban,    "Erreurs 500",     "danger",  k500_));
     mainLayout->addLayout(cards);
 
     // --- Onglets ---
@@ -886,16 +896,17 @@ void MainWindow::showBanner(BannerLevel level, const QString& html,
                             const QString& actionText,
                             std::function<void()> onAction) {
     const char* levelName = "info";
-    const char* icon = "ℹ️";
+    icons::Glyph glyph = icons::Glyph::CircleInfo;
     switch (level) {
-        case BannerLevel::Success: levelName = "success"; icon = "✅"; break;
-        case BannerLevel::Warning: levelName = "warn";    icon = "⚠️"; break;
-        case BannerLevel::Error:   levelName = "error";   icon = "⛔"; break;
-        case BannerLevel::Info:    levelName = "info";    icon = "ℹ️"; break;
+        case BannerLevel::Success: levelName = "success"; glyph = icons::Glyph::CircleCheck;  break;
+        case BannerLevel::Warning: levelName = "warn";    glyph = icons::Glyph::Warn;         break;
+        case BannerLevel::Error:   levelName = "error";   glyph = icons::Glyph::CrossCircle;  break;
+        case BannerLevel::Info:    levelName = "info";    glyph = icons::Glyph::CircleInfo;   break;
     }
     banner_->setProperty("level", levelName);
     bannerText_->setProperty("level", levelName);
-    bannerIcon_->setText(icon);
+    bannerIcon_->setProperty("level", levelName);
+    bannerIcon_->setText(icons::ch(glyph));
     bannerText_->setText(html);
 
     bannerActionFn_ = std::move(onAction);
@@ -905,6 +916,7 @@ void MainWindow::showBanner(BannerLevel level, const QString& html,
 
     repolish(banner_);
     repolish(bannerText_);
+    repolish(bannerIcon_);
     banner_->setVisible(true);
 }
 
@@ -1357,10 +1369,13 @@ void MainWindow::displayStats(const Stats& s) {
         // de la catégorie au double-clic / à l'export.
         std::vector<QString> raw;
         raw.reserve(rows.size());
-        for (auto& r : rows) { raw.push_back(r.first); r.first = sevDot(r.first); }
+        for (auto& r : rows) raw.push_back(r.first);
         setRows(securityTable_, rows);
         for (int i = 0; i < static_cast<int>(raw.size()); ++i)
-            if (auto* it = securityTable_->item(i, 0)) it->setData(Qt::UserRole, raw[i]);
+            if (auto* it = securityTable_->item(i, 0)) {
+                it->setData(Qt::UserRole, raw[i]);
+                it->setIcon(icons::icon(icons::Glyph::Dot, stateColor(isSevereLabel(raw[i]) ? 2 : 1)));
+            }
     }
     setRows3(activityTable_, sortedByValue(s.normalActivity), t);
     setRows(pagesTable_,    sortedByValue(s.topPages, 50));
@@ -1426,7 +1441,9 @@ void MainWindow::refreshSitesOverview() {
         auto* name = textItem(row.name, row.name.toLower());
         name->setData(Qt::UserRole + 1, row.name);
         sitesTable_->setItem(r, 0, name);
-        sitesTable_->setItem(r, 1, textItem(healthLabel(row.level), row.level));
+        auto* stateItem = textItem(healthLabel(row.level), row.level);
+        stateItem->setIcon(icons::icon(icons::Glyph::Dot, stateColor(row.level)));
+        sitesTable_->setItem(r, 1, stateItem);
         sitesTable_->setItem(r, 2, numberItem(s.humans));
         sitesTable_->setItem(r, 3, numberItem(s.bots));
         sitesTable_->setItem(r, 4, numberItem(ai));
@@ -1458,16 +1475,26 @@ void MainWindow::refreshSitesOverview() {
         return a.name.toLower() < b.name.toLower();
     });
 
-    sitesSummary_->setText(QString(
-        "🏆 Site le plus visité : %1   ·   🛡 Site le plus attaqué : %2   ·   "
-        "🤖 Robots IA : %3   ·   ❌ Erreurs 404 : %4   ·   "
-        "📈 Activité Google : %5   ·   ❤️ Meilleur état : %6")
-        .arg(maxBy([](const Stats& s) { return s.humans; }),
-             maxBy([](const Stats& s) { return sumAttacks(s); }),
-             maxBy([](const Stats& s) { return aiBots(s); }),
-             maxBy([](const Stats& s) { return s.errors404; }),
-             maxBy([](const Stats& s) { return botOf(s, "Google"); }),
-             bestHealth != rows.end() ? bestHealth->name : QString("Aucun")));
+    Theme& th = Theme::instance();
+    const int ip = 13;
+    auto item = [&](icons::Glyph g, const QString& colorTok, const QString& label,
+                    const QString& value) {
+        return icons::span(g, th.color(colorTok), ip) + " " + label + " : " + value;
+    };
+    sitesSummary_->setText(QStringList{
+        item(icons::Glyph::Trophy,  "accent",    "Site le plus visité",
+             maxBy([](const Stats& s) { return s.humans; })),
+        item(icons::Glyph::Shield,  "danger",    "Site le plus attaqué",
+             maxBy([](const Stats& s) { return sumAttacks(s); })),
+        item(icons::Glyph::Robot,   "textMuted", "Robots IA",
+             maxBy([](const Stats& s) { return aiBots(s); })),
+        item(icons::Glyph::CrossCircle, "kpi404", "Erreurs 404",
+             maxBy([](const Stats& s) { return s.errors404; })),
+        item(icons::Glyph::TrendUp, "accent",    "Activité Google",
+             maxBy([](const Stats& s) { return botOf(s, "Google"); })),
+        item(icons::Glyph::Heart,   "ok",        "Meilleur état",
+             bestHealth != rows.end() ? bestHealth->name : QString("Aucun")),
+    }.join("   ·   "));
 }
 
 void MainWindow::fillUrls() {
@@ -1718,17 +1745,20 @@ void MainWindow::fillHealth(const Stats& s) {
     const int worst = healthLevel(s);
 
     QString text, state;
+    auto withDot = [](int lvl, const QString& words) {
+        return icons::span(icons::Glyph::Dot, stateHex(lvl), 18) + "  " + words;
+    };
     if (total == 0) {
         text = "Aucune donnée à analyser sur cette période.";
         state = "neutral";
     } else if (worst == 2) {
-        text = "🔴  Attention — anomalies détectées";
+        text = withDot(2, "Attention — anomalies détectées");
         state = "danger";
     } else if (worst == 1) {
-        text = "🟠  Quelques anomalies";
+        text = withDot(1, "Quelques anomalies");
         state = "warn";
     } else {
-        text = "🟢  Aucune anomalie détectée";
+        text = withDot(0, "Aucune anomalie détectée");
         state = "ok";
     }
     verdictLabel_->setText(text);
@@ -1744,7 +1774,6 @@ void MainWindow::fillHealth(const Stats& s) {
     }
     for (size_t i = 0; i < inds.size(); ++i) {
         const auto& ind = inds[i];
-        const QString dot = ind.st == 0 ? "🟢" : ind.st == 1 ? "🟠" : "🔴";
         auto* row = new QFrame;
         row->setObjectName("panel");
         row->setProperty("healthIndex", static_cast<int>(i));
@@ -1753,8 +1782,9 @@ void MainWindow::fillHealth(const Stats& s) {
         row->installEventFilter(this);
         auto* h = new QHBoxLayout(row);
         h->setContentsMargins(12, 8, 12, 8);
-        auto* dotLbl = new QLabel(dot);
-        dotLbl->setStyleSheet("font-size:16px;");
+        auto* dotLbl = new QLabel(icons::ch(icons::Glyph::Dot));
+        dotLbl->setFont(icons::font(14));
+        dotLbl->setStyleSheet("color:" + stateHex(ind.st) + ";");
         h->addWidget(dotLbl);
         auto* titleLbl = new QLabel("<b>" + ind.title + "</b>");
         titleLbl->setMinimumWidth(180);

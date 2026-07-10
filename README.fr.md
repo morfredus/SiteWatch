@@ -1,8 +1,8 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.4.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.2-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.20+-064F8C?logo=cmake)
@@ -11,15 +11,19 @@
 **🌍 Langue :** [English](README.md) · Français
 
 > ✅ **Compilation et fonctionnement vérifiés** sous **Windows 11**
-> (MSYS2/MinGW, Qt 6.11) et **Linux Mint 22.3 « Zena »** — base Ubuntu 24.04 LTS
-> « Noble », Qt 6.4.
+> (MSYS2/MinGW, Qt 6.11), **Linux Mint 22.3 « Zena »** (base Ubuntu 24.04 LTS,
+> Qt 6.4) et **Raspberry Pi 4** (Raspberry Pi OS 64 bits).
 
-**Outil de bureau d'investigation des journaux d'accès Apache et LiteSpeed.**
+**Outil de bureau multiplateforme d'investigation des journaux d'accès Apache et LiteSpeed.**
 
-SiteWatch est une application de bureau dédiée à l'administration et à la
-supervision de sites web. Contrairement aux outils de statistiques classiques,
-il ne cherche pas à compter les visiteurs ni à produire des rapports marketing.
-Son objectif est beaucoup plus simple :
+SiteWatch est une **application Qt / C++17 multiplateforme** dédiée à
+l'administration et à la supervision de sites web. Elle s'exécute nativement sous
+**Windows, Linux (x86_64 et ARM64) et Raspberry Pi** — Windows n'est qu'une
+plateforme supportée parmi d'autres, pas la cible unique.
+
+Contrairement aux outils de statistiques classiques, elle ne cherche pas à
+compter les visiteurs ni à produire des rapports marketing. Son objectif est
+beaucoup plus simple :
 
 > **Comprendre ce qui s'est réellement passé sur un serveur web.**
 
@@ -31,6 +35,13 @@ surveillés**. Il lit directement les fichiers de logs compressés (`.gz`).
 SiteWatch fonctionne avec tout hébergeur proposant un accès SSH/SFTP et dispose
 d'une intégration avancée pour **o2switch** (ouverture automatique du pare-feu
 via l'API cPanel).
+
+N'étant plus lié à Windows, SiteWatch convient aux installations sobres et
+toujours allumées :
+
+- un **Raspberry Pi** qui surveille plusieurs sites en permanence ;
+- une **VM Linux** exécutant SiteWatch en tâche planifiée ;
+- un **NAS Debian** ou un **mini-PC fanless** consommant quelques watts.
 
 ## Pourquoi SiteWatch ?
 

@@ -12,6 +12,7 @@
 #include "core/model/Stats.h"
 #include "core/model/LogEntry.h"
 #include "ui/UrlReport.h"
+#include "ui/Icons.h"
 
 class QComboBox;
 class QTabWidget;
@@ -111,7 +112,7 @@ private:
     std::vector<urlreport::Group> groupsFor(QTableWidget* table, DetailSource src,
                                             const std::vector<int>& rows) const;
 
-    QWidget* makeKpiCard(const QString& emoji, const QString& title,
+    QWidget* makeKpiCard(icons::Glyph glyph, const QString& title,
                          const QString& subRole, Kpi& out);
 
     Config  config_;

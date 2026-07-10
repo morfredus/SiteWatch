@@ -1,8 +1,8 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.4.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.2-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.20+-064F8C?logo=cmake)
@@ -10,12 +10,17 @@
 
 **🌍 Language:** English · [Français](README.fr.md)
 
-> ✅ **Build and runtime verified** on **Windows 11** (MSYS2/MinGW, Qt 6.11)
-> and **Linux Mint 22.3 “Zena”** — Ubuntu 24.04 LTS “Noble” base, Qt 6.4.
+> ✅ **Build and runtime verified** on **Windows 11** (MSYS2/MinGW, Qt 6.11),
+> **Linux Mint 22.3 “Zena”** (Ubuntu 24.04 LTS base, Qt 6.4) and **Raspberry Pi 4**
+> (Raspberry Pi OS 64-bit).
 
-**Desktop investigation tool for Apache and LiteSpeed access logs.**
+**Cross-platform desktop investigation tool for Apache and LiteSpeed access logs.**
 
-SiteWatch is a desktop application for website administration and monitoring.
+SiteWatch is a **cross-platform Qt / C++17 application** for website
+administration and monitoring. It runs natively on **Windows, Linux (x86_64 and
+ARM64) and Raspberry Pi** — Windows is one supported platform among others, not
+the only target.
+
 Unlike traditional analytics tools, it does not aim to count visitors or produce
 marketing reports. Its goal is much simpler:
 
@@ -29,6 +34,12 @@ compressed log files (`.gz`) directly.
 SiteWatch works with any host offering SSH/SFTP access, and ships with an
 advanced integration for **o2switch** (automatic firewall opening via the cPanel
 API).
+
+Because it is not tied to Windows, SiteWatch fits low-power, always-on setups:
+
+- a **Raspberry Pi** continuously watching several sites;
+- a **Linux VM** running SiteWatch as a scheduled task;
+- a **Debian NAS** or a **fanless mini-PC** drawing a few watts.
 
 ## Why SiteWatch?
 

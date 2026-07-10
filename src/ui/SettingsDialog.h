@@ -8,6 +8,7 @@
 #include <QDialog>
 #include <vector>
 #include <QString>
+#include <QIcon>
 #include "config/Config.h"
 
 class QLineEdit;
@@ -50,7 +51,7 @@ private:
     void showTestResult(int state, const QString& message);  // 1=OK, 2=échec, 0=à tester
     void applyResultStyle(int state);
     void updateSummary();
-    QString stateIcon(int index) const;
+    QIcon stateIcon(int index) const;
 
     Config config_;
     std::vector<int>     siteState_;      // 0 à tester, 1 valide, 2 erreur

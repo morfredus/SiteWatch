@@ -1,11 +1,21 @@
-# SiteWatch 1.4.1 — Release Notes
+# SiteWatch 1.4.2 — Release Notes
 
-A **tooling and documentation** release: no change to the application itself, but
-a simpler and clearer build strategy, plus a reorganized bilingual documentation.
-SiteWatch remains the Apache/LiteSpeed log analyzer for the administration and
-monitoring of websites hosted on o2switch (and compatible with other SSH hosts).
+SiteWatch is now a **cross-platform Qt/C++ application** — Windows is one
+supported platform among others. This release makes the UI icons render
+everywhere and adds the Raspberry Pi to the verified platforms.
 
-## What's new in 1.4.1
+## What's new in 1.4.2
+
+- **Icons visible everywhere.** The UI pictograms (KPI cards, health dots,
+  banner, etc.) used color emoji that stayed invisible on Linux/WSL. They are now
+  drawn from an **embedded icon font**, so they render identically on Windows,
+  Linux, WSL and Raspberry Pi.
+- **Officially cross-platform.** Verified on **Windows 11**, **Linux Mint 22.3**
+  and **Raspberry Pi 4** (Raspberry Pi OS 64-bit). This opens up always-on,
+  low-power deployments: a Raspberry Pi watching several sites, a Linux VM running
+  it as a scheduled task, a Debian NAS, or a fanless mini-PC.
+
+## Reminder — what's new in 1.4.1
 
 - **Simplified compilation chains.** Building Linux x86_64 **from Windows** no
   longer uses a fragile cross-compilation: you now use **WSL2** and build
@@ -124,11 +134,13 @@ Step-by-step guide (French): [docs/fr/DEPANNAGE_LOGS.md](docs/fr/DEPANNAGE_LOGS.
 
 ## Requirements
 
-- **Windows** 10 / 11 (64-bit), or **Linux** 64-bit (x86_64). The AppImage may
-  require FUSE 2 on some recent distributions (see the Linux guide).
+- **Windows** 10 / 11 (64-bit), or **Linux** 64-bit — **x86_64 or ARM64**
+  (including Raspberry Pi). The AppImage may require FUSE 2 on some recent
+  distributions (see the Linux guide).
 
-> Build and runtime verified on **Windows 11** (MSYS2/MinGW, Qt 6.11) and
-> **Linux Mint 22.3 “Zena”** (Ubuntu 24.04 LTS “Noble” base, Qt 6.4).
+> Build and runtime verified on **Windows 11** (MSYS2/MinGW, Qt 6.11),
+> **Linux Mint 22.3 “Zena”** (Ubuntu 24.04 LTS “Noble” base, Qt 6.4) and
+> **Raspberry Pi 4** (Raspberry Pi OS 64-bit).
 - **SSH/SFTP** access to the hosting (SSH key recommended).
 - For o2switch: SSH access enabled + a **cPanel API token** for automatic firewall
   opening.

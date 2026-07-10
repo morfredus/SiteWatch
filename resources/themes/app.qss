@@ -34,6 +34,10 @@ QLabel[panelTitle="true"] { font-weight: 600; padding: 2px; }
 /* Libellés secondaires gris (méta, intros, notes, indices…). */
 QLabel[muted="true"] { color: @{textMuted}; }
 
+/* Icône de carte KPI : police d'icônes embarquée, teintée comme la sous-valeur
+   (la couleur vient des règles QLabel[kpi="…"] ci-dessous). */
+QLabel#cardIcon { font-family: 'SiteWatch Icons'; font-size: 20px; }
+
 /* Sous-valeur des cartes KPI : couleur selon la nature de l'indicateur. */
 QLabel[kpi="neutral"] { color: @{textMuted};  font-weight: 600; }
 QLabel[kpi="good"]    { color: @{kpiGood};    font-weight: 600; }
@@ -57,7 +61,8 @@ QPushButton#dangerButton:pressed { background: @{dangerPressed}; }
 QPushButton#dangerButton:disabled { background: @{disabledBg}; color: @{disabledText}; }
 
 /* Petit bouton « œil » (afficher/masquer un mot de passe). */
-QToolButton#eye { border: none; font-size: 15px; padding: 2px; background: transparent; }
+QToolButton#eye { border: none; font-family: 'SiteWatch Icons'; font-size: 14px;
+                  padding: 2px; background: transparent; color: @{textMuted}; }
 
 /* --- Champs de saisie --------------------------------------------------- */
 QComboBox, QDateEdit, QLineEdit, QSpinBox {
@@ -151,7 +156,11 @@ QFrame#banner[level="success"] { background: @{okBg};     border-color: @{ok}; }
 QFrame#banner[level="warn"]    { background: @{warnBg};   border-color: @{warn}; }
 QFrame#banner[level="error"]   { background: @{dangerBg}; border-color: @{danger}; }
 
-QLabel#bannerIcon { font-size: 16px; }
+QLabel#bannerIcon { font-family: 'SiteWatch Icons'; font-size: 16px; color: @{textMuted}; }
+QLabel#bannerIcon[level="success"] { color: @{ok}; }
+QLabel#bannerIcon[level="warn"]    { color: @{warn}; }
+QLabel#bannerIcon[level="error"]   { color: @{danger}; }
+QLabel#bannerIcon[level="info"]    { color: @{accent}; }
 QLabel#bannerText { color: @{text}; font-size: 12px; }
 QLabel#bannerText[level="success"] { color: @{ok}; }
 QLabel#bannerText[level="warn"]    { color: @{warn}; }
@@ -160,10 +169,10 @@ QLabel#bannerText[level="error"]   { color: @{danger}; }
 /* Bouton d'action de la bannière (ex. « Utiliser ce filtre »). */
 QPushButton#bannerAction { padding: 5px 12px; }
 
-/* Croix de fermeture de la bannière. */
+/* Croix de fermeture de la bannière (police d'icônes). */
 QToolButton#bannerClose {
     border: none; background: transparent; color: @{textMuted};
-    font-size: 13px; font-weight: 700; padding: 2px 6px;
+    font-family: 'SiteWatch Icons'; font-size: 12px; padding: 2px 6px;
 }
 QToolButton#bannerClose:hover { color: @{text}; }
 

@@ -5,7 +5,11 @@
  */
 
 #include "ui/SettingsDialog.h"
+#include "ui/Icons.h"
+#include "ui/Theme.h"
 
+#include <QColor>
+#include <QListWidgetItem>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -61,7 +65,7 @@ void addRow(QFormLayout* form, const QString& label, QWidget* field) {
 // Petit bouton "œil" pour afficher/masquer un champ masqué.
 QToolButton* makeEye(QLineEdit* edit) {
     auto* eye = new QToolButton;
-    eye->setText("👁");
+    eye->setText(icons::ch(icons::Glyph::Eye));
     eye->setCheckable(true);
     eye->setCursor(Qt::PointingHandCursor);
     eye->setToolTip("Afficher / masquer");
@@ -272,20 +276,21 @@ void SettingsDialog::buildUi() {
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
-QString SettingsDialog::stateIcon(int index) const {
-    if (index < 0 || index >= static_cast<int>(siteState_.size())) return "🟠 ";
-    switch (siteState_[index]) {
-        case 1:  return "🟢 ";   // valide
-        case 2:  return "🔴 ";   // erreur
-        default: return "🟠 ";   // à tester
+QIcon SettingsDialog::stateIcon(int index) const {
+    const char* tok = "warn";                       // à tester (orange) par défaut
+    if (index >= 0 && index < static_cast<int>(siteState_.size())) {
+        if (siteState_[index] == 1)      tok = "ok";      // valide (vert)
+        else if (siteState_[index] == 2) tok = "danger";  // erreur (rouge)
     }
+    return icons::icon(icons::Glyph::Dot, QColor(Theme::instance().color(tok)), 12);
 }
 
 void SettingsDialog::refreshSiteList() {
     loading_ = true;
     sitesList_->clear();
     for (int i = 0; i < static_cast<int>(config_.sites.size()); ++i)
-        sitesList_->addItem(stateIcon(i) + QString::fromStdString(config_.sites[i].name));
+        sitesList_->addItem(new QListWidgetItem(
+            stateIcon(i), QString::fromStdString(config_.sites[i].name)));
     loading_ = false;
 }
 
@@ -377,8 +382,10 @@ void SettingsDialog::onSiteChanged(int row) {
 
 void SettingsDialog::onNameEdited(const QString& text) {
     if (loading_) return;
-    if (auto* item = sitesList_->currentItem())
-        item->setText(stateIcon(current_) + text);
+    if (auto* item = sitesList_->currentItem()) {
+        item->setIcon(stateIcon(current_));
+        item->setText(text);
+    }
 }
 
 void SettingsDialog::onAddSite() {
@@ -430,8 +437,10 @@ void SettingsDialog::showTestResult(int state, const QString& message) {
     if (current_ >= 0 && current_ < static_cast<int>(siteState_.size())) {
         siteState_[current_] = state;
         lastReport_[current_] = message;
-        if (auto* item = sitesList_->currentItem())
-            item->setText(stateIcon(current_) + QString::fromStdString(config_.sites[current_].name));
+        if (auto* item = sitesList_->currentItem()) {
+            item->setIcon(stateIcon(current_));
+            item->setText(QString::fromStdString(config_.sites[current_].name));
+        }
     }
 }
 

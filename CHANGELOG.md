@@ -2,6 +2,27 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.4.2] — 2026-07-10
+
+### Fixed
+
+- **UI pictograms now display universally** (Windows, Linux, WSL, Raspberry Pi).
+  The interface used Unicode color emoji (KPI icons, health dots, banner, etc.),
+  which are absent from default Linux/WSL fonts and poorly rendered by Qt 6.4 —
+  they showed as empty “tofu” boxes. They are replaced by an **embedded icon
+  font** (`resources/fonts/SiteWatchIcons.ttf`, a ~4 KB subset of Font Awesome
+  Free), loaded at startup and colored via the theme. New `src/ui/Icons` module.
+
+### Changed
+
+- **SiteWatch is now positioned as a cross-platform Qt/C++ application** — Windows
+  is one supported platform among others, not the only target. Documentation
+  updated accordingly (README, README.fr).
+- **Raspberry Pi 4** (Raspberry Pi OS 64-bit) added to the verified platforms,
+  alongside Windows 11 and Linux Mint 22.3. This enables always-on, low-power
+  deployments (Raspberry Pi, Linux VM as a scheduled task, Debian NAS, fanless
+  mini-PC).
+
 ## [1.4.1] — 2026-07-10
 
 Tooling and documentation release; no application code change.

@@ -8,6 +8,7 @@
 #include <QIcon>
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
+#include "ui/Icons.h"
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
@@ -18,6 +19,10 @@ int main(int argc, char* argv[]) {
     // (voir Theme.cpp), sans toucher à cet emplacement.
     app.setApplicationName("SiteWatch");
     app.setWindowIcon(QIcon(":/app.ico"));
+
+    // Charge la police d'icônes AVANT le thème : la feuille de style s'y réfère
+    // par font-family (« SiteWatch Icons ») pour les pictogrammes de l'UI.
+    icons::family();
 
     // Apparence : la feuille de style est externalisée (resources/themes/).
     // Le thème (clair / sombre / système) est restauré depuis les préférences.

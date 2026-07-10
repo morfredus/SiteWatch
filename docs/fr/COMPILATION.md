@@ -127,7 +127,8 @@ cmake --build --preset linux-arm64
 
 La compilation native sur le Raspberry utilise exactement les bibliothèques de la
 machine : aucun sysroot ni copie de Qt à gérer. C'est aujourd'hui la voie ARM
-recommandée.
+recommandée. **Compilation et exécution vérifiées sur Raspberry Pi 4** (Raspberry
+Pi OS 64 bits).
 
 ---
 

@@ -71,6 +71,7 @@ set(CORE_HEADERS
 set(UI_SOURCES
     src/main.cpp
     src/ui/Theme.cpp
+    src/ui/Icons.cpp
     src/ui/MainWindow.cpp
     src/ui/SettingsDialog.cpp
     src/ui/DetailDialog.cpp
@@ -80,6 +81,7 @@ set(UI_SOURCES
 
 set(UI_HEADERS
     src/ui/Theme.h
+    src/ui/Icons.h
     src/ui/MainWindow.h
     src/ui/SettingsDialog.h
     src/ui/DetailDialog.h
