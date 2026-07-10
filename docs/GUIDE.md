@@ -1,12 +1,14 @@
 # Guide utilisateur — SiteWatch
 
 Ce guide explique la configuration et l'utilisation quotidienne de SiteWatch.
-Pour l'installation/compilation, voir le [README](README.md).
+Pour l'installation/compilation, voir le [README](../README.md).
 Sous **Linux**, suivre le guide dédié
-[Installer et lancer SiteWatch sous Linux](docs/INSTALL_LINUX.md).
+[Installer et lancer SiteWatch sous Linux](INSTALL_LINUX.md).
 Sous **Windows**, pour débuter, suivre le guide
-[Compiler SiteWatch quand on débute](docs/BUILD_FOR_BEGINNERS.md).
-Pour les évolutions envisagées, consulter la [roadmap](ROADMAP.md).
+[Compiler SiteWatch quand on débute](BUILD_FOR_BEGINNERS.md).
+En cas de message « aucun log trouvé », voir le
+[guide de dépannage du téléchargement](DEPANNAGE_LOGS.md).
+Pour les évolutions envisagées, consulter la [roadmap](../ROADMAP.md).
 
 ---
 
@@ -92,12 +94,26 @@ o2switch exige une **clé SSH autorisée** et l'**ouverture du pare-feu**.
 
 ## 4. Utilisation quotidienne
 
-### Synchroniser / Analyser
+### Télécharger les logs / Analyser
 
-- **Synchroniser** : ouvre le pare-feu, télécharge les nouveaux logs (barre de
-  progression), puis analyse. Les fichiers déjà présents et inchangés ne sont
-  jamais retéléchargés.
+- **Télécharger les logs** : ouvre le pare-feu, télécharge les nouveaux logs
+  (barre de progression), puis analyse. Les fichiers déjà présents et inchangés
+  ne sont jamais retéléchargés.
 - **Analyser** : (re)analyse les logs déjà en cache, sans connexion réseau.
+
+À la fin (ou en cas de problème), un **bandeau coloré** s'affiche sous la barre
+d'outils, sans bloquer l'application :
+
+| Couleur | Signification |
+|---|---|
+| 🟢 **Vert** | Succès : nombre de fichiers téléchargés, ou « déjà à jour ». |
+| 🟠 **Orange** | Avertissement : aucun log présent, ou des logs existent mais aucun ne correspond au filtre. |
+| 🔴 **Rouge** | Erreur : connexion impossible, pare-feu refusé, ou dossier distant illisible. |
+
+Quand des logs existent mais ne correspondent pas au filtre, SiteWatch peut
+proposer un bouton **« Utiliser ce filtre : … »** : un clic enregistre le filtre
+proposé et relance aussitôt le téléchargement. Détails et exemples :
+[guide de dépannage du téléchargement](DEPANNAGE_LOGS.md).
 
 ### Période
 
@@ -133,7 +149,7 @@ d'attaque ou l'erreur (Sécurité), l'activité WordPress (Activité WP), la
 provenance (Référents), ou l'URL du résultat (Recherche).
 
 Pour un exemple réel d'investigation, lire les
-[études de cas](docs/CASE_STUDIES.md). Le premier cas montre comment des 404
+[études de cas](CASE_STUDIES.md). Le premier cas montre comment des 404
 peu visibles dans les logs bruts ont permis d'identifier une extension WordPress
 devenue inutile.
 
@@ -180,6 +196,11 @@ SiteWatch cible o2switch mais reste ouvert :
    **contenir** (ex. `monsite.fr` ou `access`). Cela remplace la détection
    automatique o2switch.
 
+   Souvent, vous n'avez rien à calculer vous-même : lancez **Télécharger les
+   logs**, et si aucun fichier ne correspond, SiteWatch **propose directement le
+   bon filtre** avec un bouton **« Utiliser ce filtre »**. Voir le
+   [guide de dépannage du téléchargement](DEPANNAGE_LOGS.md).
+
 ---
 
 ## 7. Aide
@@ -194,4 +215,4 @@ SiteWatch cible o2switch mais reste ouvert :
 Copyright (C) 2026 morfredus
 
 Ce projet est distribué sous les termes de la **GNU General Public License v3.0**.
-Voir le fichier [`LICENSE`](LICENSE) pour le texte complet.
+Voir le fichier [`LICENSE`](../LICENSE) pour le texte complet.

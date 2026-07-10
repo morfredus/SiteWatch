@@ -6,6 +6,7 @@
 
 #pragma once
 #include <QMainWindow>
+#include <functional>
 #include <vector>
 #include "config/Config.h"
 #include "core/model/Stats.h"
@@ -23,6 +24,9 @@ class QDateEdit;
 class QProgressBar;
 class QVBoxLayout;
 class QCheckBox;
+class QFrame;
+class QPushButton;
+class QToolButton;
 QT_BEGIN_NAMESPACE
 class QChartView;
 QT_END_NAMESPACE
@@ -62,6 +66,20 @@ private:
 
     // Configuration du site actuellement sélectionné (ou nullptr).
     const SiteConfig* currentSite() const;
+    // Variante modifiable (pour appliquer un filtre déduit puis sauvegarder).
+    SiteConfig* currentSiteMutable();
+
+    // --- Bannière intégrée (messages non bloquants remplaçant les MessageBox) ---
+    enum class BannerLevel { Info, Success, Warning, Error };
+    // Affiche la bannière. 'html' accepte du texte riche ; si 'actionText' est
+    // non vide, un bouton d'action est affiché et déclenche 'onAction'.
+    void showBanner(BannerLevel level, const QString& html,
+                    const QString& actionText = {},
+                    std::function<void()> onAction = {});
+    void hideBanner();
+    // Applique un filtre déduit au site courant, l'enregistre puis relance la
+    // synchronisation (bouton « Utiliser ce filtre »).
+    void applySuggestedFilter(const QString& filter);
 
     // Chemin du config.json (emplacement standard %LOCALAPPDATA%\SiteWatch).
     static QString configFilePath();
@@ -139,6 +157,14 @@ private:
     QLineEdit*    searchEdit_  = nullptr;
     QTableWidget* searchTable_ = nullptr;
     QLabel*       searchInfo_  = nullptr;
+
+    // --- Bannière intégrée ---
+    QFrame*      banner_       = nullptr;
+    QLabel*      bannerIcon_   = nullptr;
+    QLabel*      bannerText_   = nullptr;
+    QPushButton* bannerAction_ = nullptr;
+    QToolButton* bannerClose_  = nullptr;
+    std::function<void()> bannerActionFn_;
 
     // --- Barre de statut ---
     QProgressBar* progressBar_ = nullptr;

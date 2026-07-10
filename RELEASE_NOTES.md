@@ -1,12 +1,28 @@
-# SiteWatch 1.3.1 — Notes de version
+# SiteWatch 1.4.0 — Notes de version
 
-Version qui ouvre grand **SiteWatch** à Linux (AppImage prête à l'emploi,
-intégration au bureau) et ajoute des **thèmes clair / sombre / système**.
-SiteWatch reste l'analyseur de logs Apache/LiteSpeed pour l'administration et la
-supervision de sites web hébergés sur o2switch (et compatible avec d'autres
-hébergeurs SSH).
+Version qui rend le **téléchargement des logs beaucoup plus intelligent** :
+SiteWatch explique désormais clairement ce qui se passe et vous guide au lieu de
+laisser un simple message discret. SiteWatch reste l'analyseur de logs
+Apache/LiteSpeed pour l'administration et la supervision de sites web hébergés
+sur o2switch (et compatible avec d'autres hébergeurs SSH).
 
-## Corrigé dans 1.3.1
+## Nouveautés dans 1.4.0
+
+- **Assistant de téléchargement des logs.** SiteWatch distingue maintenant les
+  différentes causes d'un problème et les affiche dans une **bannière intégrée**
+  (plus de fenêtre bloquante) : connexion impossible, pare-feu o2switch refusé,
+  dossier distant illisible, aucun log présent, ou logs présents mais ne
+  correspondant pas au filtre.
+- **Filtre déduit automatiquement.** Quand des fichiers existent mais qu'aucun ne
+  correspond, SiteWatch lit les noms présents, propose le bon **filtre** (ex.
+  `tabacclaouey.fr`) et un bouton **« Utiliser ce filtre »** qui l'applique et
+  relance le téléchargement — sans passer par la documentation.
+- **Messages rassurants** en cas de succès (fichiers téléchargés ou déjà à jour),
+  adaptés aux thèmes clair / sombre / système.
+
+Guide pas à pas : [docs/DEPANNAGE_LOGS.md](docs/DEPANNAGE_LOGS.md).
+
+## Rappel — corrigé dans 1.3.1
 
 - **Compilation sous Linux avec Qt < 6.5** (Qt système de certaines
   distributions) : la gestion du thème est protégée par des gardes de version,
@@ -108,7 +124,7 @@ hébergeurs SSH).
 - Pour o2switch : l'accès SSH activé + un **jeton d'API cPanel** pour
   l'ouverture automatique du pare-feu.
 
-Voir le [Guide utilisateur](GUIDE.md) pour la prise en main pas à pas.
+Voir le [Guide utilisateur](docs/GUIDE.md) pour la prise en main pas à pas.
 Voir aussi la [roadmap](ROADMAP.md) pour les évolutions envisagées.
 Pour comprendre l'intérêt concret de l'analyse, consulter les
 [études de cas](docs/CASE_STUDIES.md).

@@ -51,6 +51,7 @@ set(CORE_SOURCES
     src/core/analytics/StatsEngine.cpp
     src/core/cache/CacheManager.cpp
     src/core/net/SftpClient.cpp
+    src/core/net/LogDiscovery.cpp
 )
 
 set(CORE_HEADERS
@@ -61,6 +62,7 @@ set(CORE_HEADERS
     src/core/analytics/StatsEngine.h
     src/core/cache/CacheManager.h
     src/core/net/SftpClient.h
+    src/core/net/LogDiscovery.h
     src/core/model/LogEntry.h
     src/core/model/Stats.h
 )

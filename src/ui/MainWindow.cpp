@@ -9,6 +9,7 @@
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -68,6 +69,7 @@
 #include "core/analytics/StatsEngine.h"
 #include "core/analytics/BotDetector.h"
 #include "core/net/SftpClient.h"
+#include "core/net/LogDiscovery.h"
 #include "ui/SettingsDialog.h"
 #include "ui/DetailDialog.h"
 #include "ui/CacheCleanupDialog.h"
@@ -345,21 +347,12 @@ bool isSystemRequest(const std::string& url) {
         "humans.txt", "security.txt", "apple-touch-icon", "browserconfig.xml", "/feed"});
 }
 
+// Appartenance d'un fichier à un site : logique déplacée dans le module cœur
+// LogDiscovery (portable, testable). Conservée ici comme mince adaptateur pour
+// ne pas alourdir les nombreux points d'appel de l'interface.
 bool fileBelongsToSite(const std::string& filename, const std::string& name,
                        const std::string& logMatch = "") {
-    // Mode générique (autre hébergeur) : le nom de fichier contient le motif.
-    if (!logMatch.empty())
-        return lowerStr(filename).find(lowerStr(logMatch)) != std::string::npos;
-    // Mode o2switch : préfixe (avant 1er point) == nom du site sans les points.
-    if (name.empty()) return true;
-    auto keyOf = [](const std::string& s) {
-        std::string r;
-        for (unsigned char c : s)
-            if (c != '.') r += static_cast<char>(std::tolower(c));
-        return r;
-    };
-    const std::string prefix = filename.substr(0, filename.find('.'));
-    return keyOf(prefix) == keyOf(name);
+    return logdiscovery::belongsToSite(filename, name, logMatch);
 }
 
 // Calcule les statistiques d'un site sur une période (sans conserver les entrées).
@@ -529,6 +522,40 @@ void MainWindow::buildUi() {
     connect(applyBtn, &QPushButton::clicked, this, &MainWindow::onAnalyze);
     topBar->addWidget(applyBtn);
     mainLayout->addLayout(topBar);
+
+    // --- Bannière intégrée (messages non bloquants) ---
+    banner_ = new QFrame;
+    banner_->setObjectName("banner");
+    banner_->setVisible(false);
+    auto* bannerRow = new QHBoxLayout(banner_);
+    bannerRow->setContentsMargins(10, 8, 8, 8);
+    bannerRow->setSpacing(8);
+    bannerIcon_ = new QLabel;
+    bannerIcon_->setObjectName("bannerIcon");
+    bannerRow->addWidget(bannerIcon_, 0, Qt::AlignTop);
+    bannerText_ = new QLabel;
+    bannerText_->setObjectName("bannerText");
+    bannerText_->setWordWrap(true);
+    bannerText_->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    bannerText_->setOpenExternalLinks(false);
+    bannerRow->addWidget(bannerText_, 1);
+    bannerAction_ = new QPushButton;
+    bannerAction_->setObjectName("bannerAction");
+    bannerAction_->setVisible(false);
+    connect(bannerAction_, &QPushButton::clicked, this, [this] {
+        // Copie locale : l'action peut réinitialiser bannerActionFn_ (via
+        // hideBanner/showBanner) pendant son exécution.
+        if (bannerActionFn_) { auto fn = bannerActionFn_; fn(); }
+    });
+    bannerRow->addWidget(bannerAction_, 0, Qt::AlignVCenter);
+    bannerClose_ = new QToolButton;
+    bannerClose_->setObjectName("bannerClose");
+    bannerClose_->setText("✕");
+    bannerClose_->setToolTip("Masquer ce message");
+    bannerClose_->setCursor(Qt::PointingHandCursor);
+    connect(bannerClose_, &QToolButton::clicked, this, &MainWindow::hideBanner);
+    bannerRow->addWidget(bannerClose_, 0, Qt::AlignTop);
+    mainLayout->addWidget(banner_);
 
     // --- Ligne permanente : site / periode / fichiers / taille ---
     metaHeader_ = new QLabel("Sélectionnez un site puis cliquez sur Analyser.");
@@ -839,6 +866,70 @@ const SiteConfig* MainWindow::currentSite() const {
     return nullptr;
 }
 
+SiteConfig* MainWindow::currentSiteMutable() {
+    const QString name = siteSelector_->currentText();
+    for (auto& s : config_.sites)
+        if (QString::fromStdString(s.name) == name) return &s;
+    return nullptr;
+}
+
+// Force la ré-application de la feuille de style après un changement de
+// propriété dynamique (level="…"), sinon Qt ne recalcule pas les couleurs.
+static void repolish(QWidget* w) {
+    if (!w) return;
+    w->style()->unpolish(w);
+    w->style()->polish(w);
+    w->update();
+}
+
+void MainWindow::showBanner(BannerLevel level, const QString& html,
+                            const QString& actionText,
+                            std::function<void()> onAction) {
+    const char* levelName = "info";
+    const char* icon = "ℹ️";
+    switch (level) {
+        case BannerLevel::Success: levelName = "success"; icon = "✅"; break;
+        case BannerLevel::Warning: levelName = "warn";    icon = "⚠️"; break;
+        case BannerLevel::Error:   levelName = "error";   icon = "⛔"; break;
+        case BannerLevel::Info:    levelName = "info";    icon = "ℹ️"; break;
+    }
+    banner_->setProperty("level", levelName);
+    bannerText_->setProperty("level", levelName);
+    bannerIcon_->setText(icon);
+    bannerText_->setText(html);
+
+    bannerActionFn_ = std::move(onAction);
+    const bool hasAction = !actionText.isEmpty() && bannerActionFn_;
+    bannerAction_->setVisible(hasAction);
+    if (hasAction) bannerAction_->setText(actionText);
+
+    repolish(banner_);
+    repolish(bannerText_);
+    banner_->setVisible(true);
+}
+
+void MainWindow::hideBanner() {
+    banner_->setVisible(false);
+    bannerActionFn_ = nullptr;
+}
+
+void MainWindow::applySuggestedFilter(const QString& filter) {
+    SiteConfig* site = currentSiteMutable();
+    if (!site) return;
+    site->logMatch = filter.toStdString();
+
+    std::string saveErr;
+    if (!Config::save(configFilePath().toStdString(), config_, saveErr)) {
+        showBanner(BannerLevel::Error,
+            "Impossible d'enregistrer le filtre : " +
+            QString::fromStdString(saveErr).toHtmlEscaped());
+        return;
+    }
+    // Le filtre est enregistré : on relance la synchronisation, qui va cette
+    // fois retenir les bons fichiers puis les télécharger.
+    onSync();
+}
+
 QString MainWindow::configFilePath() {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     QDir().mkpath(dir);
@@ -982,13 +1073,18 @@ bool MainWindow::whitelistSsh(const SiteConfig& site, QString& error) {
 }
 
 void MainWindow::onSync() {
+    hideBanner();   // repartir d'un état propre à chaque tentative
+
     if (!configError_.isEmpty() || config_.sites.empty()) {
-        QMessageBox::warning(this, "SiteWatch", "Aucune configuration valide.");
+        showBanner(BannerLevel::Error,
+            "Aucune configuration valide. Ouvrez <b>Fichier → Configuration…</b> "
+            "pour renseigner au moins un site.");
         return;
     }
 
     const SiteConfig* site = currentSite();
     if (!site) return;
+    const QString siteLabel = QString::fromStdString(site->name).toHtmlEscaped();
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
@@ -999,8 +1095,11 @@ void MainWindow::onSync() {
         QString wlErr;
         if (!whitelistSsh(*site, wlErr)) {
             QApplication::restoreOverrideCursor();
-            QMessageBox::warning(this, "SFTP — pare-feu o2switch", wlErr);
             statusBar()->showMessage("Échec de l'autorisation pare-feu.");
+            showBanner(BannerLevel::Error,
+                "<b>Pare-feu o2switch : autorisation refusée.</b><br>"
+                "Vérifiez le <b>jeton d'API cPanel</b> dans la configuration du site. "
+                "Détail : " + wlErr.toHtmlEscaped());
             return;
         }
     }
@@ -1012,9 +1111,12 @@ void MainWindow::onSync() {
     std::string err;
     if (!client.connect(*site, err)) {
         QApplication::restoreOverrideCursor();
-        QMessageBox::warning(this, "SFTP — connexion",
-                             QString::fromStdString(err));
         statusBar()->showMessage("Échec de la connexion SFTP.");
+        showBanner(BannerLevel::Error,
+            "<b>Connexion SFTP impossible</b> à " +
+            QString::fromStdString(site->host).toHtmlEscaped() + ".<br>"
+            "Vérifiez l'hôte, l'utilisateur et le mot de passe (ou la clé SSH). "
+            "Détail : " + QString::fromStdString(err).toHtmlEscaped());
         return;
     }
 
@@ -1022,11 +1124,64 @@ void MainWindow::onSync() {
     if (remote.empty() && !err.empty()) {
         QApplication::restoreOverrideCursor();
         client.disconnect();
-        QMessageBox::warning(this, "SFTP — liste des logs",
-                             QString::fromStdString(err));
+        statusBar()->showMessage("Dossier distant illisible.");
+        showBanner(BannerLevel::Error,
+            "<b>Dossier distant illisible :</b> " +
+            QString::fromStdString(site->remoteLogDir).toHtmlEscaped() + ".<br>"
+            "Vérifiez le chemin « Dossier distant des logs » dans la configuration. "
+            "Détail : " + QString::fromStdString(err).toHtmlEscaped());
         return;
     }
 
+    // Diagnostic : le dossier contient-il des logs, et correspondent-ils au
+    // site (filtre/domaine) ? On distingue « rien » de « présents mais filtrés ».
+    std::vector<std::string> remoteNames;
+    remoteNames.reserve(remote.size());
+    for (const auto& rf : remote) remoteNames.push_back(rf.name);
+    const logdiscovery::Report diag = logdiscovery::analyze(remoteNames, *site);
+
+    if (diag.outcome == logdiscovery::Outcome::NoFilesInDir) {
+        QApplication::restoreOverrideCursor();
+        client.disconnect();
+        statusBar()->showMessage("Aucun log sur le serveur.");
+        showBanner(BannerLevel::Warning,
+            "<b>Aucun log (.gz) dans le dossier distant</b> " +
+            QString::fromStdString(site->remoteLogDir).toHtmlEscaped() + ".<br>"
+            "Vérifiez le dossier des logs, ou attendez la rotation des logs de "
+            "votre hébergeur (les fichiers compressés apparaissent souvent le lendemain).");
+        return;
+    }
+
+    if (diag.outcome == logdiscovery::Outcome::NoneMatch) {
+        QApplication::restoreOverrideCursor();
+        client.disconnect();
+        statusBar()->showMessage("Aucun fichier ne correspond au filtre.");
+        const QString current = site->logMatch.empty()
+            ? QStringLiteral("détection automatique")
+            : QStringLiteral("« %1 »").arg(
+                  QString::fromStdString(site->logMatch).toHtmlEscaped());
+        QString msg =
+            QString("<b>%1 fichier(s) présent(s) sur le serveur, mais aucun ne "
+                    "correspond au filtre actuel (%2).</b>")
+                .arg(diag.totalGz).arg(current);
+        if (diag.suggestion.valid) {
+            const QString filter =
+                QString::fromStdString(diag.suggestion.filter);
+            msg += QString("<br>SiteWatch a détecté un préfixe commun : <b>%1</b> "
+                           "(%2 fichier(s)).")
+                       .arg(filter.toHtmlEscaped()).arg(diag.suggestion.wouldMatch);
+            showBanner(BannerLevel::Warning, msg,
+                       "Utiliser ce filtre : " + filter,
+                       [this, filter] { applySuggestedFilter(filter); });
+        } else {
+            msg += "<br>Renseignez le champ <b>Filtre des logs (avancé)</b> dans "
+                   "la configuration du site pour cibler les bons fichiers.";
+            showBanner(BannerLevel::Warning, msg);
+        }
+        return;
+    }
+
+    // Outcome::Matched : des fichiers correspondent → téléchargement.
     // 1er passage : ne retenir que les logs de CE site (filtre domaine) et
     //               non déjà présents en cache avec la même taille.
     CacheManager cache(config_.cacheRoot);
@@ -1085,6 +1240,23 @@ void MainWindow::onSync() {
         QString("SFTP : %1 téléchargé(s), %2 en cache, %3 autre(s) domaine(s) ignoré(s)%4.")
             .arg(downloaded).arg(skipped).arg(ignored)
             .arg(failed ? QString(", %1 échec(s)").arg(failed) : QString()));
+
+    // Bannière de synthèse (non bloquante).
+    if (failed > 0 && downloaded == 0) {
+        showBanner(BannerLevel::Error,
+            QString("<b>Échec du téléchargement</b> pour %1. "
+                    "Réessayez ou vérifiez la connexion.").arg(siteLabel));
+    } else if (downloaded > 0) {
+        QString msg = QString("<b>%1 : %2 fichier(s) de logs téléchargé(s).</b>")
+                          .arg(siteLabel).arg(downloaded);
+        if (skipped) msg += QString(" %1 déjà à jour.").arg(skipped);
+        if (failed)  msg += QString(" %1 échec(s).").arg(failed);
+        showBanner(BannerLevel::Success, msg);
+    } else {
+        showBanner(BannerLevel::Success,
+            QString("<b>%1 : déjà à jour.</b> Aucun nouveau fichier à télécharger "
+                    "(%2 en cache).").arg(siteLabel).arg(skipped));
+    }
 
     onAnalyze();   // analyse immédiate des logs mis à jour
     refreshSitesOverview();

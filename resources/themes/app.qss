@@ -143,6 +143,30 @@ QLabel#verdict[state="danger"] { background: @{dangerBg}; color: @{danger}; }
 QLabel#verdict[state="warn"]   { background: @{warnBg};   color: @{warn}; }
 QLabel#verdict[state="ok"]     { background: @{okBg};     color: @{ok}; }
 
+/* --- Bannière intégrée (messages non bloquants) ------------------------- */
+QFrame#banner {
+    border-radius: 8px; border: 1px solid @{border}; background: @{surfaceAlt};
+}
+QFrame#banner[level="success"] { background: @{okBg};     border-color: @{ok}; }
+QFrame#banner[level="warn"]    { background: @{warnBg};   border-color: @{warn}; }
+QFrame#banner[level="error"]   { background: @{dangerBg}; border-color: @{danger}; }
+
+QLabel#bannerIcon { font-size: 16px; }
+QLabel#bannerText { color: @{text}; font-size: 12px; }
+QLabel#bannerText[level="success"] { color: @{ok}; }
+QLabel#bannerText[level="warn"]    { color: @{warn}; }
+QLabel#bannerText[level="error"]   { color: @{danger}; }
+
+/* Bouton d'action de la bannière (ex. « Utiliser ce filtre »). */
+QPushButton#bannerAction { padding: 5px 12px; }
+
+/* Croix de fermeture de la bannière. */
+QToolButton#bannerClose {
+    border: none; background: transparent; color: @{textMuted};
+    font-size: 13px; font-weight: 700; padding: 2px 6px;
+}
+QToolButton#bannerClose:hover { color: @{text}; }
+
 /* --- Résultat du test de connexion (Configuration) ---------------------- */
 QLabel#testResult {
     font-family: 'Cascadia Mono', 'Consolas', monospace;

@@ -2,6 +2,36 @@
 
 Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/).
 
+## [1.4.0] — 2026-07-10
+
+### Ajouté
+
+- **Assistant intelligent de téléchargement des logs.** Lors du clic sur
+  **Télécharger les logs**, SiteWatch distingue désormais clairement les
+  situations et l'explique dans une **bannière intégrée** (non bloquante, à la
+  place des anciennes fenêtres d'alerte) :
+  - **échec de connexion** (hôte, identifiants ou clé SSH) ;
+  - **pare-feu o2switch** refusé (jeton d'API cPanel) ;
+  - **dossier distant illisible** ;
+  - **aucun log présent** sur le serveur ;
+  - **des logs présents mais aucun ne correspond au filtre** actuel.
+- **Détection automatique du filtre.** Quand des fichiers existent mais qu'aucun
+  ne correspond, SiteWatch analyse les noms présents, en déduit le préfixe
+  commun (ex. `tabacclaouey.fr` à partir de `tabacclaouey.fr.ssl.log-…`) et
+  propose un bouton **« Utiliser ce filtre »** qui l'enregistre et relance
+  aussitôt le téléchargement.
+- **Bannières de succès** après un téléchargement (fichiers récupérés / déjà à
+  jour), cohérentes avec les thèmes clair / sombre / système.
+
+### Modifié
+
+- Nouveau module cœur **`LogDiscovery`** (C++17 pur, sans Qt ni réseau,
+  testable) : logique d'appartenance d'un fichier à un site et détection du
+  filtre, partagée entre le téléchargement et l'analyse.
+- **Réorganisation de la documentation** : le guide utilisateur passe de
+  `GUIDE.md` à **`docs/GUIDE.md`** ; ajout d'un index **`docs/README.md`** et
+  d'un guide de dépannage **`docs/DEPANNAGE_LOGS.md`**.
+
 ## [1.3.1] — 2026-07-10
 
 ### Corrigé

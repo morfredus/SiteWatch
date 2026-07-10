@@ -57,13 +57,17 @@ SiteWatch est conçu comme un **outil d'investigation** destiné aux administrat
 
 ## Documentation
 
-- 📖 **Guide utilisateur** : `GUIDE.md`
-- 🐧 **Installer et lancer sous Linux** : `docs/INSTALL_LINUX.md`
-- 🛠 **Compiler SiteWatch quand on débute (Windows)** : `docs/BUILD_FOR_BEGINNERS.md`
-- 📚 **Études de cas** : `docs/CASE_STUDIES.md`
-- 🗺 **Roadmap** : `ROADMAP.md`
-- 🤝 **Contribuer** : `CONTRIBUTING.md`
-- 📝 **Journal des versions** : `CHANGELOG.md`
+Toute la documentation utilisateur est regroupée dans le dossier
+[`docs/`](docs/README.md) (index complet).
+
+- 📖 **Guide utilisateur** : [`docs/GUIDE.md`](docs/GUIDE.md)
+- 🆘 **Dépannage du téléchargement des logs** : [`docs/DEPANNAGE_LOGS.md`](docs/DEPANNAGE_LOGS.md)
+- 🐧 **Installer et lancer sous Linux** : [`docs/INSTALL_LINUX.md`](docs/INSTALL_LINUX.md)
+- 🛠 **Compiler SiteWatch quand on débute (Windows)** : [`docs/BUILD_FOR_BEGINNERS.md`](docs/BUILD_FOR_BEGINNERS.md)
+- 📚 **Études de cas** : [`docs/CASE_STUDIES.md`](docs/CASE_STUDIES.md)
+- 🗺 **Roadmap** : [`ROADMAP.md`](ROADMAP.md)
+- 🤝 **Contribuer** : [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- 📝 **Journal des versions** : [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
 
@@ -341,6 +345,13 @@ Les téléchargements sont incrémentaux afin de limiter les transferts.
 
 Les journaux sont ensuite stockés dans le cache local de SiteWatch.
 
+Un **bandeau intégré** (vert / orange / rouge) résume ce qui s'est passé sans
+bloquer l'application : succès, erreur de connexion, ou logs présents mais ne
+correspondant pas au filtre. Dans ce dernier cas, SiteWatch **déduit le bon
+filtre** à partir des noms de fichiers et propose un bouton **« Utiliser ce
+filtre »** qui l'applique et relance le téléchargement. Détails :
+[docs/DEPANNAGE_LOGS.md](docs/DEPANNAGE_LOGS.md).
+
 ---
 
 ## 3. Choisir une période
@@ -582,7 +593,9 @@ Le dépôt contient une documentation complète destinée aussi bien aux utilisa
 | Document | Description |
 |----------|-------------|
 | `README.md` | Présentation générale du projet |
-| `GUIDE.md` | Guide utilisateur |
+| `docs/README.md` | Index de la documentation |
+| `docs/GUIDE.md` | Guide utilisateur |
+| `docs/DEPANNAGE_LOGS.md` | Dépannage du téléchargement des logs |
 | `CHANGELOG.md` | Historique des versions |
 | `ROADMAP.md` | Évolutions prévues |
 | `CONTRIBUTING.md` | Guide de contribution |
