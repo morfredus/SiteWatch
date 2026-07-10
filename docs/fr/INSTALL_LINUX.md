@@ -229,10 +229,9 @@ Prérequis : SiteWatch compilé **nativement** sur la même famille de distribut
 # x86_64
 cmake --preset linux       && cmake --build --preset linux
 # … ou ARM64 (Raspberry Pi)
-cmake --preset linux-arm64 && cmake --build --preset linux-arm64 && \
-  scripts/linux/package-deb.sh --build build-arm64
+cmake --preset linux-arm64 && cmake --build --preset linux-arm64
 
-# x86_64 : le dossier build/ par défaut suffit
+# Le script trouve tout seul le binaire dans build/ ou build-arm64/
 scripts/linux/package-deb.sh
 ```
 
@@ -293,6 +292,24 @@ AppImages. Deux solutions :
 
 Le fichier n'a pas encore été rendu exécutable. Reprendre l'étape
 [A.2](#a2-autoriser-lexécution).
+
+### Au lancement : « could not connect to display » ou « libxcb-cursor0 is needed »
+
+SiteWatch est une application **graphique** : elle doit être lancée depuis une
+**session de bureau**, pas depuis une connexion SSH sans affichage. Le message
+`qt.qpa.xcb: could not connect to display` signale précisément ce cas. Pour
+lancer à distance, utiliser le transfert X11 (`ssh -X`) ou ouvrir le bureau du
+Raspberry Pi.
+
+Le message `xcb-cursor0 or libxcb-cursor0 is needed` indique qu'il manque une
+bibliothèque exigée par Qt 6.5+ (absente par défaut sur Raspberry Pi OS) :
+
+```bash
+sudo apt install libxcb-cursor0
+```
+
+Le paquet `.deb` déclare désormais cette dépendance : après un
+`sudo apt install ./sitewatch_*.deb`, apt l'installe automatiquement.
 
 ### La commande `sitewatch` n'est pas trouvée après `install.sh`
 
