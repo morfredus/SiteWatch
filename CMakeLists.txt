@@ -40,6 +40,12 @@ else()
     set(LIBSSH2_TARGET PkgConfig::LIBSSH2)
 endif()
 
+# --- Modules communs « morf » (copies vendorées dans third_party/) ---------
+# Autonome : aucune dépendance à un dépôt externe, compilé dans l'exécutable.
+# Voir third_party/morf/README.md. Resynchro : scripts/sync-morf.(ps1|sh).
+add_subdirectory(third_party/morf/beacon)
+add_subdirectory(third_party/morf/update)
+
 # --- Sources --------------------------------------------------------------
 # Le coeur (core/) ne depend QUE de la bibliotheque standard, zlib et json.
 # Il ne connait NI Qt NI le reseau : il reste portable.
@@ -120,6 +126,9 @@ target_link_libraries(SiteWatch PRIVATE
     ZLIB::ZLIB
     nlohmann_json::nlohmann_json
     ${LIBSSH2_TARGET}
+    morfBeacon::morfBeacon
+    morfUpdate::morfUpdate
+    morfUpdate::Widgets
 )
 
 # Winsock, requis par libssh2 sur Windows.

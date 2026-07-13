@@ -127,6 +127,8 @@ horaire et quotidienne, avec copie et export CSV partout.
 - Configuration entièrement graphique
 - Thèmes clair / sombre / système (suit automatiquement l'apparence de l'OS)
 - Intégration de l'API o2switch pour l'ouverture automatique du pare-feu
+- Diffusion de présence sur le réseau local + endpoint de métriques (`/status`) pour une supervision centralisée
+- Vérification des mises à jour via les *releases* GitHub (silencieuse au démarrage, à la demande depuis le menu Aide)
 
 ---
 
@@ -175,6 +177,7 @@ Toute la documentation utilisateur est regroupée (en français) dans
 - 🐧 Installer et lancer sous Linux : [`docs/fr/INSTALL_LINUX.md`](docs/fr/INSTALL_LINUX.md)
 - 🛠 Compiler depuis les sources : [`docs/fr/COMPILATION.md`](docs/fr/COMPILATION.md)
 - 🧭 Architecture et philosophie : [`docs/fr/ARCHITECTURE.md`](docs/fr/ARCHITECTURE.md)
+- 🛰 Supervision réseau et mises à jour : [`docs/fr/SUPERVISION_ET_MAJ.md`](docs/fr/SUPERVISION_ET_MAJ.md)
 - 📚 Études de cas : [`docs/fr/CASE_STUDIES.md`](docs/fr/CASE_STUDIES.md)
 - 🗺 Roadmap : [`ROADMAP.md`](ROADMAP.md)
 - 🤝 Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md)

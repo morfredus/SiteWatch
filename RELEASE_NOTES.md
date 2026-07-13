@@ -1,10 +1,22 @@
-# SiteWatch 1.4.2 — Release Notes
+# SiteWatch 1.5.0 — Release Notes
 
-SiteWatch is now a **cross-platform Qt/C++ application** — Windows is one
-supported platform among others. This release makes the UI icons render
-everywhere and adds the Raspberry Pi to the verified platforms.
+This release adds **LAN supervision** and an **update check**, two small modules
+shared with the other morfredus desktop tools.
 
-## What's new in 1.4.2
+## What's new in 1.5.0
+
+- **LAN supervision (morfBeacon).** SiteWatch announces its presence on the local
+  network (a small UDP heartbeat) and exposes live metrics over a local HTTP
+  `/status` endpoint, so a running instance can be watched from a central
+  dashboard (RaspberryDashboard) — no scanning, no configuration, automatic
+  discovery.
+- **Update check (morfUpdate).** SiteWatch now checks GitHub Releases for a newer
+  version — silently at startup, and on demand via **Help → “Check for updates…”**.
+- Both are shared modules **vendored** in the project (`third_party/morf/`) and
+  compiled into the binary — nothing external to install, identical on Windows,
+  Linux and Raspberry Pi. See `docs/fr/SUPERVISION_ET_MAJ.md`.
+
+## Reminder — what's new in 1.4.2
 
 - **Icons visible everywhere.** The UI pictograms (KPI cards, health dots,
   banner, etc.) used color emoji that stayed invisible on Linux/WSL. They are now
