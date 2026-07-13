@@ -84,7 +84,7 @@ Ou avec le testeur fourni dans le dépôt morfBeacon (écoute le heartbeat +
 interroge `/status`, sans aucune dépendance) :
 
 ```sh
-python3 morfBeacon_travail/tools/fake_dashboard.py --poll
+python3 morfBeacon/tools/fake_dashboard.py --poll
 ```
 
 Il affiche `DECOUVERT SiteWatch@…` en quelques secondes, puis les métriques.
@@ -134,7 +134,7 @@ dans l'exécutable. Conséquences :
 ### Mettre à jour ces modules
 
 Ne modifiez pas le code sous `third_party/` : la **source de vérité** est dans les
-dépôts voisins `morfBeacon_travail` / `morfUpdate_travail`. Pour resynchroniser la
+dépôts voisins `morfBeacon` / `morfUpdate`. Pour resynchroniser la
 copie après une évolution :
 
 ```sh
