@@ -4,8 +4,18 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-07-13
+
 ### Added
 
+- **LAN supervision (morfBeacon) and update check (morfUpdate).** SiteWatch now
+  announces its presence on the local network (UDP heartbeat, port 45454) and
+  exposes live metrics over a small local HTTP endpoint (`/status`, port 8788), so
+  the running application can be watched from a central dashboard
+  (RaspberryDashboard). It also checks GitHub Releases for a newer version —
+  silently at startup, and on demand via **Help → "Check for updates…"**. Both are
+  shared modules vendored under `third_party/morf/` (compiled into the binary, no
+  external dependency). See [docs/fr/SUPERVISION_ET_MAJ.md](docs/fr/SUPERVISION_ET_MAJ.md) *(FR)*.
 - **Debian packaging script** `scripts/linux/package-deb.sh`: builds a `.deb`
   from a native Linux build (x86_64 or ARM64 / Raspberry Pi), with automatic
   dependency detection, for a clean install/removal via apt. Documented in

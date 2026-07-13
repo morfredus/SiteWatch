@@ -122,6 +122,8 @@ traffic, bots, AI bots, Google, HTTP errors, WordPress activity).
 - Fully graphical configuration
 - Light / dark / system themes (follows the OS appearance automatically)
 - o2switch API integration for automatic firewall opening
+- LAN presence broadcast and live metrics endpoint (`/status`) for central monitoring
+- Update check against GitHub Releases (silent at startup, on demand from the Help menu)
 
 ---
 
@@ -168,6 +170,7 @@ The full user documentation currently lives in French under
 - 🐧 Install & run on Linux (FR): [`docs/fr/INSTALL_LINUX.md`](docs/fr/INSTALL_LINUX.md)
 - 🛠 Build from source (FR): [`docs/fr/COMPILATION.md`](docs/fr/COMPILATION.md)
 - 🧭 Architecture & philosophy (FR): [`docs/fr/ARCHITECTURE.md`](docs/fr/ARCHITECTURE.md)
+- 🛰 LAN supervision & updates (FR): [`docs/fr/SUPERVISION_ET_MAJ.md`](docs/fr/SUPERVISION_ET_MAJ.md)
 - 📚 Case studies (FR): [`docs/fr/CASE_STUDIES.md`](docs/fr/CASE_STUDIES.md)
 - 🗺 Roadmap: [`ROADMAP.md`](ROADMAP.md)
 - 🤝 Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)

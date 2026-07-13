@@ -6,6 +6,10 @@
 
 #include "ui/MainWindow.h"
 
+#include <morfbeacon/PresenceService.h>
+#include <morfbeacon/IMetricsProvider.h>
+#include <morfupdate/UpdateDialog.h>
+
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
@@ -398,6 +402,48 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     resize(1180, 720);
     buildUi();
     loadConfiguration();
+
+    // --- Supervision LAN : présence UDP + endpoint /status (morfBeacon) -----
+    // Heartbeat « je suis actif » broadcast, plus /status interrogé à la demande
+    // par le RaspberryDashboard. Les métriques reflètent la config et la
+    // dernière analyse ; elles sont lues au moment de la requête (thread Qt).
+    morfbeacon::PresenceConfig beaconCfg;
+    beaconCfg.appName    = "SiteWatch";
+    beaconCfg.version    = SITEWATCH_VERSION;
+    beaconCfg.statusPort = 8788;                // port /status distinct de ComponentHub (8787)
+
+    presenceMetrics_ = std::make_unique<morfbeacon::FunctionMetricsProvider>(
+        [this]() {
+            QJsonObject m;
+            m["sites_configured"]    = static_cast<int>(config_.sites.size());
+            m["last_total_requests"] = static_cast<int>(lastStats_.totalRequests);
+            m["last_humans"]         = static_cast<int>(lastStats_.humans);
+            m["last_bots"]           = static_cast<int>(lastStats_.bots);
+            m["last_404"]            = static_cast<int>(lastStats_.errors404);
+            if (!lastStats_.lastDate.empty())
+                m["last_analysis_date"] = QString::fromStdString(lastStats_.lastDate);
+            return m;
+        });
+
+    presence_ = new morfbeacon::PresenceService(beaconCfg, presenceMetrics_.get());
+    presence_->start();
+
+    // Vérification silencieuse des mises à jour, peu après l'affichage de l'UI.
+    QTimer::singleShot(2000, this, [this]{ checkForUpdates(false); });
+}
+
+MainWindow::~MainWindow() {
+    // Arrête heartbeat + serveur AVANT la destruction de presenceMetrics_.
+    delete presence_;
+}
+
+void MainWindow::checkForUpdates(bool manual) {
+    morfupdate::morfUpdateConfig cfg;
+    cfg.owner          = "morfredus";
+    cfg.repo           = "SiteWatch";
+    cfg.currentVersion = SITEWATCH_VERSION;
+    // manual : affiche aussi « à jour » et les erreurs ; démarrage : silencieux.
+    morfupdate::checkAndNotify(this, "SiteWatch", cfg, /*silentIfUpToDate=*/!manual);
 }
 
 QWidget* MainWindow::makeKpiCard(icons::Glyph glyph, const QString& title,
@@ -478,6 +524,8 @@ void MainWindow::buildUi() {
     QAction* actDoc = aide->addAction("Documentation");
     actDoc->setShortcut(QKeySequence::HelpContents);   // F1
     connect(actDoc, &QAction::triggered, this, &MainWindow::onHelp);
+    QAction* actUpdates = aide->addAction("Rechercher les mises à jour…");
+    connect(actUpdates, &QAction::triggered, this, [this]{ checkForUpdates(true); });
     aide->addSeparator();
     QAction* actAbout = aide->addAction("À propos de SiteWatch");
     connect(actAbout, &QAction::triggered, this, &MainWindow::onAbout);

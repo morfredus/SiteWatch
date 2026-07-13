@@ -7,6 +7,7 @@
 #pragma once
 #include <QMainWindow>
 #include <functional>
+#include <memory>
 #include <vector>
 #include "config/Config.h"
 #include "core/model/Stats.h"
@@ -32,6 +33,8 @@ QT_BEGIN_NAMESPACE
 class QChartView;
 QT_END_NAMESPACE
 
+namespace morfbeacon { class PresenceService; class IMetricsProvider; }
+
 // -----------------------------------------------------------------------------
 // MainWindow : la seule classe qui connait Qt.
 //
@@ -42,6 +45,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    ~MainWindow() override;
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;  // double-clic santé
@@ -88,6 +92,7 @@ private:
 
     void buildUi();
     void loadConfiguration();
+    void checkForUpdates(bool manual);   // manual=true : entrée de menu ; false : au démarrage (silencieux)
     void displayStats(const Stats& stats);
     void refreshSitesOverview();
     void fillHealth(const Stats& stats);
@@ -170,4 +175,11 @@ private:
     // --- Barre de statut ---
     QProgressBar* progressBar_ = nullptr;
     QLabel*       statusRight_ = nullptr;
+
+    // --- Supervision LAN (morfBeacon) ---
+    // Fournisseur de metriques (non-QObject) detruit apres 'presence_', qui est
+    // supprime explicitement dans le destructeur pour arreter proprement les
+    // sockets avant que le provider ne disparaisse.
+    std::unique_ptr<morfbeacon::IMetricsProvider> presenceMetrics_;
+    morfbeacon::PresenceService*                  presence_ = nullptr;
 };

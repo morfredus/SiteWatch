@@ -25,6 +25,13 @@ cmake --build --preset mingw
 Other paths (WSL2, native Linux) are described in the documentation.
 The code must stay **portable**: it builds on Windows (MinGW) and Linux.
 
+**Vendored common modules (`third_party/morf/`).** The LAN supervision
+(morfBeacon) and update-check (morfUpdate) libraries are **copies** compiled into
+the binary — no external repository is needed to build. Do **not** edit them under
+`third_party/`: change the source in the `morfBeacon_travail` / `morfUpdate_travail`
+repositories, then resync with `scripts/sync-morf.ps1` (or `scripts/sync-morf.sh`).
+See [docs/fr/SUPERVISION_ET_MAJ.md](docs/fr/SUPERVISION_ET_MAJ.md) *(FR)*.
+
 ---
 
 ## Reporting a bug

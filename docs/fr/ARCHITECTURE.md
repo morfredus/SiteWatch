@@ -61,6 +61,20 @@ Pour compiler le projet, voir [Compiler depuis les sources](COMPILATION.md).
 
 ---
 
+## Supervision réseau et mises à jour
+
+Deux petites bibliothèques communes sont **vendorées** dans `third_party/morf/`
+(compilées dans l'exécutable, sans dépendance externe) :
+
+- **morfBeacon** — annonce la présence de l'application sur le réseau (heartbeat
+  UDP) et expose ses métriques (`/status` HTTP), pour le RaspberryDashboard ;
+- **morfUpdate** — vérifie les *releases* GitHub (menu Aide + au démarrage).
+
+Elles ne concernent que la couche interface, jamais le moteur d'analyse. Détails :
+[Supervision réseau et mises à jour](SUPERVISION_ET_MAJ.md).
+
+---
+
 ## Philosophie
 
 SiteWatch n'est pas un logiciel de statistiques.
