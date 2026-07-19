@@ -4,6 +4,20 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-07-19
+
+### Changed
+- **Copie vendorée de morfBeacon resynchronisée en 0.2.0** (champ `capabilities`
+  du heartbeat). Ajout purement additif et facultatif : ce projet n'annonce
+  aucune capacité et son comportement est strictement inchangé. La
+  resynchronisation évite que la copie embarquée ne dérive de l'amont.
+- **`scripts/sync-morf.sh` : résolution du dépôt source corrigée.** Le script
+  cherchait exclusivement `morfBeacon` / `morfUpdate` et échouait donc sur une
+  organisation où les clones sont suffixés (`morfBeacon_travail`) — c'est-à-dire
+  qu'il ne fonctionnait tout simplement pas. Il accepte désormais les deux noms.
+
+  morfUpdate reste en 0.1.0, déjà aligné sur l'amont.
+
 ## [1.5.0] — 2026-07-13
 
 ### Added
