@@ -13,7 +13,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
   resynchronisation évite que la copie embarquée ne dérive de l'amont.
 - **`scripts/sync-morf.sh` : résolution du dépôt source corrigée.** Le script
   cherchait exclusivement `morfBeacon` / `morfUpdate` et échouait donc sur une
-  organisation où les clones sont suffixés (`morfBeacon_travail`) — c'est-à-dire
+  organisation où les clones sont suffixés (`morfBeacon`) — c'est-à-dire
   qu'il ne fonctionnait tout simplement pas. Il accepte désormais les deux noms.
 
   morfUpdate reste en 0.1.0, déjà aligné sur l'amont.
