@@ -93,21 +93,26 @@ Les extensions utiles sont :
 - **CMake** ;
 - **C/C++**.
 
-Le projet contient déjà une configuration `.vscode/`, donc aucune tâche n'est
-à créer manuellement.
+Aucune tâche n'est à créer manuellement : tout ce dont la compilation a besoin
+(compilateur, `PATH` MSYS2, dossier de sortie) est déjà décrit dans le fichier
+`CMakePresets.json` du projet, que l'extension CMake Tools lit automatiquement.
 
 ## 4. Compiler
 
-Dans VS Code, appuyer sur :
+À la première ouverture, l'extension CMake Tools demande quel preset utiliser.
+Choisir :
 
 ```text
-Ctrl+Shift+B
+SiteWatch (Windows, MSYS2/MinGW)
 ```
 
-Choisir la tâche :
+Ce choix peut être refait à tout moment avec **CMake: Select Configure Preset**
+depuis la palette de commandes (`Ctrl+Shift+P`).
+
+Compiler ensuite avec la palette de commandes :
 
 ```text
-CMake: Build (MinGW)
+CMake: Build
 ```
 
 Si tout est déjà compilé, le message suivant est normal :
@@ -126,12 +131,13 @@ build-mingw\SiteWatch.exe
 
 ## 5. Lancer l'application depuis VS Code
 
-Dans VS Code :
+Dans VS Code, ouvrir la palette de commandes (`Ctrl+Shift+P`) et choisir :
 
-1. ouvrir **Terminal > Run Task...** ;
-2. choisir `SiteWatch: Run`.
+```text
+CMake: Run Without Debugging
+```
 
-La tâche compile d'abord si nécessaire, puis lance `SiteWatch.exe`.
+L'application est compilée si nécessaire, puis lancée.
 
 Il est aussi possible de lancer directement :
 
@@ -194,8 +200,9 @@ configuration CMake.
 
 Cela veut dire que Qt est lancé sans les DLL MSYS2 dans le `PATH`.
 
-Le projet configure déjà le bon environnement dans `.vscode/settings.json` et
-`CMakePresets.json`. Recharger VS Code, puis relancer :
+Le preset `mingw` de `CMakePresets.json` place déjà `C:/msys64/mingw64/bin` en
+tête du `PATH`. Vérifier que le preset sélectionné est bien
+**SiteWatch (Windows, MSYS2/MinGW)**, recharger VS Code, puis relancer :
 
 ```text
 CMake: Configure

@@ -4,7 +4,16 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-07-20
+
 ### Changed
+
+- **`docs/fr/BUILD_FOR_BEGINNERS.md`**: the guide promised a `.vscode/`
+  configuration shipped with the repository, but `.vscode/` is git-ignored and
+  has never been committed. Beginners looked for a `CMake: Build (MinGW)` task
+  and a `SiteWatch: Run` task that do not exist. The guide now uses CMake Tools
+  with the `mingw` preset, which already carries the MSYS2 `PATH`.
+- Version badge in `README.md` and `README.fr.md` corrected from 1.4.2 to 1.5.1.
 - Updated user-facing changelog wording to use canonical production naming.
 
 ## [1.5.1] — 2026-07-19
