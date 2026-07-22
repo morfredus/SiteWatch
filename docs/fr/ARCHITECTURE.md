@@ -67,7 +67,7 @@ Deux petites bibliothèques communes sont **vendorées** dans `third_party/morf/
 (compilées dans l'exécutable, sans dépendance externe) :
 
 - **morfBeacon** — annonce la présence de l'application sur le réseau (heartbeat
-  UDP) et expose ses métriques (`/status` HTTP), pour le RaspberryDashboard ;
+  UDP) et expose ses métriques (`/status` HTTP), pour le morfDashboard ;
 - **morfUpdate** — vérifie les *releases* GitHub (menu Aide + au démarrage).
 
 Elles ne concernent que la couche interface, jamais le moteur d'analyse. Détails :

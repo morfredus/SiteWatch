@@ -8,7 +8,7 @@ shared with the other morfredus desktop tools.
 - **LAN supervision (morfBeacon).** SiteWatch announces its presence on the local
   network (a small UDP heartbeat) and exposes live metrics over a local HTTP
   `/status` endpoint, so a running instance can be watched from a central
-  dashboard (RaspberryDashboard) — no scanning, no configuration, automatic
+  dashboard (morfDashboard) — no scanning, no configuration, automatic
   discovery.
 - **Update check (morfUpdate).** SiteWatch now checks GitHub Releases for a newer
   version — silently at startup, and on demand via **Help → “Check for updates…”**.
