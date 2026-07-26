@@ -398,7 +398,7 @@ void replaceLast(QLayout* layout, QWidget* fresh) {
 
 // ---------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowTitle("SiteWatch");
+    setWindowTitle(QStringLiteral("SiteWatch %1").arg(QString::fromLatin1(SITEWATCH_VERSION)));
     resize(1180, 720);
     buildUi();
     loadConfiguration();
