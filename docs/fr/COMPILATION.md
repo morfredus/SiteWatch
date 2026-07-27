@@ -137,7 +137,7 @@ Pi OS 64 bits).
 Le preset `linux-arm64-cross` est **conservé comme base pour une future
 automatisation** (GitHub Actions, serveur CI…) : il permettra de produire des
 binaires Raspberry directement depuis une machine x86_64, sans y compiler
-nativement. Il n'est **pas nécessaire** au quotidien — la compilation native sur
+nativement. Il n'est **pas nécessaire** au quotidien - la compilation native sur
 le Raspberry reste la voie recommandée aujourd'hui.
 
 La cross-compilation d'une application **Qt** exige un **sysroot** de la cible

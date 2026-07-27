@@ -17,6 +17,8 @@ class QToolButton;
 class QLabel;
 class QPushButton;
 class QFormLayout;
+class QComboBox;
+class QVBoxLayout;
 
 // -----------------------------------------------------------------------------
 // SettingsDialog : édition graphique de la configuration (config.json).
@@ -44,6 +46,9 @@ private slots:
 
 private:
     void buildUi();
+    void buildCollectorGroup(QVBoxLayout* root);   // groupe morfCollector
+    void refreshCollector();                        // état + fichiers du site choisi
+    QString collectorUrl() const;                   // URL effective (champ, sinon découverte)
     void refreshSiteList();
     void loadSiteToForm(int index);
     void commitFormToSite(int index);
@@ -76,4 +81,10 @@ private:
 
     QPushButton* testButton_ = nullptr;
     QLabel*      testResult_ = nullptr;
+
+    // --- morfCollector ---
+    QLineEdit*   collectorEdit_  = nullptr;   // URL (vide = découverte)
+    QLabel*      collectorState_ = nullptr;   // état du collecteur
+    QComboBox*   collectorSite_  = nullptr;   // site dont on liste les copies
+    QListWidget* collectorFiles_ = nullptr;   // fichiers conservés (object_id en UserRole)
 };

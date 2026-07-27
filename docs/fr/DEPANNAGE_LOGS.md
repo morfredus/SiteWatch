@@ -1,4 +1,4 @@
-# Dépannage — « Je n'arrive pas à télécharger mes logs »
+# Dépannage - « Je n'arrive pas à télécharger mes logs »
 
 Ce guide explique, en langage simple, les messages que SiteWatch affiche quand
 vous cliquez sur **Télécharger les logs**, et comment régler chaque situation.
@@ -86,7 +86,7 @@ Cliquez sur le bouton : le filtre est **enregistré** et le téléchargement
 **redémarre tout seul**. En général, c'est terminé.
 
 Si aucun bouton n'apparaît (préfixes trop variés pour décider sans risque),
-réglez le filtre à la main — voir la section suivante.
+réglez le filtre à la main - voir la section suivante.
 
 ---
 
@@ -94,7 +94,7 @@ réglez le filtre à la main — voir la section suivante.
 
 1. Ouvrez **Fichier → Configuration…**.
 2. Dans le champ **Filtre des logs (avancé)**, tapez un morceau de texte que le
-   nom des fichiers **contient** — le plus souvent votre domaine :
+   nom des fichiers **contient** - le plus souvent votre domaine :
 
    | Vos fichiers ressemblent à… | Filtre à saisir |
    |---|---|
@@ -105,7 +105,7 @@ réglez le filtre à la main — voir la section suivante.
 3. **Enregistrez**, puis relancez **Télécharger les logs**.
 
 > Astuce : le bouton **Tester la connexion** (dans la configuration) affiche le
-> **préfixe détecté** et le nombre de fichiers correspondants — pratique pour
+> **préfixe détecté** et le nombre de fichiers correspondants - pratique pour
 > vérifier votre filtre avant de fermer la fenêtre.
 
 Pour o2switch avec un nom de site standard, laissez ce champ **vide** : la
@@ -124,5 +124,5 @@ détection est automatique.
 
 ## Licence
 
-Copyright (C) 2026 morfredus — distribué sous **GNU GPL v3.0**
+Copyright (C) 2026 morfredus - distribué sous **GNU GPL v3.0**
 (voir [`LICENSE`](../../LICENSE)).

@@ -95,6 +95,16 @@ set(UI_HEADERS
     src/ui/CacheCleanupDialog.h
 )
 
+# Integration morfCollector (cote fournisseur). Qt Network ; appele par l'UI.
+set(COLLECTOR_SOURCES
+    src/collector/CollectorClient.cpp
+    src/collector/CollectorSync.cpp
+)
+set(COLLECTOR_HEADERS
+    src/collector/CollectorClient.h
+    src/collector/CollectorSync.h
+)
+
 # Ressources : icone Qt (barre de titre) + .rc Windows (icone de l'exe).
 set(APP_RESOURCES resources/app.qrc)
 if(WIN32)
@@ -104,6 +114,8 @@ endif()
 add_executable(SiteWatch WIN32
     ${CORE_SOURCES}
     ${CORE_HEADERS}
+    ${COLLECTOR_SOURCES}
+    ${COLLECTOR_HEADERS}
     ${UI_SOURCES}
     ${UI_HEADERS}
     ${APP_RESOURCES}
@@ -144,6 +156,30 @@ if(WIN32)
             COMMAND "${WINDEPLOYQT_EXE}" --no-translations --compiler-runtime "$<TARGET_FILE:SiteWatch>"
             COMMENT "Deploiement des DLL Qt a cote de l'executable")
     endif()
+endif()
+
+# --- Outil headless : synchronisation vers morfCollector ------------------
+# Cote FOURNISSEUR du contrat morfcollect/1 (decouverte morfBeacon, push du
+# manifeste et des secrets, lecture des copies). Console (Qt Core + Network), sans
+# GUI : sert a l'integration et a la verification. La GUI reutilisera
+# CollectorClient.
+add_executable(sitewatch-collector-sync
+    src/collector/sync_main.cpp
+    src/collector/CollectorClient.cpp
+    src/collector/CollectorClient.h
+    src/collector/CollectorSync.cpp
+    src/collector/CollectorSync.h
+    src/config/Config.cpp
+    src/config/Config.h
+)
+target_include_directories(sitewatch-collector-sync PRIVATE src)
+target_link_libraries(sitewatch-collector-sync PRIVATE
+    Qt6::Core
+    Qt6::Network
+    nlohmann_json::nlohmann_json
+)
+if(MSVC)
+    target_compile_options(sitewatch-collector-sync PRIVATE /utf-8)
 endif()
 
 # MinGW/MSYS2 : windeployqt ne copie QUE les DLL Qt. Ce script complete avec les

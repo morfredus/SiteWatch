@@ -12,6 +12,8 @@
 // SiteConfig : parametres d'un site a analyser (lus depuis config.json).
 // -----------------------------------------------------------------------------
 struct SiteConfig {
+    std::string id;            // UUID STABLE du site (identite pour morfCollector) ;
+                               // genere au chargement s'il manque, jamais reutilise
     std::string name;          // ex. "morfredus"
     std::string host;          // ex. "morfredus.fr"
     std::string protocol;      // "sftp" ou "ftp"
@@ -29,6 +31,8 @@ struct SiteConfig {
 // -----------------------------------------------------------------------------
 struct Config {
     std::string cacheRoot;             // ex. "D:/SiteWatch"
+    std::string collectorUrl;          // URL de morfCollector (ex. "http://pi4fred:8792") ;
+                                       // vide = découverte automatique via morfBeacon
     std::vector<SiteConfig> sites;
 
     // Charge la configuration depuis un fichier JSON.

@@ -22,6 +22,13 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QDate>
+#include <QGroupBox>
+#include <QAbstractItemView>
+#include <QJsonObject>
+#include <QJsonArray>
+
+#include "collector/CollectorClient.h"
+#include "collector/CollectorSync.h"
 
 namespace {
 
@@ -48,12 +55,113 @@ QDate fileMonth(const QString& filename) {
 } // namespace
 
 CacheCleanupDialog::CacheCleanupDialog(const QString& cacheRoot, const QStringList& siteNames,
+                                       const QVector<QPair<QString, QString>>& collectorSites,
+                                       const QString& collectorUrl,
                                        QWidget* parent)
-    : QDialog(parent), cacheRoot_(cacheRoot), siteNames_(siteNames) {
+    : QDialog(parent), cacheRoot_(cacheRoot), siteNames_(siteNames),
+      collectorSites_(collectorSites), collectorUrl_(collectorUrl) {
     setWindowTitle("Effacer des logs téléchargés — SiteWatch");
     setMinimumWidth(560);
     buildUi();
     updateMode();
+    refreshCollector();
+}
+
+QString CacheCleanupDialog::effectiveCollectorUrl() {
+    if (!collectorUrl_.isEmpty())
+        return collectorUrl_;
+    collectorUrl_ = collectorsync::locate(QString(), 4000);
+    return collectorUrl_;
+}
+
+void CacheCleanupDialog::buildCollectorSection(QVBoxLayout* root) {
+    auto* box = new QGroupBox("Copies conservées sur morfCollector (sur le Pi)");
+    auto* v = new QVBoxLayout(box);
+
+    colState_ = new QLabel("Interrogation du collecteur…");
+    colState_->setProperty("muted", true);
+    colState_->setWordWrap(true);
+    v->addWidget(colState_);
+
+    auto* row = new QHBoxLayout;
+    row->addWidget(new QLabel("Site :"));
+    colSite_ = new QComboBox;
+    for (const auto& p : collectorSites_)
+        colSite_->addItem(p.first, p.second);
+    row->addWidget(colSite_, 1);
+    auto* refreshBtn = new QPushButton("Rafraîchir");
+    row->addWidget(refreshBtn);
+    v->addLayout(row);
+
+    colFiles_ = new QListWidget;
+    colFiles_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    colFiles_->setMaximumHeight(140);
+    v->addWidget(colFiles_);
+
+    auto* actions = new QHBoxLayout;
+    auto* delSel = new QPushButton("Supprimer la sélection");
+    auto* delAll = new QPushButton("Supprimer toutes les copies du site");
+    actions->addStretch();
+    actions->addWidget(delSel);
+    actions->addWidget(delAll);
+    v->addLayout(actions);
+
+    root->addWidget(box);
+
+    connect(refreshBtn, &QPushButton::clicked, this, &CacheCleanupDialog::refreshCollector);
+    connect(colSite_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &CacheCleanupDialog::refreshCollector);
+    connect(delSel, &QPushButton::clicked, this, [this] {
+        const QString url = effectiveCollectorUrl();
+        if (url.isEmpty()) return;
+        const auto items = colFiles_->selectedItems();
+        if (items.isEmpty()) return;
+        if (QMessageBox::question(this, "Supprimer",
+                QString("Supprimer %1 fichier(s) conservé(s) sur le collecteur ? "
+                        "Action irréversible.").arg(items.size())) != QMessageBox::Yes) return;
+        for (QListWidgetItem* it : items)
+            CollectorClient::deleteObject(url, it->data(Qt::UserRole).toString());
+        refreshCollector();
+    });
+    connect(delAll, &QPushButton::clicked, this, [this] {
+        const QString url = effectiveCollectorUrl();
+        if (url.isEmpty() || colSite_->currentIndex() < 0) return;
+        if (QMessageBox::question(this, "Supprimer toutes les copies",
+                "Supprimer TOUTES les copies conservées pour « "
+                + colSite_->currentText() + " » sur le collecteur ? Action irréversible.")
+                != QMessageBox::Yes) return;
+        CollectorClient::deleteSourceObjects(url, colSite_->currentData().toString());
+        refreshCollector();
+    });
+}
+
+void CacheCleanupDialog::refreshCollector() {
+    if (!colFiles_) return;
+    colFiles_->clear();
+    const QString url = effectiveCollectorUrl();
+    if (url.isEmpty()) {
+        colState_->setText("Aucun morfCollector joignable (les copies distantes ne sont "
+                           "gérables que lorsqu'il tourne). Cette section ne concerne pas "
+                           "le cache local ci-dessus.");
+        return;
+    }
+    const CollectorClient::Reply st = CollectorClient::getStatus(url);
+    if (!st.ok()) { colState_->setText("Collecteur injoignable à " + url.toHtmlEscaped() + "."); return; }
+    const QJsonObject m = st.json.value("metrics").toObject();
+    colState_->setText(QString("Collecteur <b>%1</b> — %2 objet(s) conservé(s).")
+        .arg(st.json.value("host").toString().toHtmlEscaped())
+        .arg(m.value("objects").toInt()));
+
+    if (colSite_->currentIndex() < 0) return;
+    const CollectorClient::Reply o =
+        CollectorClient::getObjects(url, colSite_->currentData().toString());
+    for (const QJsonValue& val : o.json.value("objects").toArray()) {
+        const QJsonObject j = val.toObject();
+        auto* item = new QListWidgetItem(QString("%1   (%2)")
+            .arg(j.value("original_name").toString()).arg(j.value("period").toString()));
+        item->setData(Qt::UserRole, j.value("object_id").toString());
+        colFiles_->addItem(item);
+    }
 }
 
 void CacheCleanupDialog::buildUi() {
@@ -96,6 +204,9 @@ void CacheCleanupDialog::buildUi() {
     summary_ = new QLabel;
     checkRow->addWidget(summary_);
     root->addLayout(checkRow);
+
+    // --- Copies conservées sur morfCollector ---
+    buildCollectorSection(root);
 
     // --- Boutons ---
     auto* buttons = new QDialogButtonBox;

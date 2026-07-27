@@ -27,7 +27,7 @@ The code must stay **portable**: it builds on Windows (MinGW) and Linux.
 
 **Vendored common modules (`third_party/morf/`).** The LAN supervision
 (morfBeacon) and update-check (morfUpdate) libraries are **copies** compiled into
-the binary — no external repository is needed to build. Do **not** edit them under
+the binary - no external repository is needed to build. Do **not** edit them under
 `third_party/`: change the source in the `morfBeacon` / `morfUpdate`
 repositories, then resync with `scripts/sync-morf.ps1` (or `scripts/sync-morf.sh`).
 See [docs/fr/SUPERVISION_ET_MAJ.md](docs/fr/SUPERVISION_ET_MAJ.md) *(FR)*.
@@ -76,10 +76,10 @@ Every contribution is distributed under the project's license (**GNU GPL v3.0**)
 
 ## Coding conventions
 
-**Architecture** — the separation is strict:
+**Architecture** - the separation is strict:
 
 - `src/core/`: the business **core** (parser, statistics, cache, network). It must
-  **never** include Qt or depend on the interface — it stays portable.
+  **never** include Qt or depend on the interface - it stays portable.
 - `src/config/`: reading/writing the configuration.
 - `src/ui/`: the **interface** (Qt). The only place allowed to use Qt.
 

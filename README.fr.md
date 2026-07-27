@@ -18,7 +18,7 @@
 
 SiteWatch est une **application Qt / C++17 multiplateforme** dédiée à
 l'administration et à la supervision de sites web. Elle s'exécute nativement sous
-**Windows, Linux (x86_64 et ARM64) et Raspberry Pi** — Windows n'est qu'une
+**Windows, Linux (x86_64 et ARM64) et Raspberry Pi** - Windows n'est qu'une
 plateforme supportée parmi d'autres, pas la cible unique.
 
 Contrairement aux outils de statistiques classiques, elle ne cherche pas à
@@ -28,7 +28,7 @@ beaucoup plus simple :
 > **Comprendre ce qui s'est réellement passé sur un serveur web.**
 
 Il télécharge les journaux Apache ou LiteSpeed via SFTP, les analyse localement
-et présente les résultats sous une forme immédiatement exploitable — **aucune
+et présente les résultats sous une forme immédiatement exploitable - **aucune
 base SQL, aucune dépendance WordPress, aucun plugin à installer sur les sites
 surveillés**. Il lit directement les fichiers de logs compressés (`.gz`).
 
@@ -63,41 +63,41 @@ sites web.
 
 ## Captures
 
-**Tableau de bord** — vue globale multi-sites après chaque synchronisation ou
+**Tableau de bord** - vue globale multi-sites après chaque synchronisation ou
 analyse, pour repérer en quelques secondes les sites à surveiller. Un double-clic
 sur un site ouvre son analyse détaillée.
 
 ![Tableau de bord](docs/pictures/dashboard.png)
 
-**Santé** — les principaux indicateurs du site sélectionné, avec des états
+**Santé** - les principaux indicateurs du site sélectionné, avec des états
 🟢 🟠 🔴 qui mènent directement à l'onglet concerné.
 
 ![Santé](docs/pictures/health.png)
 
-**Robots** — classement automatique par catégorie (IA, moteurs, SEO, divers)
+**Robots** - classement automatique par catégorie (IA, moteurs, SEO, divers)
 avec graphique de répartition.
 
 ![Robots](docs/pictures/robots.png)
 
-**Sécurité** — requêtes suspectes regroupées pour distinguer rapidement
+**Sécurité** - requêtes suspectes regroupées pour distinguer rapidement
 l'activité normale des véritables tentatives d'attaque, faux positifs WordPress
 écartés.
 
 ![Sécurité](docs/pictures/security.png)
 
-**Activité WordPress** — activités WordPress légitimes (admin, connexion, REST
+**Activité WordPress** - activités WordPress légitimes (admin, connexion, REST
 API, `admin-ajax.php`, XML-RPC, cron…) identifiées pour distinguer le
 fonctionnement normal des comportements inhabituels.
 
 ![Activité WordPress](docs/pictures/wordpress-activity.png)
 
-**Top pages & référents** — les pages les plus demandées et la provenance du
+**Top pages & référents** - les pages les plus demandées et la provenance du
 trafic (moteurs, réseaux sociaux, accès directs, autres sites).
 
 ![Top pages](docs/pictures/top-pages.png)
 ![Référents](docs/pictures/referrers.png)
 
-**URLs & fenêtres de détail** — exploration de chaque URL par catégorie (toutes,
+**URLs & fenêtres de détail** - exploration de chaque URL par catégorie (toutes,
 attaques probables, 404, WordPress, robots, système). Un double-clic ouvre une
 fenêtre de détail complète : IP, User-Agents, codes HTTP, référents, répartition
 horaire et quotidienne, avec copie et export CSV partout.
@@ -105,7 +105,7 @@ horaire et quotidienne, avec copie et export CSV partout.
 ![URLs](docs/pictures/urls.png)
 ![Fenêtre de détail](docs/pictures/urls-detail.png)
 
-**Graphiques** — évolution des principaux indicateurs sur la période analysée
+**Graphiques** - évolution des principaux indicateurs sur la période analysée
 (trafic humain, robots, robots IA, Google, erreurs HTTP, activité WordPress).
 
 ![Graphiques](docs/pictures/graph.png)
@@ -199,8 +199,8 @@ SiteWatch est distribué sous licence **GNU GPL v3.0 only**. Voir le fichier
 
 ## Auteur
 
-**morfredus** — développeur, photographe et créateur d'outils open source.
+**morfredus** - développeur, photographe et créateur d'outils open source.
 La plupart de mes projets naissent d'un besoin concret rencontré sur le terrain.
 Voir [`AUTHORS`](AUTHORS).
 
-© 2026 morfredus — GNU GPL v3.0 only.
+© 2026 morfredus - GNU GPL v3.0 only.

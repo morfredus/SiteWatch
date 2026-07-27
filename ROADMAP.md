@@ -1,4 +1,4 @@
-# Roadmap — SiteWatch
+# Roadmap - SiteWatch
 
 This roadmap describes possible directions for SiteWatch. It is not a promise of
 dates: it exists to keep a clear direction for the next versions.

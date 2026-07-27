@@ -37,10 +37,17 @@
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
 #include <QStyle>
+#include <QComboBox>
+#include <QGroupBox>
+#include <QMessageBox>
+#include <QAbstractItemView>
+#include <QJsonArray>
 
 #include <cctype>
 
 #include "core/net/SftpClient.h"
+#include "collector/CollectorClient.h"
+#include "collector/CollectorSync.h"
 
 // ---------------------------------------------------------------------------
 namespace {
@@ -189,6 +196,9 @@ void SettingsDialog::buildUi() {
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/cache"));
     });
     root->addWidget(dataBox);
+
+    // --- morfCollector : connexion, état et copies conservées ---
+    buildCollectorGroup(root);
 
     // --- Sites ---
     auto* sitesBox = new QGroupBox("Sites");
@@ -494,5 +504,128 @@ void SettingsDialog::onTestConnection() {
 void SettingsDialog::onAccept() {
     if (current_ >= 0) commitFormToSite(current_);
     config_.cacheRoot = cacheEdit_->text().trimmed().toStdString();
+    config_.collectorUrl = collectorEdit_->text().trimmed().toStdString();
     accept();
+}
+
+// --- morfCollector -----------------------------------------------------------
+
+QString SettingsDialog::collectorUrl() const {
+    const QString typed = collectorEdit_->text().trimmed();
+    if (!typed.isEmpty())
+        return typed;
+    // Champ vide : on tente une découverte ponctuelle (utile dans ce dialogue,
+    // qui n'a pas d'écouteur permanent comme la fenêtre principale).
+    return collectorsync::locate(QString(), 4000);
+}
+
+void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
+    auto* box = new QGroupBox("morfCollector (collecte et conservation sur le réseau)");
+    auto* v = new QVBoxLayout(box);
+
+    auto* form = new QFormLayout;
+    collectorEdit_ = new QLineEdit(QString::fromStdString(config_.collectorUrl));
+    collectorEdit_->setPlaceholderText("http://pi4fred:8792  (vide = découverte automatique)");
+    auto* refreshBtn = new QPushButton("Rafraîchir");
+    auto* urlRow = new QWidget;
+    auto* urlRowL = new QHBoxLayout(urlRow);
+    urlRowL->setContentsMargins(0, 0, 0, 0);
+    urlRowL->addWidget(collectorEdit_, 1);
+    urlRowL->addWidget(refreshBtn);
+    addRow(form, "Adresse du collecteur :", urlRow);
+    v->addLayout(form);
+
+    collectorState_ = new QLabel("État inconnu — cliquez sur « Rafraîchir ».");
+    collectorState_->setProperty("muted", true);
+    collectorState_->setWordWrap(true);
+    v->addWidget(collectorState_);
+
+    // Copies conservées, par site.
+    auto* filesRow = new QHBoxLayout;
+    filesRow->addWidget(new QLabel("Copies du site :"));
+    collectorSite_ = new QComboBox;
+    for (const SiteConfig& s : config_.sites)
+        collectorSite_->addItem(QString::fromStdString(s.name), QString::fromStdString(s.id));
+    filesRow->addWidget(collectorSite_, 1);
+    v->addLayout(filesRow);
+
+    collectorFiles_ = new QListWidget;
+    collectorFiles_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    collectorFiles_->setMaximumHeight(150);
+    v->addWidget(collectorFiles_);
+
+    auto* actionRow = new QHBoxLayout;
+    auto* delSel = new QPushButton("Supprimer la sélection");
+    auto* delAll = new QPushButton("Supprimer toutes les copies du site");
+    actionRow->addStretch();
+    actionRow->addWidget(delSel);
+    actionRow->addWidget(delAll);
+    v->addLayout(actionRow);
+
+    root->addWidget(box);
+
+    connect(refreshBtn, &QPushButton::clicked, this, &SettingsDialog::refreshCollector);
+    connect(collectorSite_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SettingsDialog::refreshCollector);
+    connect(delSel, &QPushButton::clicked, this, [this] {
+        const QString url = collectorUrl();
+        if (url.isEmpty()) { collectorState_->setText("Aucun collecteur joignable."); return; }
+        const auto items = collectorFiles_->selectedItems();
+        if (items.isEmpty()) return;
+        if (QMessageBox::question(this, "Supprimer",
+                QString("Supprimer %1 fichier(s) du collecteur ? Action irréversible.")
+                    .arg(items.size())) != QMessageBox::Yes) return;
+        for (QListWidgetItem* it : items)
+            CollectorClient::deleteObject(url, it->data(Qt::UserRole).toString());
+        refreshCollector();
+    });
+    connect(delAll, &QPushButton::clicked, this, [this] {
+        const QString url = collectorUrl();
+        if (url.isEmpty() || collectorSite_->currentIndex() < 0) return;
+        const QString id = collectorSite_->currentData().toString();
+        if (QMessageBox::question(this, "Supprimer toutes les copies",
+                "Supprimer TOUTES les copies conservées pour « "
+                + collectorSite_->currentText() + " » ? Action irréversible.")
+                != QMessageBox::Yes) return;
+        CollectorClient::deleteSourceObjects(url, id);
+        refreshCollector();
+    });
+}
+
+void SettingsDialog::refreshCollector() {
+    collectorFiles_->clear();
+    const QString url = collectorUrl();
+    if (url.isEmpty()) {
+        collectorState_->setText(
+            "Aucun collecteur joignable. Renseignez son adresse (ex. http://pi4fred:8792) "
+            "ou vérifiez qu'il tourne sur le réseau.");
+        return;
+    }
+
+    const CollectorClient::Reply st = CollectorClient::getStatus(url);
+    if (!st.ok()) {
+        collectorState_->setText("Collecteur injoignable à " + url.toHtmlEscaped() + ".");
+        return;
+    }
+    const QJsonObject m = st.json.value("metrics").toObject();
+    collectorState_->setText(QString(
+        "Connecté à <b>%1</b> (%2) — %3 objet(s), %4 conservés, %5 source(s).")
+        .arg(st.json.value("host").toString().toHtmlEscaped())
+        .arg(url.toHtmlEscaped())
+        .arg(m.value("objects").toInt())
+        .arg(QString::number(m.value("bytes").toDouble() / (1024.0 * 1024.0), 'f', 1) + " Mo")
+        .arg(m.value("sources").toInt()));
+
+    if (collectorSite_->currentIndex() < 0)
+        return;
+    const QString id = collectorSite_->currentData().toString();
+    const CollectorClient::Reply o = CollectorClient::getObjects(url, id);
+    for (const QJsonValue& v : o.json.value("objects").toArray()) {
+        const QJsonObject j = v.toObject();
+        auto* item = new QListWidgetItem(QString("%1   (%2)")
+            .arg(j.value("original_name").toString())
+            .arg(j.value("period").toString()));
+        item->setData(Qt::UserRole, j.value("object_id").toString());
+        collectorFiles_->addItem(item);
+    }
 }

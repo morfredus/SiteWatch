@@ -16,7 +16,7 @@ En cas de blocage, voir la section [Dépannage](#dépannage).
 
 ---
 
-## Partie A — Utiliser SiteWatch sans compiler (AppImage)
+## Partie A - Utiliser SiteWatch sans compiler (AppImage)
 
 C'est la méthode la plus simple. Une **AppImage** est un fichier unique qui
 contient l'application **et toutes ses dépendances** (dont Qt). Rien à installer,
@@ -81,7 +81,7 @@ l'icône pour vous.
 
 ---
 
-## Partie B — Compiler puis installer
+## Partie B - Compiler puis installer
 
 À réserver aux personnes qui veulent compiler SiteWatch depuis les sources. À la
 différence de l'AppImage, cette méthode s'appuie sur le **Qt du système** : les
@@ -185,11 +185,11 @@ scripts/linux/install.sh --uninstall
 
 > Astuce : si les icônes sont générées à plusieurs tailles, installer d'abord
 > **ImageMagick** (`sudo apt install imagemagick`, ou l'équivalent). Sans lui, le
-> script se contente d'une icône unique — l'application fonctionne quand même.
+> script se contente d'une icône unique - l'application fonctionne quand même.
 
 ---
 
-## Partie C — Produire l'AppImage pour une release
+## Partie C - Produire l'AppImage pour une release
 
 Cette partie concerne la personne qui **prépare les releases** (par exemple le
 mainteneur). Elle génère le fichier `.AppImage` distribué en [Partie A](#partie-a--utiliser-sitewatch-sans-compiler-appimage).
@@ -215,7 +215,7 @@ automatiquement dans le fichier `VERSION`.
 
 ---
 
-## Partie D — Produire un paquet Debian (.deb)
+## Partie D - Produire un paquet Debian (.deb)
 
 Sur **Debian, Ubuntu ou Raspberry Pi OS**, on peut produire un paquet `.deb`
 qui s'intègre proprement au système (menu, désinstallation via apt). Contrairement
@@ -338,8 +338,8 @@ particulier `qt6-charts-dev` / `qt6-qtcharts-devel` / `qt6-charts`).
 ### Erreur de configuration persistante après un changement (cache CMake obsolète)
 
 CMake mémorise le résultat de sa configuration dans le dossier `build/`. Après un
-changement d'environnement — dépendance installée entre-temps, mise à jour de Qt,
-bascule de branche — ce cache peut rester **incohérent** et faire échouer la
+changement d'environnement - dépendance installée entre-temps, mise à jour de Qt,
+bascule de branche - ce cache peut rester **incohérent** et faire échouer la
 configuration ou la compilation alors que tout est pourtant en place. Symptôme
 typique : une erreur qui persiste d'un essai à l'autre, par exemple
 `Could not find XKB (missing: XKB_LIBRARY XKB_INCLUDE_DIR)`.

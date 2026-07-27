@@ -7,6 +7,8 @@
 #include "config/Config.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <random>
+#include <cstdio>
 
 using nlohmann::json;
 
@@ -14,6 +16,27 @@ using nlohmann::json;
 static std::string getStr(const json& j, const char* key) {
     if (j.contains(key) && j[key].is_string()) return j[key].get<std::string>();
     return "";
+}
+
+// Genere un UUID v4 (sans dependance : utilise pour l'identite stable d'un site
+// vis-a-vis de morfCollector -- l'identite ne doit jamais deriver du nom, cf.
+// contrat morfcollect/1 §1.3). Genere une seule fois, puis persiste.
+static std::string makeUuidV4() {
+    static std::random_device rd;
+    static std::mt19937_64 gen(rd() ^ (static_cast<uint64_t>(rd()) << 32));
+    std::uniform_int_distribution<uint64_t> dist;
+    uint64_t hi = dist(gen), lo = dist(gen);
+    hi = (hi & 0xFFFFFFFFFFFF0FFFULL) | 0x0000000000004000ULL;  // version 4
+    lo = (lo & 0x3FFFFFFFFFFFFFFFULL) | 0x8000000000000000ULL;  // variant 1
+    char buf[37];
+    std::snprintf(buf, sizeof(buf),
+        "%08x-%04x-%04x-%04x-%012llx",
+        static_cast<unsigned>(hi >> 32),
+        static_cast<unsigned>((hi >> 16) & 0xFFFF),
+        static_cast<unsigned>(hi & 0xFFFF),
+        static_cast<unsigned>(lo >> 48),
+        static_cast<unsigned long long>(lo & 0xFFFFFFFFFFFFULL));
+    return std::string(buf);
 }
 
 bool Config::load(const std::string& path, Config& out, std::string& error) {
@@ -36,11 +59,13 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
         error = "Le champ 'cacheRoot' est manquant dans config.json";
         return false;
     }
+    out.collectorUrl = getStr(j, "collectorUrl");   // facultatif (découverte sinon)
 
     out.sites.clear();
     if (j.contains("sites") && j["sites"].is_array()) {
         for (const auto& s : j["sites"]) {
             SiteConfig site;
+            site.id           = getStr(s, "id");
             site.name         = getStr(s, "name");
             site.host         = getStr(s, "host");
             site.protocol     = getStr(s, "protocol");
@@ -54,6 +79,10 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
             // Migration : l'ancien champ "domain" (ex. morfredus.fr) devient le
             // "nom du site". Le préfixe de filtrage en est déduit automatiquement.
             if (!site.domain.empty()) site.name = site.domain;
+            // Identite stable : attribuee une seule fois, puis conservee. Un site
+            // sans id (config anterieure) en recoit un ici ; il sera persiste au
+            // prochain save().
+            if (site.id.empty()) site.id = makeUuidV4();
             if (!site.name.empty()) out.sites.push_back(site);
         }
     }
@@ -64,10 +93,12 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
 bool Config::save(const std::string& path, const Config& config, std::string& error) {
     json j;
     j["cacheRoot"] = config.cacheRoot;
+    if (!config.collectorUrl.empty()) j["collectorUrl"] = config.collectorUrl;
 
     json sites = json::array();
     for (const auto& s : config.sites) {
         json o;
+        o["id"]           = s.id.empty() ? makeUuidV4() : s.id;
         o["name"]         = s.name;
         o["host"]         = s.host;
         o["protocol"]     = s.protocol.empty() ? std::string("sftp") : s.protocol;

@@ -39,6 +39,7 @@
 #include <QUrlQuery>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
@@ -73,6 +74,15 @@
 #include "core/analytics/StatsEngine.h"
 #include "core/analytics/BotDetector.h"
 #include "core/net/SftpClient.h"
+#include "collector/CollectorSync.h"
+#include "collector/CollectorClient.h"
+#include <QToolButton>
+#include <QMenu>
+#include <QFileDialog>
+#include <QUdpSocket>
+#include <QHostAddress>
+#include <QVector>
+#include <QPair>
 #include "core/net/LogDiscovery.h"
 #include "ui/SettingsDialog.h"
 #include "ui/DetailDialog.h"
@@ -428,8 +438,43 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     presence_ = new morfbeacon::PresenceService(beaconCfg, presenceMetrics_.get());
     presence_->start();
 
+    // Écoute PERMANENTE des annonces morfBeacon (comme un superviseur). Le
+    // heartbeat n'est émis que toutes les ~15 s : une découverte ponctuelle de
+    // quelques secondes le raterait presque toujours. Un écouteur de fond capte
+    // la prochaine annonce sans bloquer l'interface. Le heartbeat émet depuis un
+    // port éphémère : écouter le 45454 ne crée aucun conflit avec notre propre
+    // annonce de présence.
+    auto* beaconListener = new QUdpSocket(this);
+    if (beaconListener->bind(QHostAddress(QHostAddress::AnyIPv4), 45454,
+                             QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+        connect(beaconListener, &QUdpSocket::readyRead, this, [this, beaconListener]{
+            while (beaconListener->hasPendingDatagrams()) {
+                QByteArray buf(int(beaconListener->pendingDatagramSize()), '\0');
+                QHostAddress sender;
+                beaconListener->readDatagram(buf.data(), buf.size(), &sender);
+                const QJsonObject o = QJsonDocument::fromJson(buf).object();
+                if (!o.value("proto").toString().startsWith("morfbeacon/"))
+                    continue;
+                QStringList caps;
+                for (const QJsonValue& v : o.value("capabilities").toArray())
+                    caps << v.toString();
+                if (!caps.contains(QStringLiteral("collection")))
+                    continue;                       // on cherche la capacité, pas le nom
+                QString host = sender.toString();
+                if (host.startsWith(QStringLiteral("::ffff:"))) host = host.mid(7);
+                collectorUrl_ = QString("http://%1:%2")
+                    .arg(host).arg(o.value("status_port").toInt());
+            }
+        });
+    }
+
     // Vérification silencieuse des mises à jour, peu après l'affichage de l'UI.
     QTimer::singleShot(2000, this, [this]{ checkForUpdates(false); });
+
+    // Synchronisation d'ouverture avec morfCollector (si présent) : pousse la
+    // config, alerte sur les sites ajoutés / retirés. Différée pour ne pas
+    // retarder l'affichage.
+    QTimer::singleShot(2500, this, [this]{ startupCollectorSync(); });
 }
 
 MainWindow::~MainWindow() {
@@ -499,6 +544,11 @@ void MainWindow::buildUi() {
     QMenu* outils = menuBar()->addMenu("Outils");
     QAction* actSync = outils->addAction("Synchroniser maintenant");
     connect(actSync, &QAction::triggered, this, &MainWindow::onSync);
+    outils->addSeparator();
+    QAction* actSyncAllCol = outils->addAction("Tout synchroniser via morfCollector");
+    connect(actSyncAllCol, &QAction::triggered, this, &MainWindow::syncAllViaCollector);
+    QAction* actSyncAllLoc = outils->addAction("Tout synchroniser en direct (SFTP)");
+    connect(actSyncAllLoc, &QAction::triggered, this, &MainWindow::syncAllLocal);
 
     // --- Affichage → Thème (Système / Clair / Sombre) ---
     QMenu* affichage = menuBar()->addMenu("Affichage");
@@ -550,6 +600,20 @@ void MainWindow::buildUi() {
     auto* analyzeBtn = new QPushButton("Analyser");
     connect(analyzeBtn, &QPushButton::clicked, this, &MainWindow::onAnalyze);
     topBar->addWidget(analyzeBtn);
+
+    // « Tout synchroniser » : bouton a menu, deux modes (collecteur / direct).
+    auto* syncAllBtn = new QToolButton;
+    syncAllBtn->setText("Tout synchroniser");
+    syncAllBtn->setToolTip("Mettre a jour tous les sites en une passe");
+    syncAllBtn->setPopupMode(QToolButton::InstantPopup);
+    auto* syncAllMenu = new QMenu(syncAllBtn);
+    QAction* viaCol = syncAllMenu->addAction("Via morfCollector (copies locales du Pi)");
+    connect(viaCol, &QAction::triggered, this, &MainWindow::syncAllViaCollector);
+    QAction* viaSftp = syncAllMenu->addAction("En direct depuis l'hebergeur (SFTP)");
+    connect(viaSftp, &QAction::triggered, this, &MainWindow::syncAllLocal);
+    syncAllBtn->setMenu(syncAllMenu);
+    topBar->addWidget(syncAllBtn);
+
     topBar->addStretch();
 
     topBar->addWidget(new QLabel("Période :"));
@@ -888,6 +952,9 @@ void MainWindow::buildUi() {
         }
     });
     tabs_->addTab(searchTab, "Recherche");
+
+    // Onglet « Copies locales » : archives conservées par morfCollector.
+    buildCopiesTab();
     previousDetailTab_ = healthTab_;
     connect(tabs_, &QTabWidget::currentChanged, this, [this](int index) {
         QWidget* current = tabs_->widget(index);
@@ -1323,6 +1390,393 @@ void MainWindow::onSync() {
     tabs_->setCurrentWidget(sitesTab_);
 }
 
+// --- Intégration morfCollector ----------------------------------------------
+
+QString MainWindow::ensureCollector(int discoverTimeoutMs) {
+    // 1. Endpoint explicitement configuré : prioritaire et fiable (le Pi est
+    //    joignable par nom d'hôte même si son IP change).
+    if (!config_.collectorUrl.empty())
+        return QString::fromStdString(config_.collectorUrl);
+    // 2. Adresse déjà captée par l'écouteur de fond.
+    if (!collectorUrl_.isEmpty())
+        return collectorUrl_;
+    // 3. Dernier recours : une découverte ponctuelle (peut rater si l'annonce
+    //    tombe hors de la fenêtre d'écoute).
+    statusBar()->showMessage("Recherche de morfCollector sur le réseau …");
+    QApplication::processEvents();
+    collectorUrl_ = collectorsync::locate(QString(), discoverTimeoutMs);
+    return collectorUrl_;
+}
+
+void MainWindow::startupCollectorSync() {
+    if (!configError_.isEmpty() || config_.sites.empty())
+        return;
+    const QString url = ensureCollector(2500);
+    if (url.isEmpty())
+        return;   // aucun collecteur : SiteWatch reste autonome (silencieux)
+
+    const collectorsync::SyncResult r =
+        collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/false);
+    if (!r.ok) {
+        showBanner(BannerLevel::Warning,
+            "morfCollector détecté mais synchronisation impossible : " + r.error.toHtmlEscaped());
+        return;
+    }
+
+    // Alerte prioritaire : les retraits. Les copies restent conservées sur le Pi.
+    if (!r.removedLabels.isEmpty()) {
+        showBanner(BannerLevel::Warning,
+            QString("<b>%1 site(s) retiré(s)</b> de la configuration : %2.<br>"
+                    "La collecte s'arrête, mais <b>les copies déjà conservées sur le Pi "
+                    "(morfCollector) ne sont pas effacées</b>. Passez par « Copies locales » "
+                    "pour les supprimer définitivement si vous le souhaitez.")
+                .arg(r.removedLabels.size())
+                .arg(r.removedLabels.join(", ").toHtmlEscaped()));
+        return;
+    }
+    if (!r.addedLabels.isEmpty()) {
+        showBanner(BannerLevel::Info,
+            QString("<b>morfCollector</b> : %1 nouveau(x) site(s) confié(s) à la collecte (%2).")
+                .arg(r.addedLabels.size()).arg(r.addedLabels.join(", ").toHtmlEscaped()));
+        return;
+    }
+    if (r.pushed)
+        statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(r.revision));
+}
+
+void MainWindow::syncAllViaCollector() {
+    hideBanner();
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+        return;
+    }
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const QString url = ensureCollector(3000);
+    if (url.isEmpty()) {
+        QApplication::restoreOverrideCursor();
+        showBanner(BannerLevel::Warning,
+            "<b>Aucun morfCollector détecté</b> sur le réseau.<br>"
+            "Utilisez « Tout synchroniser → En direct (SFTP) » pour télécharger "
+            "directement depuis l'hébergeur.");
+        return;
+    }
+
+    // 1. Aligner la configuration sur le collecteur (manifeste + secrets).
+    const collectorsync::SyncResult sr =
+        collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/true);
+    if (!sr.ok) {
+        QApplication::restoreOverrideCursor();
+        showBanner(BannerLevel::Error, "Synchronisation refusée : " + sr.error.toHtmlEscaped());
+        return;
+    }
+
+    // 2. Remplir le cache local depuis les copies conservées (tous les sites).
+    int totalDl = 0, totalSkip = 0;
+    QStringList problems;
+    for (const SiteConfig& s : config_.sites) {
+        statusBar()->showMessage("Copies locales : " + QString::fromStdString(s.name) + " …");
+        QApplication::processEvents();
+        const collectorsync::FillResult f = collectorsync::fillCache(url, s, config_.cacheRoot);
+        totalDl += f.downloaded;
+        totalSkip += f.skipped;
+        if (!f.ok) problems << QString::fromStdString(s.name);
+    }
+    QApplication::restoreOverrideCursor();
+
+    QString msg = QString("<b>morfCollector : %1 fichier(s) copié(s) dans le cache</b> "
+                          "(%2 déjà à jour).").arg(totalDl).arg(totalSkip);
+    if (!sr.removedLabels.isEmpty())
+        msg += QString("<br>%1 site(s) retiré(s) : copies conservées sur le Pi, non effacées.")
+                   .arg(sr.removedLabels.size());
+    if (!problems.isEmpty())
+        msg += "<br>Problème pour : " + problems.join(", ").toHtmlEscaped();
+    showBanner(problems.isEmpty() ? BannerLevel::Success : BannerLevel::Warning, msg);
+
+    onAnalyze();
+    refreshSitesOverview();
+}
+
+void MainWindow::syncAllLocal() {
+    hideBanner();
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+        return;
+    }
+    // Réutilise le téléchargement SFTP éprouvé, site par site, en une passe.
+    const int n = siteSelector_->count();
+    const int keep = siteSelector_->currentIndex();
+    for (int i = 0; i < n; ++i) {
+        siteSelector_->setCurrentIndex(i);
+        QApplication::processEvents();
+        onSync();   // télécharge (SFTP) + analyse le site i
+    }
+    if (keep >= 0 && keep < n)
+        siteSelector_->setCurrentIndex(keep);
+    showBanner(BannerLevel::Success,
+        QString("<b>Tout synchroniser (SFTP) terminé</b> : %1 site(s) traité(s).").arg(n));
+}
+
+// --- Onglet « Copies locales » ----------------------------------------------
+
+namespace {
+QString humanSize(qint64 b) {
+    const char* u[] = {"o", "Ko", "Mo", "Go", "To"};
+    double x = static_cast<double>(b);
+    int i = 0;
+    while (x >= 1024.0 && i < 4) { x /= 1024.0; ++i; }
+    return QString::number(x, 'f', i ? 1 : 0) + " " + u[i];
+}
+QString whenTs(qint64 ts) {
+    return ts > 0 ? QDateTime::fromSecsSinceEpoch(ts).toString("dd/MM/yyyy HH:mm")
+                  : QStringLiteral("jamais");
+}
+QString frAdmin(const QString& s) {
+    if (s == "active")   return QStringLiteral("Actif");
+    if (s == "suspended")return QStringLiteral("Suspendu");
+    if (s == "retired")  return QStringLiteral("Retiré");
+    return s;
+}
+QString frOp(const QString& s) {
+    if (s == "idle")        return QStringLiteral("Au repos");
+    if (s == "waiting")     return QStringLiteral("En attente");
+    if (s == "collecting")  return QStringLiteral("Collecte…");
+    if (s == "error")       return QStringLiteral("Erreur");
+    if (s == "auth_failed") return QStringLiteral("Auth. refusée");
+    if (s == "unreachable") return QStringLiteral("Injoignable");
+    return s.isEmpty() ? QStringLiteral("—") : s;
+}
+void styleTable(QTableWidget* t) {
+    t->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    t->setSelectionBehavior(QAbstractItemView::SelectRows);
+    t->setSelectionMode(QAbstractItemView::SingleSelection);
+    t->setAlternatingRowColors(true);
+    t->setShowGrid(false);
+    t->verticalHeader()->setVisible(false);
+    t->horizontalHeader()->setStretchLastSection(true);
+}
+} // namespace
+
+void MainWindow::buildCopiesTab() {
+    copiesTab_ = new QWidget;
+    auto* v = new QVBoxLayout(copiesTab_);
+    v->setSpacing(10);
+
+    auto* intro = new QLabel(
+        "Archives conservées par <b>morfCollector</b> — le service qui récupère les "
+        "journaux avant leur disparition chez l'hébergeur et les garde localement "
+        "(sur le Raspberry Pi, par exemple). SiteWatch ne modifie jamais ces fichiers "
+        "directement : toutes les actions sont exécutées par le collecteur.");
+    intro->setProperty("muted", true);
+    intro->setWordWrap(true);
+    v->addWidget(intro);
+
+    auto* top = new QHBoxLayout;
+    copiesStatus_ = new QLabel("Cliquez sur « Rafraîchir » pour interroger le collecteur.");
+    copiesStatus_->setWordWrap(true);
+    top->addWidget(copiesStatus_, 1);
+    auto* refreshBtn = new QPushButton("Rafraîchir");
+    connect(refreshBtn, &QPushButton::clicked, this, &MainWindow::refreshCopies);
+    top->addWidget(refreshBtn);
+    v->addLayout(top);
+
+    auto* tables = new QHBoxLayout;
+    copiesSourcesTable_ = new QTableWidget;
+    copiesSourcesTable_->setColumnCount(6);
+    copiesSourcesTable_->setHorizontalHeaderLabels(
+        {"Site", "État", "Opérationnel", "Objets", "Taille", "Dernière collecte"});
+    styleTable(copiesSourcesTable_);
+    connect(copiesSourcesTable_, &QTableWidget::itemSelectionChanged,
+            this, &MainWindow::loadCopiesObjects);
+    tables->addWidget(copiesSourcesTable_, 3);
+
+    copiesObjectsTable_ = new QTableWidget;
+    copiesObjectsTable_->setColumnCount(3);
+    copiesObjectsTable_->setHorizontalHeaderLabels({"Fichier", "Période", "Taille"});
+    styleTable(copiesObjectsTable_);
+    tables->addWidget(copiesObjectsTable_, 2);
+    v->addLayout(tables, 1);
+
+    // Sélections courantes (source / objet).
+    auto srcId = [this]() -> QString {
+        const int r = copiesSourcesTable_->currentRow();
+        auto* it = (r >= 0) ? copiesSourcesTable_->item(r, 0) : nullptr;
+        return it ? it->data(Qt::UserRole).toString() : QString();
+    };
+    auto srcLabel = [this]() -> QString {
+        const int r = copiesSourcesTable_->currentRow();
+        auto* it = (r >= 0) ? copiesSourcesTable_->item(r, 0) : nullptr;
+        return it ? it->text() : QString();
+    };
+    auto objId = [this]() -> QString {
+        const int r = copiesObjectsTable_->currentRow();
+        auto* it = (r >= 0) ? copiesObjectsTable_->item(r, 0) : nullptr;
+        return it ? it->data(Qt::UserRole).toString() : QString();
+    };
+    auto objName = [this]() -> QString {
+        const int r = copiesObjectsTable_->currentRow();
+        auto* it = (r >= 0) ? copiesObjectsTable_->item(r, 0) : nullptr;
+        return it ? it->text() : QString();
+    };
+    auto needSource = [this, srcId]() -> QString {
+        const QString id = srcId();
+        if (id.isEmpty() || collectorUrl_.isEmpty())
+            showBanner(BannerLevel::Info, "Sélectionnez d'abord un site dans la liste.");
+        return id;
+    };
+
+    auto* actions = new QHBoxLayout;
+    auto* collectBtn = new QPushButton("Collecter maintenant");
+    connect(collectBtn, &QPushButton::clicked, this, [this, needSource]{
+        const QString id = needSource(); if (id.isEmpty()) return;
+        CollectorClient::collectNow(collectorUrl_, id);
+        statusBar()->showMessage("Collecte demandée au collecteur…");
+        QTimer::singleShot(1500, this, [this]{ refreshCopies(); });
+    });
+    auto* suspendBtn = new QPushButton("Suspendre");
+    connect(suspendBtn, &QPushButton::clicked, this, [this, needSource]{
+        const QString id = needSource(); if (id.isEmpty()) return;
+        CollectorClient::suspend(collectorUrl_, id);
+        refreshCopies();
+    });
+    auto* resumeBtn = new QPushButton("Reprendre");
+    connect(resumeBtn, &QPushButton::clicked, this, [this, needSource]{
+        const QString id = needSource(); if (id.isEmpty()) return;
+        CollectorClient::resume(collectorUrl_, id);
+        refreshCopies();
+    });
+    actions->addWidget(collectBtn);
+    actions->addWidget(suspendBtn);
+    actions->addWidget(resumeBtn);
+    actions->addStretch();
+
+    auto* exportBtn = new QPushButton("Exporter le fichier…");
+    connect(exportBtn, &QPushButton::clicked, this, [this, objId, objName]{
+        const QString oid = objId();
+        if (oid.isEmpty() || collectorUrl_.isEmpty()) {
+            showBanner(BannerLevel::Info, "Sélectionnez d'abord un fichier."); return;
+        }
+        const QString path = QFileDialog::getSaveFileName(this, "Exporter l'archive", objName());
+        if (path.isEmpty()) return;
+        bool ok = false; QString err;
+        const QByteArray bytes = CollectorClient::download(collectorUrl_, oid, ok, err);
+        if (!ok) { showBanner(BannerLevel::Error, "Export impossible : " + err.toHtmlEscaped()); return; }
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly)) { showBanner(BannerLevel::Error, "Écriture impossible."); return; }
+        f.write(bytes);
+        showBanner(BannerLevel::Success, "Archive exportée : " + path.toHtmlEscaped());
+    });
+    auto* delObjBtn = new QPushButton("Supprimer le fichier…");
+    connect(delObjBtn, &QPushButton::clicked, this, [this, objId, objName]{
+        const QString oid = objId();
+        if (oid.isEmpty() || collectorUrl_.isEmpty()) {
+            showBanner(BannerLevel::Info, "Sélectionnez d'abord un fichier."); return;
+        }
+        if (QMessageBox::question(this, "Supprimer le fichier",
+                "Supprimer définitivement « " + objName() + " » du collecteur ?\n"
+                "Cette action est irréversible.") != QMessageBox::Yes) return;
+        CollectorClient::deleteObject(collectorUrl_, oid);
+        loadCopiesObjects();
+        refreshCopies();
+    });
+    actions->addWidget(exportBtn);
+    actions->addWidget(delObjBtn);
+    actions->addSpacing(16);
+
+    auto* delSiteBtn = new QPushButton("Supprimer les copies du site…");
+    connect(delSiteBtn, &QPushButton::clicked, this, [this, needSource, srcLabel]{
+        const QString id = needSource(); if (id.isEmpty()) return;
+        if (QMessageBox::question(this, "Supprimer les copies du site",
+                "Supprimer définitivement TOUTES les copies conservées pour « "
+                + srcLabel() + " » ?\nCette action est irréversible.") != QMessageBox::Yes) return;
+        CollectorClient::deleteSourceObjects(collectorUrl_, id);
+        loadCopiesObjects();
+        refreshCopies();
+    });
+    auto* delSrcBtn = new QPushButton("Supprimer le site retiré…");
+    connect(delSrcBtn, &QPushButton::clicked, this, [this, needSource, srcLabel]{
+        const QString id = needSource(); if (id.isEmpty()) return;
+        if (QMessageBox::question(this, "Supprimer le site",
+                "Supprimer définitivement le site « " + srcLabel()
+                + " » et tout son historique du collecteur ?") != QMessageBox::Yes) return;
+        const CollectorClient::Reply r = CollectorClient::deleteSource(collectorUrl_, id);
+        if (r.status == 409)
+            showBanner(BannerLevel::Warning,
+                "Ce site est encore actif. Il faut d'abord le retirer de la "
+                "configuration (il passera « retiré ») avant de pouvoir le supprimer.");
+        refreshCopies();
+    });
+    actions->addWidget(delSiteBtn);
+    actions->addWidget(delSrcBtn);
+    v->addLayout(actions);
+
+    tabs_->addTab(copiesTab_, "Copies locales");
+}
+
+void MainWindow::refreshCopies() {
+    const QString url = ensureCollector(3000);
+    if (url.isEmpty()) {
+        copiesStatus_->setText(
+            "Aucun morfCollector détecté sur le réseau. Les copies locales ne sont "
+            "disponibles que lorsque le service tourne (sur le Raspberry Pi, par ex.). "
+            "SiteWatch fonctionne sans lui, en téléchargement direct.");
+        copiesSourcesTable_->setRowCount(0);
+        copiesObjectsTable_->setRowCount(0);
+        return;
+    }
+
+    const CollectorClient::Reply st = CollectorClient::getStatus(url);
+    const QJsonObject m = st.json.value("metrics").toObject();
+    copiesStatus_->setText(QString(
+        "Collecteur <b>%1</b> — %2 objet(s), %3 conservés, dernière collecte %4, %5 erreur(s).")
+        .arg(st.json.value("host").toString().toHtmlEscaped())
+        .arg(m.value("objects").toInt())
+        .arg(humanSize(static_cast<qint64>(m.value("bytes").toDouble())))
+        .arg(whenTs(static_cast<qint64>(m.value("last_collect_ts").toDouble())))
+        .arg(m.value("errors").toInt(0)));
+
+    const CollectorClient::Reply s = CollectorClient::getSources(url);
+    const QJsonArray arr = s.json.value("sources").toArray();
+    copiesSourcesTable_->setRowCount(arr.size());
+    int r = 0;
+    for (const QJsonValue& val : arr) {
+        const QJsonObject o = val.toObject();
+        auto* site = new QTableWidgetItem(o.value("label").toString());
+        site->setData(Qt::UserRole, o.value("source_id").toString());
+        copiesSourcesTable_->setItem(r, 0, site);
+        copiesSourcesTable_->setItem(r, 1, new QTableWidgetItem(frAdmin(o.value("admin_state").toString())));
+        copiesSourcesTable_->setItem(r, 2, new QTableWidgetItem(frOp(o.value("operational_state").toString())));
+        copiesSourcesTable_->setItem(r, 3, new QTableWidgetItem(QString::number(o.value("objects").toInt())));
+        copiesSourcesTable_->setItem(r, 4, new QTableWidgetItem(humanSize(static_cast<qint64>(o.value("bytes").toDouble()))));
+        copiesSourcesTable_->setItem(r, 5, new QTableWidgetItem(whenTs(static_cast<qint64>(o.value("last_collect_ts").toDouble()))));
+        ++r;
+    }
+    copiesObjectsTable_->setRowCount(0);
+}
+
+void MainWindow::loadCopiesObjects() {
+    copiesObjectsTable_->setRowCount(0);
+    const int r = copiesSourcesTable_->currentRow();
+    if (r < 0 || collectorUrl_.isEmpty())
+        return;
+    auto* it = copiesSourcesTable_->item(r, 0);
+    if (!it) return;
+    const QString id = it->data(Qt::UserRole).toString();
+
+    const CollectorClient::Reply o = CollectorClient::getObjects(collectorUrl_, id);
+    const QJsonArray arr = o.json.value("objects").toArray();
+    copiesObjectsTable_->setRowCount(arr.size());
+    int row = 0;
+    for (const QJsonValue& val : arr) {
+        const QJsonObject j = val.toObject();
+        auto* name = new QTableWidgetItem(j.value("original_name").toString());
+        name->setData(Qt::UserRole, j.value("object_id").toString());
+        copiesObjectsTable_->setItem(row, 0, name);
+        copiesObjectsTable_->setItem(row, 1, new QTableWidgetItem(j.value("period").toString()));
+        copiesObjectsTable_->setItem(row, 2, new QTableWidgetItem(humanSize(static_cast<qint64>(j.value("size").toDouble()))));
+        ++row;
+    }
+}
+
 void MainWindow::onAnalyze() {
     if (!configError_.isEmpty() || config_.sites.empty()) {
         QMessageBox::warning(this, "SiteWatch",
@@ -1712,8 +2166,15 @@ void MainWindow::onSearch() {
 
 void MainWindow::onCleanCache() {
     QStringList names;
-    for (const auto& s : config_.sites) names << QString::fromStdString(s.name);
-    CacheCleanupDialog dlg(QString::fromStdString(config_.cacheRoot), names, this);
+    QVector<QPair<QString, QString>> colSites;   // (nom, source_id) pour morfCollector
+    for (const auto& s : config_.sites) {
+        names << QString::fromStdString(s.name);
+        colSites.append({ QString::fromStdString(s.name), QString::fromStdString(s.id) });
+    }
+    // URL déjà connue (endpoint configuré ou capté par l'écouteur), sans découverte bloquante.
+    const QString url = config_.collectorUrl.empty()
+        ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
+    CacheCleanupDialog dlg(QString::fromStdString(config_.cacheRoot), names, colSites, url, this);
     dlg.exec();
 }
 

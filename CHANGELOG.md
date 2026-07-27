@@ -1,10 +1,71 @@
-# Changelog — SiteWatch
+# Changelog - SiteWatch
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
-## [1.5.2] — 2026-07-20
+## [1.7.0] - 2026-07-27
+
+### Fixed
+
+- **Découverte de morfCollector fiabilisée.** Le heartbeat morfBeacon n'est émis
+  que toutes les ~15 s ; la découverte ponctuelle de quelques secondes le
+  manquait presque toujours (morfCollector apparaissait « non détecté » alors
+  qu'il tournait). SiteWatch écoute désormais les annonces **en permanence**, en
+  tâche de fond, dès le démarrage (comme un superviseur) et capte la prochaine
+  annonce sans bloquer l'interface.
+
+### Added
+
+- **Adresse du collecteur configurable** (`collectorUrl` dans la configuration).
+  Renseigner par exemple `http://pi4fred:8792` connecte SiteWatch à morfCollector
+  de façon déterministe, indépendamment de la découverte (utile car l'IP du Pi
+  peut changer, mais son nom d'hôte reste stable). Vide = découverte automatique.
+- **Gestion morfCollector dans la fenêtre de configuration** : adresse du
+  collecteur, état (hôte, nombre d'objets, espace, sources), et copies conservées
+  par site (lister, supprimer une sélection ou toutes les copies d'un site).
+- **Gestion des copies morfCollector dans « Effacer les logs »** : à côté du cache
+  local, une section permet de lister et supprimer les fichiers conservés par le
+  collecteur, par site.
+
+## [1.6.0] - 2026-07-27
+
+### Added
+
+- **Intégration morfCollector (côté fournisseur du contrat `morfcollect/1`).**
+  Nouveau composant headless `src/collector/CollectorClient` : découverte de
+  morfCollector via morfBeacon (capacité `collection`, jamais par le nom),
+  vérification de compatibilité, comparaison des révisions
+  (`GET /manifest/state`), envoi du manifeste (`POST /manifest`) et des secrets
+  (`POST /credentials`), lecture des copies locales. Outil console
+  `sitewatch-collector-sync` (Qt Core + Network, sans GUI) qui pilote cette
+  synchronisation et sert à la vérifier ; la GUI réutilisera `CollectorClient`.
+- **Identité stable des sites (`SiteConfig::id`, UUID).** Attribuée une fois au
+  chargement si absente puis persistée. C'est l'identité d'un site vis-à-vis de
+  morfCollector : elle ne dérive jamais du nom, de sorte qu'un changement d'hôte,
+  de domaine ou de chemin ne casse pas l'historique de collecte.
+- **Intégration morfCollector dans l'interface.** `CollectorSync` (réutilisé par
+  la GUI et l'outil) construit le manifeste depuis la configuration, gère
+  génération + révision (état persisté `config.json.collector.json`), pousse le
+  manifeste et les secrets, détecte les sites **ajoutés** et **retirés**, et
+  remplit le cache local depuis les copies du collecteur (seulement les fichiers
+  absents ou de taille différente).
+  - **Synchronisation à l'ouverture** : si un morfCollector est présent, la
+    configuration lui est poussée automatiquement. Un site **retiré** déclenche
+    une **alerte** rappelant que ses copies restent **conservées sur le Pi** (rien
+    n'est effacé) ; l'effacement définitif reste une action explicite.
+  - **Bouton « Tout synchroniser »** (deux modes) : *via morfCollector* (récupère
+    les copies locales du Pi en une passe) ou *en direct (SFTP)* (télécharge
+    depuis l'hébergeur, site par site). Également dans le menu Outils.
+  - **Onglet « Copies locales »** : consulter l'état du collecteur (espace occupé,
+    dernière collecte, erreurs), la liste des sites archivés (état administratif +
+    opérationnel, nombre d'objets, taille), et les archives d'un site (fichier,
+    période, taille). Actions déléguées au collecteur : collecter maintenant,
+    suspendre / reprendre, exporter une archive, supprimer un fichier, supprimer
+    toutes les copies d'un site, supprimer un site retiré. SiteWatch ne modifie
+    jamais les fichiers directement.
+
+## [1.5.2] - 2026-07-20
 
 ### Changed
 
@@ -16,7 +77,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 - Version badge in `README.md` and `README.fr.md` corrected from 1.4.2 to 1.5.1.
 - Updated user-facing changelog wording to use canonical production naming.
 
-## [1.5.1] — 2026-07-19
+## [1.5.1] - 2026-07-19
 
 ### Changed
 - **Copie vendorée de morfBeacon resynchronisée en 0.2.0** (champ `capabilities`
@@ -25,12 +86,12 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
   resynchronisation évite que la copie embarquée ne dérive de l'amont.
 - **`scripts/sync-morf.sh` : résolution du dépôt source corrigée.** Le script
   cherchait exclusivement `morfBeacon` / `morfUpdate` et échouait donc sur une
-  organisation où les clones portaient un suffixe de développement — c'est-à-dire
+  organisation où les clones portaient un suffixe de développement - c'est-à-dire
   qu'il ne fonctionnait tout simplement pas. Il accepte désormais les deux conventions.
 
   morfUpdate reste en 0.1.0, déjà aligné sur l'amont.
 
-## [1.5.0] — 2026-07-13
+## [1.5.0] - 2026-07-13
 
 ### Added
 
@@ -38,7 +99,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
   announces its presence on the local network (UDP heartbeat, port 45454) and
   exposes live metrics over a small local HTTP endpoint (`/status`, port 8788), so
   the running application can be watched from a central dashboard
-  (RaspberryDashboard). It also checks GitHub Releases for a newer version —
+  (RaspberryDashboard). It also checks GitHub Releases for a newer version -
   silently at startup, and on demand via **Help → "Check for updates…"**. Both are
   shared modules vendored under `third_party/morf/` (compiled into the binary, no
   external dependency). See [docs/fr/SUPERVISION_ET_MAJ.md](docs/fr/SUPERVISION_ET_MAJ.md) *(FR)*.
@@ -47,24 +108,24 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
   dependency detection, for a clean install/removal via apt. Documented in
   `docs/fr/INSTALL_LINUX.md` (Part D). The build directory is now auto-detected
   (`build/` then `build-arm64/`), so no `--build` flag is needed on Raspberry Pi.
-  The package also explicitly declares `libxcb-cursor0` — required by the Qt xcb
+  The package also explicitly declares `libxcb-cursor0` - required by the Qt xcb
   platform plugin since Qt 6.5 but loaded via `dlopen`, so invisible to `ldd`;
   without it the application refused to start on Raspberry Pi OS.
 
-## [1.4.2] — 2026-07-10
+## [1.4.2] - 2026-07-10
 
 ### Fixed
 
 - **UI pictograms now display universally** (Windows, Linux, WSL, Raspberry Pi).
   The interface used Unicode color emoji (KPI icons, health dots, banner, etc.),
-  which are absent from default Linux/WSL fonts and poorly rendered by Qt 6.4 —
+  which are absent from default Linux/WSL fonts and poorly rendered by Qt 6.4 -
   they showed as empty “tofu” boxes. They are replaced by an **embedded icon
   font** (`resources/fonts/SiteWatchIcons.ttf`, a ~4 KB subset of Font Awesome
   Free), loaded at startup and colored via the theme. New `src/ui/Icons` module.
 
 ### Changed
 
-- **SiteWatch is now positioned as a cross-platform Qt/C++ application** — Windows
+- **SiteWatch is now positioned as a cross-platform Qt/C++ application** - Windows
   is one supported platform among others, not the only target. Documentation
   updated accordingly (README, README.fr).
 - **Raspberry Pi 4** (Raspberry Pi OS 64-bit) added to the verified platforms,
@@ -72,7 +133,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
   deployments (Raspberry Pi, Linux VM as a scheduled task, Debian NAS, fanless
   mini-PC).
 
-## [1.4.1] — 2026-07-10
+## [1.4.1] - 2026-07-10
 
 Tooling and documentation release; no application code change.
 
@@ -84,7 +145,7 @@ Tooling and documentation release; no application code change.
   ARM64 cross toolchain file under `cmake/toolchains/` and documented the targets
   in `docs/fr/COMPILATION.md`. No application code change.
 
-### Changed — build strategy
+### Changed - build strategy
 
 - Simplified the cross-compilation strategy: building Linux x86_64 **from
   Windows** now relies on **WSL2** (native build with the `linux` preset) instead
@@ -107,7 +168,7 @@ Tooling and documentation release; no application code change.
 - Fixed internal documentation links (including two previously broken links to
   the user guide).
 
-## [1.4.0] — 2026-07-10
+## [1.4.0] - 2026-07-10
 
 ### Added
 
@@ -135,7 +196,7 @@ Tooling and documentation release; no application code change.
   **`docs/GUIDE.md`**; added an index **`docs/README.md`** and a troubleshooting
   guide **`docs/DEPANNAGE_LOGS.md`**.
 
-## [1.3.1] — 2026-07-10
+## [1.3.1] - 2026-07-10
 
 ### Fixed
 
@@ -146,7 +207,7 @@ Tooling and documentation release; no application code change.
   The “System” mode follows the OS live from Qt 6.5; on older Qt, the theme is
   determined at startup and via the menu. No behavior change on Windows.
 
-## [1.3.0] — 2026-07-10
+## [1.3.0] - 2026-07-10
 
 ### Added
 
@@ -171,7 +232,7 @@ Tooling and documentation release; no application code change.
   **Sites** tab was invisible with the default Windows theme). Contrasts revised
   to stay readable in light and dark.
 
-## [1.2.0] — 2026-07-09
+## [1.2.0] - 2026-07-09
 
 ### Added
 
@@ -184,7 +245,7 @@ Tooling and documentation release; no application code change.
 - Old **Compare sites…** dialog in the Tools menu, replaced by the permanent
   **Sites** tab.
 
-## [1.1.2] — 2026-07-09
+## [1.1.2] - 2026-07-09
 
 ### Added
 
@@ -210,7 +271,7 @@ Tooling and documentation release; no application code change.
 - Old Windows **MSVC/vcpkg** path: removed the associated CMake preset and
   `vcpkg.json`. The official Windows path is now **MSYS2/MinGW**.
 
-## [1.1.1] — 2026-07-09
+## [1.1.1] - 2026-07-09
 
 ### Changed
 
@@ -218,11 +279,11 @@ Tooling and documentation release; no application code change.
 - Expanded build documentation in the README.
 - Cleaned up frozen version references in the distribution notes.
 
-## [1.1.0] — 2026-07-09
+## [1.1.0] - 2026-07-09
 
 ### Added
 
-- **Interactive tabs** — each tabular tab (Security, WP Activity, Top pages,
+- **Interactive tabs** - each tabular tab (Security, WP Activity, Top pages,
   Referrers, URLs, Search) reacts to a **double-click** on a row: a detail window
   aggregates IPs, HTTP codes, user-agents, URLs, referrers, hourly breakdown and
   daily evolution.
@@ -234,10 +295,10 @@ Tooling and documentation release; no application code change.
 
 - Unified detail view: the URL-specific window is replaced by a generic window
   shared by all tabs. The core classifiers (`classifyActivity`,
-  `classifyReferer`) are reused to find the entries of a category or referrer —
+  `classifyReferer`) are reused to find the entries of a category or referrer -
   no duplicated logic.
 
-## [1.0.0] — 2026-07-07
+## [1.0.0] - 2026-07-07
 
 First complete release.
 
@@ -277,6 +338,6 @@ First complete release.
 
 ### Portability
 
-- Builds on **Windows** (MSYS2/MinGW) and **Linux** (GCC/Clang) — portable socket
+- Builds on **Windows** (MSYS2/MinGW) and **Linux** (GCC/Clang) - portable socket
   layer.
 - Support for **other hosts** (optional firewall token, advanced log filter).

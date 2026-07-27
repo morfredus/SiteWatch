@@ -93,6 +93,22 @@ private:
     void buildUi();
     void loadConfiguration();
     void checkForUpdates(bool manual);   // manual=true : entrée de menu ; false : au démarrage (silencieux)
+
+    // --- Intégration morfCollector (côté fournisseur, contrat morfcollect/1) ---
+    // Localise morfCollector (découverte morfBeacon), en mémorisant l'URL. "" si
+    // aucun collecteur n'est présent (SiteWatch reste autonome).
+    QString ensureCollector(int discoverTimeoutMs);
+    // Au démarrage : pousse la config au collecteur si présent, et ALERTE sur les
+    // sites ajoutés / retirés (un retrait n'efface JAMAIS les copies du Pi).
+    void startupCollectorSync();
+    // « Tout synchroniser » : en une passe, tous les sites.
+    void syncAllViaCollector();   // récupère les copies locales depuis le collecteur
+    void syncAllLocal();          // télécharge en direct (SFTP), site par site
+
+    // Onglet « Copies locales » : consulter/piloter les archives du collecteur.
+    void buildCopiesTab();
+    void refreshCopies();         // recharge collecteur + sources
+    void loadCopiesObjects();     // recharge les objets de la source sélectionnée
     void displayStats(const Stats& stats);
     void refreshSitesOverview();
     void fillHealth(const Stats& stats);
@@ -122,6 +138,7 @@ private:
 
     Config  config_;
     QString configError_;
+    QString collectorUrl_;   // URL du morfCollector découvert (vide si absent)
     Stats   lastStats_;
     std::vector<LogEntry> entries_;   // entrées de la dernière analyse (pour le détail)
 
@@ -158,6 +175,12 @@ private:
 
     QWidget*    chartTab_      = nullptr;
     QComboBox*  chartSelector_ = nullptr;
+
+    // --- Onglet « Copies locales » (morfCollector) ---
+    QWidget*      copiesTab_          = nullptr;
+    QLabel*       copiesStatus_       = nullptr;
+    QTableWidget* copiesSourcesTable_ = nullptr;
+    QTableWidget* copiesObjectsTable_ = nullptr;
 
     // --- Recherche ---
     QLineEdit*    searchEdit_  = nullptr;

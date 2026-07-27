@@ -18,7 +18,7 @@
 
 SiteWatch is a **cross-platform Qt / C++17 application** for website
 administration and monitoring. It runs natively on **Windows, Linux (x86_64 and
-ARM64) and Raspberry Pi** — Windows is one supported platform among others, not
+ARM64) and Raspberry Pi** - Windows is one supported platform among others, not
 the only target.
 
 Unlike traditional analytics tools, it does not aim to count visitors or produce
@@ -27,7 +27,7 @@ marketing reports. Its goal is much simpler:
 > **Understand what really happened on a web server.**
 
 It downloads Apache or LiteSpeed access logs over SFTP, analyzes them locally and
-presents the results in an immediately actionable form — **no SQL database, no
+presents the results in an immediately actionable form - **no SQL database, no
 WordPress dependency, no plugin to install on the monitored sites**. It reads the
 compressed log files (`.gz`) directly.
 
@@ -59,40 +59,40 @@ It is designed as an **investigation tool** for website administrators.
 
 ## Screenshots
 
-**Dashboard** — a global multi-site view after each sync or analysis, to spot in
+**Dashboard** - a global multi-site view after each sync or analysis, to spot in
 seconds which sites need attention. Double-click a site to open its detailed
 analysis.
 
 ![Dashboard](docs/pictures/dashboard.png)
 
-**Health** — the main indicators of the selected site, with 🟢 🟠 🔴 states that
+**Health** - the main indicators of the selected site, with 🟢 🟠 🔴 states that
 jump straight to the relevant tab.
 
 ![Health](docs/pictures/health.png)
 
-**Bots** — automatic classification by category (AI, search engines, SEO, other)
+**Bots** - automatic classification by category (AI, search engines, SEO, other)
 with a distribution chart.
 
 ![Bots](docs/pictures/robots.png)
 
-**Security** — suspicious requests grouped to quickly separate normal activity
+**Security** - suspicious requests grouped to quickly separate normal activity
 from real attack attempts, with WordPress false positives filtered out.
 
 ![Security](docs/pictures/security.png)
 
-**WordPress activity** — legitimate WordPress operations (admin, login, REST API,
+**WordPress activity** - legitimate WordPress operations (admin, login, REST API,
 `admin-ajax.php`, XML-RPC, cron…) identified to tell normal behavior from
 anomalies.
 
 ![WordPress activity](docs/pictures/wordpress-activity.png)
 
-**Top pages & referrers** — the most requested pages and the traffic sources
+**Top pages & referrers** - the most requested pages and the traffic sources
 (search engines, social, direct, other sites).
 
 ![Top pages](docs/pictures/top-pages.png)
 ![Referrers](docs/pictures/referrers.png)
 
-**URLs & detail windows** — explore every URL by category (all, probable attacks,
+**URLs & detail windows** - explore every URL by category (all, probable attacks,
 404s, WordPress, bots, system). Double-click any row for a full detail window:
 IPs, user-agents, HTTP codes, referrers, hourly and daily breakdown, with copy
 and CSV export everywhere.
@@ -100,7 +100,7 @@ and CSV export everywhere.
 ![URLs](docs/pictures/urls.png)
 ![Detail window](docs/pictures/urls-detail.png)
 
-**Charts** — evolution of the main indicators over the analyzed period (human
+**Charts** - evolution of the main indicators over the analyzed period (human
 traffic, bots, AI bots, Google, HTTP errors, WordPress activity).
 
 ![Charts](docs/pictures/graph.png)
@@ -191,7 +191,7 @@ SiteWatch is distributed under the **GNU GPL v3.0 only** license. See
 
 ## Author
 
-**morfredus** — developer, photographer and open-source tool maker.
+**morfredus** - developer, photographer and open-source tool maker.
 Most of my projects start from a concrete, real-world need. See [`AUTHORS`](AUTHORS).
 
-© 2026 morfredus — GNU GPL v3.0 only.
+© 2026 morfredus - GNU GPL v3.0 only.

@@ -18,5 +18,5 @@ The following guides will be translated here:
 | Architecture & philosophy | [docs/fr/ARCHITECTURE.md](../fr/ARCHITECTURE.md) |
 | Case studies | [docs/fr/CASE_STUDIES.md](../fr/CASE_STUDIES.md) |
 
-Contributions to translate these pages are welcome — see
+Contributions to translate these pages are welcome - see
 [CONTRIBUTING.md](../../CONTRIBUTING.md).

@@ -1,4 +1,4 @@
-# Guide utilisateur — SiteWatch
+# Guide utilisateur - SiteWatch
 
 Ce guide explique la configuration et l'utilisation quotidienne de SiteWatch.
 Pour l'installation, voir le [README](../../README.md) ; pour compiler depuis les
@@ -50,7 +50,7 @@ Cliquer **+ Ajouter**, puis renseigner :
 | **Serveur SFTP** | L'hôte SSH, ex. `serveur.o2switch.net`. |
 | **Utilisateur** | Le compte SSH/cPanel. |
 | **Clé SSH** | Chemin de la **clé privée** (bouton *Parcourir…*). Recommandé. |
-| **Mot de passe** | Optionnel — utilisé en secours si la clé échoue (icône 👁 pour afficher). |
+| **Mot de passe** | Optionnel - utilisé en secours si la clé échoue (icône 👁 pour afficher). |
 | **Dossier distant des logs** | Ex. `/home2/utilisateur/logs`. |
 | **Jeton d'API cPanel** | Pour l'ouverture automatique du pare-feu o2switch (icône 👁). Laisser **vide** pour un autre hébergeur. |
 | **Filtre des logs (avancé)** | Laisser **vide** pour o2switch. Voir §6 pour un autre hébergeur. |
@@ -79,11 +79,11 @@ Cliquer **Enregistrer** pour valider.
 
 o2switch exige une **clé SSH autorisée** et l'**ouverture du pare-feu**.
 
-1. **Clé SSH** — dans le cPanel : *Sécurité → Accès SSH → Gérer les clés SSH*.
+1. **Clé SSH** - dans le cPanel : *Sécurité → Accès SSH → Gérer les clés SSH*.
    Générer ou importer une clé, **l'autoriser**, télécharger la **clé privée**,
    puis indiquer son chemin dans le champ *Clé SSH*. La clé publique `.pub` est déduite
    automatiquement si elle est absente.
-2. **Jeton d'API cPanel** — dans le cPanel : *Sécurité → Gérer les jetons d'API*.
+2. **Jeton d'API cPanel** - dans le cPanel : *Sécurité → Gérer les jetons d'API*.
    Créer un jeton et le coller dans le champ *Jeton d'API cPanel*. SiteWatch
    s'en sert pour autoriser l'IP publique locale (souvent dynamique) avant
    chaque synchro.
@@ -141,7 +141,7 @@ se recalculent** selon la période choisie.
 
 **Double-cliquer** n'importe quelle ligne des onglets **Sécurité**, **Activité
 WP**, **Top pages**, **Référents**, **URLs** ou **Recherche** : une fenêtre
-affiche le détail des entrées correspondantes — IP, User-Agents, codes HTTP,
+affiche le détail des entrées correspondantes - IP, User-Agents, codes HTTP,
 URLs, référents, répartition horaire et évolution par jour. Le **site concerné**
 est rappelé en haut de la fenêtre.
 

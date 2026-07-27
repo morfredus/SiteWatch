@@ -7,10 +7,10 @@ Retour à l'[index de la documentation](README.md).
 SiteWatch embarque deux petits **modules communs** (préfixe « morf »), partagés
 avec les autres applications (ComponentHub, et les outils à venir) :
 
-- **morfBeacon** — *supervision réseau* : l'application annonce sa présence sur le
+- **morfBeacon** - *supervision réseau* : l'application annonce sa présence sur le
   réseau local et expose ses métriques, pour être suivie depuis un tableau de bord
   central (le **morfDashboard**).
-- **morfUpdate** — *mises à jour* : vérification de la dernière version publiée sur
+- **morfUpdate** - *mises à jour* : vérification de la dernière version publiée sur
   GitHub.
 
 > À ne pas confondre : SiteWatch **supervise des sites web** (via leurs logs) ;
@@ -23,7 +23,7 @@ l'identique sous Windows, Linux et Raspberry Pi.
 
 ---
 
-## morfBeacon — « je suis actif » + métriques
+## morfBeacon - « je suis actif » + métriques
 
 ### Le principe : annoncer, plutôt qu'être scanné
 
@@ -97,7 +97,7 @@ C'est exactement ce que fera le morfDashboard.
 
 ---
 
-## morfUpdate — vérification des mises à jour
+## morfUpdate - vérification des mises à jour
 
 SiteWatch compare sa version (fichier `VERSION`) à la dernière *release* publiée
 sur GitHub (`morfredus/SiteWatch`) :
@@ -109,7 +109,7 @@ sur GitHub (`morfredus/SiteWatch`) :
 
 La notification propose d'ouvrir la page de la *release* (ou le binaire) dans le
 navigateur. **Aucune installation automatique** : le téléchargement reste à votre
-main — un choix de prudence.
+main - un choix de prudence.
 
 ---
 
