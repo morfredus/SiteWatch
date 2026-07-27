@@ -4,6 +4,26 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-07-27
+
+### Fixed
+
+- **Liaison avec morfCollector qui se perdait** après quelques rafraîchissements
+  (le collecteur devenait « non détecté », un redémarrage rétablissait). Cause :
+  chaque découverte ponctuelle **rebindait le port UDP 45454**, ce qui, sous
+  Windows, cassait l'écoute des annonces. Il n'y a désormais **qu'un seul écouteur
+  permanent** (fenêtre principale) ; les dialogues reçoivent l'adresse déjà connue
+  et ne relancent plus jamais de découverte.
+
+### Changed
+
+- **Onglet morfCollector, boutons clarifiés.** Le bouton collé à l'adresse est
+  renommé **« Se connecter »** (il vérifie l'adresse et affiche l'état, il ne
+  modifie pas l'adresse). Le bouton **« Envoyer la config »** devient compact et
+  se place à côté. Un bouton dédié **« Rafraîchir les fichiers »** est ajouté dans
+  la liste des copies ; l'actualisation de l'état et celle des fichiers sont
+  séparées. La suppression de fichiers demande toujours une confirmation.
+
 ## [1.9.0] - 2026-07-27
 
 ### Changed

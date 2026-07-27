@@ -50,7 +50,6 @@
 
 #include "core/net/SftpClient.h"
 #include "collector/CollectorClient.h"
-#include "collector/CollectorSync.h"
 
 // ---------------------------------------------------------------------------
 namespace {
@@ -148,8 +147,8 @@ bool firewallWhitelist(const SiteConfig& site, QString& error) {
 } // namespace
 
 // ---------------------------------------------------------------------------
-SettingsDialog::SettingsDialog(const Config& config, QWidget* parent)
-    : QDialog(parent), config_(config) {
+SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUrl, QWidget* parent)
+    : QDialog(parent), config_(config), discoveredUrl_(discoveredUrl) {
     setWindowTitle("Configuration — SiteWatch");
     setMinimumWidth(780);
 
@@ -212,11 +211,7 @@ void SettingsDialog::buildUi() {
 
     // --- morfCollector : connexion, planification, état et copies conservées ---
     buildCollectorGroup(collectorLayout);
-    auto* pushBtn = new QPushButton("Envoyer la configuration à morfCollector");
-    pushBtn->setToolTip("Enregistre la configuration puis la pousse au collecteur détecté.");
-    collectorLayout->addWidget(pushBtn);
     collectorLayout->addStretch();
-    connect(pushBtn, &QPushButton::clicked, this, [this] { pushRequested_ = true; onAccept(); });
 
     // --- Sites ---
     auto* sitesBox = new QGroupBox("Sites");
@@ -537,9 +532,10 @@ QString SettingsDialog::collectorUrl() const {
     const QString typed = collectorEdit_->text().trimmed();
     if (!typed.isEmpty())
         return typed;
-    // Champ vide : on tente une découverte ponctuelle (utile dans ce dialogue,
-    // qui n'a pas d'écouteur permanent comme la fenêtre principale).
-    return collectorsync::locate(QString(), 4000);
+    // Champ vide : on utilise l'URL déjà découverte par la fenêtre principale.
+    // On ne relance JAMAIS de découverte ici (rebinder le port 45454 casserait
+    // l'écoute permanente et ferait « disparaître » le collecteur).
+    return discoveredUrl_;
 }
 
 void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
@@ -549,13 +545,18 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     auto* form = new QFormLayout;
     collectorEdit_ = new QLineEdit(QString::fromStdString(config_.collectorUrl));
     collectorEdit_->setPlaceholderText("http://pi4fred:8792  (vide = découverte automatique)");
-    auto* refreshBtn = new QPushButton("Rafraîchir");
+    auto* connectBtn = new QPushButton("Se connecter");
+    connectBtn->setToolTip("Vérifie l'adresse et affiche l'état du collecteur.");
+    auto* pushBtn = new QPushButton("Envoyer la config");
+    pushBtn->setToolTip("Enregistre puis pousse la configuration au collecteur.");
     auto* urlRow = new QWidget;
     auto* urlRowL = new QHBoxLayout(urlRow);
     urlRowL->setContentsMargins(0, 0, 0, 0);
     urlRowL->addWidget(collectorEdit_, 1);
-    urlRowL->addWidget(refreshBtn);
+    urlRowL->addWidget(connectBtn);
+    urlRowL->addWidget(pushBtn);
     addRow(form, "Adresse du collecteur :", urlRow);
+    connect(pushBtn, &QPushButton::clicked, this, [this] { pushRequested_ = true; onAccept(); });
 
     collectorTime_ = new QTimeEdit;
     collectorTime_->setDisplayFormat("HH:mm");
@@ -573,7 +574,7 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     schedHint->setWordWrap(true);
     v->addWidget(schedHint);
 
-    collectorState_ = new QLabel("État inconnu — cliquez sur « Rafraîchir ».");
+    collectorState_ = new QLabel("État inconnu — cliquez sur « Se connecter ».");
     collectorState_->setProperty("muted", true);
     collectorState_->setWordWrap(true);
     v->addWidget(collectorState_);
@@ -585,6 +586,9 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     for (const SiteConfig& s : config_.sites)
         collectorSite_->addItem(QString::fromStdString(s.name), QString::fromStdString(s.id));
     filesRow->addWidget(collectorSite_, 1);
+    auto* refreshFilesBtn = new QPushButton("Rafraîchir les fichiers");
+    refreshFilesBtn->setToolTip("Recharge la liste des fichiers conservés sur le Pi pour ce site.");
+    filesRow->addWidget(refreshFilesBtn);
     v->addLayout(filesRow);
 
     collectorFiles_ = new QListWidget;
@@ -602,9 +606,10 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
 
     root->addWidget(box);
 
-    connect(refreshBtn, &QPushButton::clicked, this, &SettingsDialog::refreshCollector);
+    connect(connectBtn, &QPushButton::clicked, this, &SettingsDialog::refreshCollector);
+    connect(refreshFilesBtn, &QPushButton::clicked, this, &SettingsDialog::refreshCollectorFiles);
     connect(collectorSite_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &SettingsDialog::refreshCollector);
+            this, &SettingsDialog::refreshCollectorFiles);
     connect(delSel, &QPushButton::clicked, this, [this] {
         const QString url = collectorUrl();
         if (url.isEmpty()) { collectorState_->setText("Aucun collecteur joignable."); return; }
@@ -631,18 +636,19 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
 }
 
 void SettingsDialog::refreshCollector() {
-    collectorFiles_->clear();
     const QString url = collectorUrl();
     if (url.isEmpty()) {
         collectorState_->setText(
             "Aucun collecteur joignable. Renseignez son adresse (ex. http://pi4fred:8792) "
             "ou vérifiez qu'il tourne sur le réseau.");
+        collectorFiles_->clear();
         return;
     }
 
     const CollectorClient::Reply st = CollectorClient::getStatus(url);
     if (!st.ok()) {
         collectorState_->setText("Collecteur injoignable à " + url.toHtmlEscaped() + ".");
+        collectorFiles_->clear();
         return;
     }
     const QJsonObject m = st.json.value("metrics").toObject();
@@ -654,7 +660,15 @@ void SettingsDialog::refreshCollector() {
         .arg(QString::number(m.value("bytes").toDouble() / (1024.0 * 1024.0), 'f', 1) + " Mo")
         .arg(m.value("sources").toInt()));
 
+    refreshCollectorFiles();
+}
+
+void SettingsDialog::refreshCollectorFiles() {
+    collectorFiles_->clear();
     if (collectorSite_->currentIndex() < 0)
+        return;
+    const QString url = collectorUrl();
+    if (url.isEmpty())
         return;
     const QString id = collectorSite_->currentData().toString();
     const CollectorClient::Reply o = CollectorClient::getObjects(url, id);

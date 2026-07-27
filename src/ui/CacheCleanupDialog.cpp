@@ -28,7 +28,6 @@
 #include <QJsonArray>
 
 #include "collector/CollectorClient.h"
-#include "collector/CollectorSync.h"
 
 namespace {
 
@@ -68,9 +67,8 @@ CacheCleanupDialog::CacheCleanupDialog(const QString& cacheRoot, const QStringLi
 }
 
 QString CacheCleanupDialog::effectiveCollectorUrl() {
-    if (!collectorUrl_.isEmpty())
-        return collectorUrl_;
-    collectorUrl_ = collectorsync::locate(QString(), 4000);
+    // URL fournie par la fenêtre principale ; on ne relance jamais de découverte
+    // ici (rebinder le port 45454 casserait l'écoute permanente).
     return collectorUrl_;
 }
 

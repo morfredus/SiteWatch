@@ -1102,7 +1102,11 @@ void MainWindow::loadConfiguration() {
 }
 
 void MainWindow::onOpenSettings() {
-    SettingsDialog dlg(config_, this);
+    // URL déjà connue (endpoint configuré ou captée par l'écouteur permanent) :
+    // le dialogue s'en sert sans jamais relancer de découverte.
+    const QString known = config_.collectorUrl.empty()
+        ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
+    SettingsDialog dlg(config_, known, this);
     if (dlg.exec() != QDialog::Accepted) return;
 
     config_ = dlg.result();
@@ -1418,19 +1422,14 @@ void MainWindow::onSync() {
 
 // --- Intégration morfCollector ----------------------------------------------
 
-QString MainWindow::ensureCollector(int discoverTimeoutMs) {
+QString MainWindow::ensureCollector(int /*discoverTimeoutMs*/) {
     // 1. Endpoint explicitement configuré : prioritaire et fiable (le Pi est
     //    joignable par nom d'hôte même si son IP change).
     if (!config_.collectorUrl.empty())
         return QString::fromStdString(config_.collectorUrl);
-    // 2. Adresse déjà captée par l'écouteur de fond.
-    if (!collectorUrl_.isEmpty())
-        return collectorUrl_;
-    // 3. Dernier recours : une découverte ponctuelle (peut rater si l'annonce
-    //    tombe hors de la fenêtre d'écoute).
-    statusBar()->showMessage("Recherche de morfCollector sur le réseau …");
-    QApplication::processEvents();
-    collectorUrl_ = collectorsync::locate(QString(), discoverTimeoutMs);
+    // 2. Adresse captée par l'écouteur PERMANENT (voir le constructeur).
+    //    On ne relance jamais de découverte ponctuelle : rebinder le port 45454
+    //    casserait cet écouteur unique. Vide tant qu'aucune annonce n'a été reçue.
     return collectorUrl_;
 }
 

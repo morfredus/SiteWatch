@@ -30,7 +30,11 @@ class QTimeEdit;
 class SettingsDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit SettingsDialog(const Config& config, QWidget* parent = nullptr);
+    // `discoveredUrl` : URL du collecteur déjà connue (écouteur permanent de la
+    // fenêtre principale). Le dialogue ne relance JAMAIS de découverte lui-même
+    // (éviter de rebinder le port UDP 45454, ce qui casse l'écoute permanente).
+    explicit SettingsDialog(const Config& config, const QString& discoveredUrl,
+                            QWidget* parent = nullptr);
 
     // Configuration éditée (valide après acceptation).
     const Config& result() const { return config_; }
@@ -52,7 +56,8 @@ private slots:
 private:
     void buildUi();
     void buildCollectorGroup(QVBoxLayout* root);   // groupe morfCollector
-    void refreshCollector();                        // état + fichiers du site choisi
+    void refreshCollector();                        // se connecter : état + fichiers
+    void refreshCollectorFiles();                   // fichiers du site sélectionné seulement
     QString collectorUrl() const;                   // URL effective (champ, sinon découverte)
     void refreshSiteList();
     void loadSiteToForm(int index);
@@ -64,6 +69,7 @@ private:
     QIcon stateIcon(int index) const;
 
     Config config_;
+    QString discoveredUrl_;               // URL du collecteur fournie par MainWindow
     std::vector<int>     siteState_;      // 0 à tester, 1 valide, 2 erreur
     std::vector<QString> lastReport_;     // dernier rapport de test par site
     int  current_ = -1;
