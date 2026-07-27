@@ -19,6 +19,7 @@ class QPushButton;
 class QFormLayout;
 class QComboBox;
 class QVBoxLayout;
+class QTimeEdit;
 
 // -----------------------------------------------------------------------------
 // SettingsDialog : édition graphique de la configuration (config.json).
@@ -33,6 +34,10 @@ public:
 
     // Configuration éditée (valide après acceptation).
     const Config& result() const { return config_; }
+
+    // true si l'utilisateur a demandé l'envoi de la config à morfCollector
+    // (bouton « Envoyer la configuration »). Lu par MainWindow après acceptation.
+    bool pushRequested() const { return pushRequested_; }
 
 private slots:
     void onSiteChanged(int row);
@@ -63,6 +68,7 @@ private:
     std::vector<QString> lastReport_;     // dernier rapport de test par site
     int  current_ = -1;
     bool loading_ = false;
+    bool pushRequested_ = false;
 
     QLineEdit*   cacheEdit_   = nullptr;
     QListWidget* sitesList_   = nullptr;
@@ -84,6 +90,7 @@ private:
 
     // --- morfCollector ---
     QLineEdit*   collectorEdit_  = nullptr;   // URL (vide = découverte)
+    QTimeEdit*   collectorTime_  = nullptr;   // heure de collecte quotidienne
     QLabel*      collectorState_ = nullptr;   // état du collecteur
     QComboBox*   collectorSite_  = nullptr;   // site dont on liste les copies
     QListWidget* collectorFiles_ = nullptr;   // fichiers conservés (object_id en UserRole)

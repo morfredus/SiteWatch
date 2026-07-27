@@ -30,6 +30,11 @@ QString providerInstance() {
 
 QJsonObject buildManifest(const Config& cfg, const QString& instance,
                           const QString& generation, qint64 revision) {
+    // Collecte quotidienne à l'heure configurée (défaut 02:00, cf. contrat §1.2.1).
+    const QString dailyAt = cfg.collectorDailyAt.empty()
+        ? QStringLiteral("02:00") : QString::fromStdString(cfg.collectorDailyAt);
+    const QJsonObject schedule{ {"daily_at", dailyAt} };
+
     QJsonArray sources;
     for (const SiteConfig& s : cfg.sites) {
         sources.append(QJsonObject{
@@ -44,7 +49,7 @@ QJsonObject buildManifest(const Config& cfg, const QString& instance,
                 {"site_key", QString::fromStdString(s.name)},
             }},
             {"credentials_ref", QStringLiteral("sw-") + QString::fromStdString(s.id)},
-            {"schedule", QJsonObject{ {"every_minutes", 360} }},
+            {"schedule", schedule},
             {"retention", QJsonObject{ {"mode", "keep_forever"} }},
         });
     }

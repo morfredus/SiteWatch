@@ -59,7 +59,8 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
         error = "Le champ 'cacheRoot' est manquant dans config.json";
         return false;
     }
-    out.collectorUrl = getStr(j, "collectorUrl");   // facultatif (découverte sinon)
+    out.collectorUrl     = getStr(j, "collectorUrl");     // facultatif (découverte sinon)
+    out.collectorDailyAt = getStr(j, "collectorDailyAt"); // facultatif (défaut 02:00)
 
     out.sites.clear();
     if (j.contains("sites") && j["sites"].is_array()) {
@@ -93,7 +94,8 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
 bool Config::save(const std::string& path, const Config& config, std::string& error) {
     json j;
     j["cacheRoot"] = config.cacheRoot;
-    if (!config.collectorUrl.empty()) j["collectorUrl"] = config.collectorUrl;
+    if (!config.collectorUrl.empty())     j["collectorUrl"]     = config.collectorUrl;
+    if (!config.collectorDailyAt.empty()) j["collectorDailyAt"] = config.collectorDailyAt;
 
     json sites = json::array();
     for (const auto& s : config.sites) {

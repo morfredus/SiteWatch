@@ -1106,15 +1106,41 @@ void MainWindow::onOpenSettings() {
     if (dlg.exec() != QDialog::Accepted) return;
 
     config_ = dlg.result();
+    const bool pushRequested = dlg.pushRequested();
     std::string err;
     if (!Config::save(configFilePath().toStdString(), config_, err)) {
         QMessageBox::warning(this, "Configuration", QString::fromStdString(err));
         return;
     }
+    // Recharger depuis le disque : les UUID des sites nouvellement ajoutés sont
+    // attribués et persistés à l'enregistrement ; on les récupère en mémoire.
+    Config reloaded; std::string lerr;
+    if (Config::load(configFilePath().toStdString(), reloaded, lerr))
+        config_ = reloaded;
     configError_.clear();
     populateSiteSelector();
     refreshSitesOverview();
     statusBar()->showMessage("Configuration enregistrée : " + configFilePath());
+
+    // Envoi explicite de la configuration à morfCollector (bouton dédié).
+    if (pushRequested) {
+        const QString url = ensureCollector(3000);
+        if (url.isEmpty()) {
+            showBanner(BannerLevel::Warning,
+                "Configuration enregistrée, mais <b>aucun morfCollector détecté</b> "
+                "pour lui envoyer la configuration. Renseignez son adresse dans "
+                "l'onglet morfCollector, ou vérifiez qu'il tourne.");
+            return;
+        }
+        const collectorsync::SyncResult r =
+            collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/true);
+        if (!r.ok)
+            showBanner(BannerLevel::Error, "Envoi refusé : " + r.error.toHtmlEscaped());
+        else
+            showBanner(BannerLevel::Success,
+                QString("<b>Configuration envoyée à morfCollector</b> (révision %1, %2 site(s)).")
+                    .arg(r.revision).arg(r.sources));
+    }
 }
 
 void MainWindow::onPresetChanged() {

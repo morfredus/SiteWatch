@@ -39,6 +39,9 @@
 #include <QStyle>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QTabWidget>
+#include <QTimeEdit>
+#include <QTime>
 #include <QMessageBox>
 #include <QAbstractItemView>
 #include <QJsonArray>
@@ -171,6 +174,16 @@ void SettingsDialog::buildUi() {
     root->setContentsMargins(16, 16, 16, 12);
     root->setSpacing(12);
 
+    // Deux onglets : le fonctionnement LOCAL de SiteWatch d'un côté, tout ce qui
+    // concerne morfCollector (réseau) de l'autre.
+    auto* tabs = new QTabWidget;
+    auto* localPage = new QWidget;
+    auto* localLayout = new QVBoxLayout(localPage);
+    localLayout->setSpacing(12);
+    auto* collectorPage = new QWidget;
+    auto* collectorLayout = new QVBoxLayout(collectorPage);
+    collectorLayout->setSpacing(12);
+
     // --- Emplacement des données SiteWatch ---
     auto* dataBox = new QGroupBox("Stockage");
     auto* dataForm = new QFormLayout(dataBox);
@@ -195,10 +208,15 @@ void SettingsDialog::buildUi() {
         cacheEdit_->setText(QDir::toNativeSeparators(
             QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/cache"));
     });
-    root->addWidget(dataBox);
+    localLayout->addWidget(dataBox);
 
-    // --- morfCollector : connexion, état et copies conservées ---
-    buildCollectorGroup(root);
+    // --- morfCollector : connexion, planification, état et copies conservées ---
+    buildCollectorGroup(collectorLayout);
+    auto* pushBtn = new QPushButton("Envoyer la configuration à morfCollector");
+    pushBtn->setToolTip("Enregistre la configuration puis la pousse au collecteur détecté.");
+    collectorLayout->addWidget(pushBtn);
+    collectorLayout->addStretch();
+    connect(pushBtn, &QPushButton::clicked, this, [this] { pushRequested_ = true; onAccept(); });
 
     // --- Sites ---
     auto* sitesBox = new QGroupBox("Sites");
@@ -268,7 +286,11 @@ void SettingsDialog::buildUi() {
     rightCol->addStretch();
 
     sitesLayout->addLayout(rightCol, 1);
-    root->addWidget(sitesBox);
+    localLayout->addWidget(sitesBox);
+
+    tabs->addTab(localPage, "SiteWatch");
+    tabs->addTab(collectorPage, "morfCollector");
+    root->addWidget(tabs);
 
     // --- Boutons ---
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
@@ -505,6 +527,7 @@ void SettingsDialog::onAccept() {
     if (current_ >= 0) commitFormToSite(current_);
     config_.cacheRoot = cacheEdit_->text().trimmed().toStdString();
     config_.collectorUrl = collectorEdit_->text().trimmed().toStdString();
+    config_.collectorDailyAt = collectorTime_->time().toString("HH:mm").toStdString();
     accept();
 }
 
@@ -533,7 +556,22 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     urlRowL->addWidget(collectorEdit_, 1);
     urlRowL->addWidget(refreshBtn);
     addRow(form, "Adresse du collecteur :", urlRow);
+
+    collectorTime_ = new QTimeEdit;
+    collectorTime_->setDisplayFormat("HH:mm");
+    collectorTime_->setTime(QTime::fromString(
+        config_.collectorDailyAt.empty() ? QStringLiteral("02:00")
+                                         : QString::fromStdString(config_.collectorDailyAt),
+        "HH:mm"));
+    addRow(form, "Collecte quotidienne à :", collectorTime_);
     v->addLayout(form);
+
+    auto* schedHint = new QLabel(
+        "morfCollector récupère les fichiers une fois par jour à cette heure (heure du Pi). "
+        "Si le Pi était éteint, la collecte a lieu au démarrage suivant.");
+    schedHint->setProperty("muted", true);
+    schedHint->setWordWrap(true);
+    v->addWidget(schedHint);
 
     collectorState_ = new QLabel("État inconnu — cliquez sur « Rafraîchir ».");
     collectorState_->setProperty("muted", true);

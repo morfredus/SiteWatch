@@ -33,6 +33,7 @@ struct Config {
     std::string cacheRoot;             // ex. "D:/SiteWatch"
     std::string collectorUrl;          // URL de morfCollector (ex. "http://pi4fred:8792") ;
                                        // vide = découverte automatique via morfBeacon
+    std::string collectorDailyAt;      // heure de collecte quotidienne "HH:MM" (défaut 02:00)
     std::vector<SiteConfig> sites;
 
     // Charge la configuration depuis un fichier JSON.

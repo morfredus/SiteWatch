@@ -4,6 +4,35 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-27
+
+### Changed
+
+- **Configuration en deux onglets.** Le fonctionnement **local** de SiteWatch
+  (stockage, sites) et les réglages **morfCollector** (adresse, heure de collecte,
+  état, copies conservées) sont désormais séparés dans deux onglets distincts,
+  au lieu d'être mélangés.
+
+### Added
+
+- **Bouton « Envoyer la configuration à morfCollector »** (onglet morfCollector) :
+  enregistre puis pousse immédiatement la configuration au collecteur détecté,
+  sans attendre le prochain démarrage.
+- La configuration est **rechargée** après enregistrement, de sorte que les UUID
+  attribués aux nouveaux sites sont disponibles immédiatement (utile pour l'envoi
+  au collecteur).
+
+## [1.8.0] - 2026-07-27
+
+### Added
+
+- **Heure de collecte quotidienne configurable.** Dans la configuration
+  morfCollector, un champ « Collecte quotidienne à » (défaut 02:00) fixe l'heure
+  à laquelle le collecteur récupère les fichiers, une fois par jour. Le réglage
+  est poussé dans le manifeste (`schedule.daily_at`) ; il est donc modifiable
+  depuis SiteWatch dès que morfCollector est détecté. Si le Pi était éteint à
+  l'heure dite, la collecte a lieu au démarrage suivant.
+
 ## [1.7.0] - 2026-07-27
 
 ### Fixed
