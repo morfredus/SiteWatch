@@ -4,6 +4,27 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-07-28
+
+### Changed
+
+- **Menus réorganisés** selon les conventions habituelles : **Fichier /
+  Analyse / Affichage / Aide**. Tout est désormais accessible depuis les menus :
+  - *Analyse* : « Télécharger les logs du site » (Ctrl+D), « Analyser le site »
+    (F5), « Rechercher… » (Ctrl+F) et « Tout synchroniser » ▸ (via morfCollector /
+    en direct SFTP) ;
+  - *Affichage → Aller à* : ouvre n'importe quel onglet, y compris **Copies
+    locales**, au clavier comme à la souris.
+- **Libellés unifiés.** L'ancien « Synchroniser maintenant » (menu) et le bouton
+  « Télécharger les logs » désignaient la même action sous deux noms : c'est
+  désormais partout « Télécharger les logs du site » (site courant), distinct de
+  « Tout synchroniser » (tous les sites).
+
+### Fixed
+
+- **Aide et « À propos » à jour** avec la version actuelle : morfCollector, onglet
+  Copies locales, « Tout synchroniser », nouveaux raccourcis clavier.
+
 ## [1.9.1] - 2026-07-27
 
 ### Fixed

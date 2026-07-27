@@ -105,6 +105,9 @@ private:
     void syncAllViaCollector();   // récupère les copies locales depuis le collecteur
     void syncAllLocal();          // télécharge en direct (SFTP), site par site
 
+    // Bascule sur l'onglet portant ce libellé (navigation depuis les menus).
+    void goToTab(const QString& tabText);
+
     // Onglet « Copies locales » : consulter/piloter les archives du collecteur.
     void buildCopiesTab();
     void refreshCopies();         // recharge collecteur + sources

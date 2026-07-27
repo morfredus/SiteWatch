@@ -530,10 +530,12 @@ QWidget* MainWindow::makeKpiCard(icons::Glyph glyph, const QString& title,
 
 void MainWindow::buildUi() {
     // --- Barre de menus ---
+    // Fichier : configuration de l'application et sortie.
     QMenu* fichier = menuBar()->addMenu("Fichier");
     QAction* actConfig = fichier->addAction("Configuration…");
     actConfig->setShortcut(QKeySequence("Ctrl+,"));
     connect(actConfig, &QAction::triggered, this, &MainWindow::onOpenSettings);
+    fichier->addSeparator();
     QAction* actClean = fichier->addAction("Effacer les logs téléchargés…");
     connect(actClean, &QAction::triggered, this, &MainWindow::onCleanCache);
     fichier->addSeparator();
@@ -541,16 +543,29 @@ void MainWindow::buildUi() {
     actQuit->setShortcut(QKeySequence::Quit);
     connect(actQuit, &QAction::triggered, this, &QWidget::close);
 
-    QMenu* outils = menuBar()->addMenu("Outils");
-    QAction* actSync = outils->addAction("Synchroniser maintenant");
-    connect(actSync, &QAction::triggered, this, &MainWindow::onSync);
-    outils->addSeparator();
-    QAction* actSyncAllCol = outils->addAction("Tout synchroniser via morfCollector");
+    // Analyse : le flux de travail sur le site courant, puis la synchro globale.
+    QMenu* analyse = menuBar()->addMenu("Analyse");
+    QAction* actDownload = analyse->addAction("Télécharger les logs du site");
+    actDownload->setShortcut(QKeySequence("Ctrl+D"));
+    connect(actDownload, &QAction::triggered, this, &MainWindow::onSync);
+    QAction* actAnalyze = analyse->addAction("Analyser le site");
+    actAnalyze->setShortcut(QKeySequence(Qt::Key_F5));
+    connect(actAnalyze, &QAction::triggered, this, &MainWindow::onAnalyze);
+    QAction* actFind = analyse->addAction("Rechercher…");
+    actFind->setShortcut(QKeySequence::Find);   // Ctrl+F
+    connect(actFind, &QAction::triggered, this, [this] {
+        goToTab("Recherche");
+        if (searchEdit_) { searchEdit_->setFocus(); searchEdit_->selectAll(); }
+    });
+    analyse->addSeparator();
+    QMenu* syncAllSub = analyse->addMenu("Tout synchroniser");
+    QAction* actSyncAllCol = syncAllSub->addAction("Via morfCollector");
     connect(actSyncAllCol, &QAction::triggered, this, &MainWindow::syncAllViaCollector);
-    QAction* actSyncAllLoc = outils->addAction("Tout synchroniser en direct (SFTP)");
+    QAction* actSyncAllLoc = syncAllSub->addAction("En direct (SFTP)");
     connect(actSyncAllLoc, &QAction::triggered, this, &MainWindow::syncAllLocal);
 
-    // --- Affichage → Thème (Système / Clair / Sombre) ---
+    // --- Affichage : thème + navigation vers les onglets (« Aller à », rempli
+    //     en fin de buildUi une fois les onglets créés). ---
     QMenu* affichage = menuBar()->addMenu("Affichage");
     QMenu* themeMenu = affichage->addMenu("Thème");
     auto* themeGroup = new QActionGroup(this);
@@ -955,6 +970,15 @@ void MainWindow::buildUi() {
 
     // Onglet « Copies locales » : archives conservées par morfCollector.
     buildCopiesTab();
+
+    // Affichage → Aller à : un raccourci vers chaque onglet, pour que tout soit
+    // atteignable au clavier / depuis les menus, pas seulement en cliquant.
+    affichage->addSeparator();
+    QMenu* goMenu = affichage->addMenu("Aller à");
+    for (int i = 0; i < tabs_->count(); ++i) {
+        QAction* a = goMenu->addAction(tabs_->tabText(i));
+        connect(a, &QAction::triggered, this, [this, i] { tabs_->setCurrentIndex(i); });
+    }
     previousDetailTab_ = healthTab_;
     connect(tabs_, &QTabWidget::currentChanged, this, [this](int index) {
         QWidget* current = tabs_->widget(index);
@@ -2150,6 +2174,16 @@ void MainWindow::wireDetailTable(QTableWidget* table, DetailSource src) {
     });
 }
 
+void MainWindow::goToTab(const QString& tabText) {
+    if (!tabs_) return;
+    for (int i = 0; i < tabs_->count(); ++i) {
+        if (tabs_->tabText(i) == tabText) {
+            tabs_->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
 void MainWindow::onSearch() {
     searchTable_->setRowCount(0);
     const QString q = searchEdit_->text().trimmed();
@@ -2211,17 +2245,28 @@ void MainWindow::onHelp() {
     box.setText(
         "<b>Prise en main</b>"
         "<ol>"
-        "<li><b>Fichier → Configuration…</b> : ajoutez vos sites (serveur SFTP, "
-        "utilisateur, clé SSH, jeton d'API cPanel, nom du site).</li>"
-        "<li><b>Synchroniser</b> télécharge les nouveaux logs puis analyse ; "
-        "<b>Analyser</b> traite les logs déjà en cache.</li>"
-        "<li>Choisissez la <b>période</b> en haut à droite — tous les onglets se recalculent.</li>"
-        "<li>Onglets : <b>Sites</b>, Santé, Robots, Sécurité, Activité WP, Top pages, "
-        "Référents, <b>URLs</b> (filtre par catégorie), Graphiques, <b>Recherche</b>.</li>"
-        "<li><b>Sites</b> donne la vue globale : priorité, points d'attention et action recommandée.</li>"
-        "<li><b>Double-cliquez</b> n'importe quelle ligne (Sécurité, Activité WP, "
-        "Top pages, Référents, URLs, Recherche) pour son détail (IP, User-Agents, "
-        "URLs, horaires…) ; <b>clic droit</b> pour copier / exporter la sélection "
+        "<li><b>Fichier → Configuration…</b> : déclarez vos sites (serveur SFTP, "
+        "utilisateur, clé SSH ou mot de passe, jeton d'API cPanel, nom du site). "
+        "L'onglet <b>morfCollector</b> y règle la conservation des journaux sur le "
+        "réseau (adresse du collecteur, heure de collecte).</li>"
+        "<li><b>Analyse → Télécharger les logs du site</b> (Ctrl+D) récupère les "
+        "nouveaux journaux puis les analyse ; <b>Analyser le site</b> (F5) traite "
+        "ceux déjà en cache.</li>"
+        "<li><b>Analyse → Tout synchroniser</b> traite <b>tous</b> les sites en une "
+        "passe : <b>via morfCollector</b> (copies conservées sur le Pi) ou "
+        "<b>en direct</b> (SFTP depuis l'hébergeur).</li>"
+        "<li>Choisissez la <b>période</b> en haut à droite — tous les onglets se "
+        "recalculent.</li>"
+        "<li>Naviguez entre les onglets depuis <b>Affichage → Aller à</b> : "
+        "<b>Sites</b>, Santé, Robots, Sécurité, Activité WP, Top pages, Référents, "
+        "<b>URLs</b>, Graphiques, <b>Recherche</b> (Ctrl+F) et <b>Copies locales</b>.</li>"
+        "<li><b>Sites</b> donne la vue globale : priorité, points d'attention et "
+        "action recommandée.</li>"
+        "<li><b>Copies locales</b> : consulter, exporter ou supprimer les journaux "
+        "conservés par morfCollector, et déclencher une collecte à la demande.</li>"
+        "<li><b>Double-cliquez</b> une ligne (Sécurité, Activité WP, Top pages, "
+        "Référents, URLs, Recherche) pour son détail (IP, User-Agents, URLs, "
+        "horaires…) ; <b>clic droit</b> pour copier / exporter la sélection "
         "(presse-papier ou CSV).</li>"
         "</ol>");
     box.exec();
@@ -2235,6 +2280,8 @@ void MainWindow::onAbout() {
             "supervision de sites web.<br><br>"
             "Analyse locale des <code>.gz</code>, téléchargement SFTP, tableau de "
             "santé, détection de robots et d'attaques.<br><br>"
+            "Peut confier la conservation des journaux à <b>morfCollector</b> sur le "
+            "réseau local (sinon, téléchargement direct depuis l'hébergeur).<br><br>"
             "Conçu pour l'hébergement <b>o2switch</b> (pare-feu SSH cPanel, "
             "découpage mensuel des logs) — adaptable à d'autres hébergeurs.<br><br>"
             "© 2026 <b>morfredus</b><br>"
