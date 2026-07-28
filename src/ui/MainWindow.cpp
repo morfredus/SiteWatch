@@ -420,7 +420,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     morfbeacon::PresenceConfig beaconCfg;
     beaconCfg.appName    = "SiteWatch";
     beaconCfg.version    = SITEWATCH_VERSION;
-    beaconCfg.statusPort = 8788;                // port /status distinct de ComponentHub (8787)
+    beaconCfg.statusPort = 8881;                // /status dans l'appRange (cf. morfTools/ecosystem.json ; ComponentHub = 8880)
 
     presenceMetrics_ = std::make_unique<morfbeacon::FunctionMetricsProvider>(
         [this]() {

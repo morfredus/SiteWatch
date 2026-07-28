@@ -25,6 +25,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ### Fixed
 
+- **Port `/status` déplacé de 8788 à 8881** pour éviter toute collision. 8788 est
+  le port du service **morfSensor** ; SiteWatch le reprenait, ce qui pouvait
+  entrer en conflit sur une machine hébergeant les deux. Le port vit désormais
+  dans la plage réservée aux applications de bureau (`appRange` 8880-8899, hors du
+  bloc des services), enregistrée dans `morfTools/ecosystem.json`.
 - **Sources bloquées en « identifiants refusés » après un redéploiement du
   collecteur.** Une fois sa synchronisation initiale enregistrée, SiteWatch ne
   redéposait plus jamais les secrets, alors que le coffre du collecteur pouvait
