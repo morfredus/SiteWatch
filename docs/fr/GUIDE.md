@@ -73,6 +73,30 @@ En cas d'échec, le message indique l'étape fautive (pare-feu, connexion, auth)
 
 Cliquer **Enregistrer** pour valider.
 
+### Confier la collecte à morfCollector (facultatif)
+
+L'onglet **morfCollector** de la configuration permet de déléguer le
+téléchargement quotidien des journaux à un service **morfCollector** présent sur
+le réseau (par exemple un Raspberry Pi allumé en permanence). SiteWatch continue
+de fonctionner sans lui : c'est un complément, pas une dépendance.
+
+- **Adresse du collecteur** : laisser vide pour la découverte automatique sur le
+  réseau, ou saisir l'adresse (ex. `http://pi4fred:8792`). **Se connecter**
+  affiche l'état ; **Envoyer la config** confie les sites au collecteur.
+- **Collecte quotidienne à** : l'heure (heure du collecteur) à laquelle les
+  journaux sont récupérés une fois par jour.
+- **Panneau d'état** : la synthèse du service et le **tableau des sites confiés**
+  indiquent, pour chaque site, son état côté collecteur et le nombre de fichiers
+  déjà téléchargés. Une source en *identifiants refusés* signale des secrets à
+  renvoyer (bouton **Envoyer la config**).
+- **Collecter maintenant** : lance une collecte immédiate de tous les sites, en
+  plus de la collecte programmée.
+- **Réinitialiser** : efface les copies conservées sur le collecteur puis les
+  re-télécharge depuis l'hébergeur. Le cache local de SiteWatch n'est pas touché.
+
+L'onglet **Copies locales** (fenêtre principale) recopie ensuite ces fichiers
+dans le cache local pour analyse.
+
 ---
 
 ## 3. Authentification SSH (o2switch)

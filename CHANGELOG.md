@@ -4,6 +4,37 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-28
+
+### Added
+
+- **Panneau d'état morfCollector** dans la configuration (onglet *morfCollector*),
+  qui occupe la partie basse jusque-là vide :
+  - synthèse du service (hôte, version, heure de collecte quotidienne, nombre de
+    fichiers téléchargés et conservés, taille, date de dernière collecte) ;
+  - **tableau des sites confiés** au collecteur, avec pour chacun son état côté
+    collecteur (*prêt*, *à jour*, *identifiants refusés*, *serveur injoignable*…),
+    le nombre de fichiers téléchargés et la taille. L'erreur détaillée s'affiche
+    en infobulle. Le panneau se remplit automatiquement à l'ouverture quand un
+    collecteur est déjà connu.
+- **Bouton « Collecter maintenant »** : déclenche une collecte immédiate de tous
+  les sites, sans attendre l'heure programmée.
+- **Bouton « Réinitialiser »** : efface les copies conservées sur le collecteur
+  puis les re-télécharge depuis l'hébergeur (utile si des fichiers manquent). Le
+  cache local de SiteWatch n'est pas touché.
+
+### Fixed
+
+- **Sources bloquées en « identifiants refusés » après un redéploiement du
+  collecteur.** Une fois sa synchronisation initiale enregistrée, SiteWatch ne
+  redéposait plus jamais les secrets, alors que le coffre du collecteur pouvait
+  avoir été vidé (réinstallation, changement de machine) : les sources restaient
+  bloquées sans espoir de reprise automatique. La synchronisation compare
+  désormais le nombre de secrets présents côté collecteur au nombre de sites, et
+  les **redépose d'office si le coffre est incomplet** (auto-guérison). Les
+  boutons « Collecter maintenant » et « Réinitialiser » redéposent aussi les
+  secrets par sécurité avant de lancer une collecte.
+
 ## [1.9.2] - 2026-07-28
 
 ### Changed
