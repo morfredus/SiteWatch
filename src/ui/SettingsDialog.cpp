@@ -44,6 +44,8 @@
 #include <QTime>
 #include <QMessageBox>
 #include <QAbstractItemView>
+#include <QTableWidget>
+#include <QHeaderView>
 #include <QJsonArray>
 
 #include <cctype>
@@ -89,6 +91,30 @@ QString humanSize(qint64 bytes) {
     const double mo = bytes / (1024.0 * 1024.0);
     if (mo >= 1.0) return QString::number(mo, 'f', 1).replace('.', ',') + " Mo";
     return QString::number(bytes / 1024.0, 'f', 1).replace('.', ',') + " Ko";
+}
+
+// Traduit l'état opérationnel d'une source (contrat morfcollect/1) en libellé
+// lisible. `suspended` (état administratif) prime pour l'affichage.
+QString stateLabel(const QString& adminState, const QString& opState) {
+    if (adminState == "suspended") return QStringLiteral("suspendu");
+    if (adminState == "retired")   return QStringLiteral("retiré");
+    if (opState == "idle")         return QStringLiteral("prêt");
+    if (opState == "waiting")      return QStringLiteral("à jour");
+    if (opState == "collecting")   return QStringLiteral("collecte en cours…");
+    if (opState == "auth_failed")  return QStringLiteral("identifiants refusés");
+    if (opState == "unreachable")  return QStringLiteral("serveur injoignable");
+    if (opState == "error")        return QStringLiteral("erreur");
+    return opState.isEmpty() ? QStringLiteral("—") : opState;
+}
+
+// Jeton de couleur (thème) pour l'état, comme la pastille des sites.
+const char* stateColorToken(const QString& adminState, const QString& opState) {
+    if (adminState == "suspended" || adminState == "retired") return "warn";
+    if (opState == "waiting" || opState == "idle")            return "ok";
+    if (opState == "collecting")                              return "warn";
+    if (opState == "auth_failed" || opState == "unreachable" || opState == "error")
+        return "danger";
+    return "neutral";
 }
 
 // Préfixe des fichiers de logs déduit du nom du site (points retirés, minuscules).
@@ -166,6 +192,12 @@ SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUr
         sitesList_->setCurrentRow(0);
     else
         setFormEnabled(false);
+
+    // Si un collecteur est déjà connu (découvert par la fenêtre principale, ou
+    // adresse en config), on remplit le panneau d'état sans attendre un clic sur
+    // « Se connecter ». Différé pour ne pas bloquer l'ouverture de la fenêtre.
+    if (!collectorUrl().isEmpty())
+        QTimer::singleShot(0, this, &SettingsDialog::refreshCollector);
 }
 
 void SettingsDialog::buildUi() {
@@ -579,6 +611,47 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     collectorState_->setWordWrap(true);
     v->addWidget(collectorState_);
 
+    // --- État du service et sites confiés -----------------------------------
+    // La partie basse récapitule ce que fait réellement morfCollector : pour
+    // chaque site confié, son état côté collecteur et le nombre de fichiers
+    // téléchargés (distinct du cache local de SiteWatch).
+    auto* sitesHeading = new QLabel("<b>Sites confiés à la collecte</b>");
+    v->addWidget(sitesHeading);
+
+    collectorSites_ = new QTableWidget(0, 4);
+    collectorSites_->setHorizontalHeaderLabels(
+        QStringList{ "Site", "État", "Fichiers", "Taille" });
+    collectorSites_->verticalHeader()->setVisible(false);
+    collectorSites_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    collectorSites_->setSelectionMode(QAbstractItemView::NoSelection);
+    collectorSites_->setFocusPolicy(Qt::NoFocus);
+    collectorSites_->setMaximumHeight(140);
+    collectorSites_->horizontalHeader()->setStretchLastSection(false);
+    collectorSites_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    collectorSites_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    collectorSites_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    collectorSites_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    v->addWidget(collectorSites_);
+
+    // Actions globales : collecter tout de suite, ou repartir de zéro.
+    auto* svcRow = new QHBoxLayout;
+    auto* collectNowBtn = new QPushButton("Collecter maintenant");
+    collectNowBtn->setToolTip(
+        "Lance une collecte immédiate de tous les sites, sans attendre l'heure programmée.");
+    auto* resetBtn = new QPushButton("Réinitialiser");
+    resetBtn->setToolTip(
+        "Efface les copies conservées sur le collecteur puis les re-télécharge "
+        "depuis l'hébergeur (utile si des fichiers manquent).");
+    svcRow->addWidget(collectNowBtn);
+    svcRow->addWidget(resetBtn);
+    svcRow->addStretch();
+    v->addLayout(svcRow);
+    connect(collectNowBtn, &QPushButton::clicked, this, &SettingsDialog::collectNowAll);
+    connect(resetBtn, &QPushButton::clicked, this, &SettingsDialog::resetCollector);
+
+    auto* sep = new QLabel("<b>Copies conservées</b>");
+    v->addWidget(sep);
+
     // Copies conservées, par site.
     auto* filesRow = new QHBoxLayout;
     filesRow->addWidget(new QLabel("Copies du site :"));
@@ -641,6 +714,7 @@ void SettingsDialog::refreshCollector() {
         collectorState_->setText(
             "Aucun collecteur joignable. Renseignez son adresse (ex. http://pi4fred:8792) "
             "ou vérifiez qu'il tourne sur le réseau.");
+        collectorSites_->setRowCount(0);
         collectorFiles_->clear();
         return;
     }
@@ -648,19 +722,134 @@ void SettingsDialog::refreshCollector() {
     const CollectorClient::Reply st = CollectorClient::getStatus(url);
     if (!st.ok()) {
         collectorState_->setText("Collecteur injoignable à " + url.toHtmlEscaped() + ".");
+        collectorSites_->setRowCount(0);
         collectorFiles_->clear();
         return;
     }
+
+    // Synthèse : identité du service, version, configuration active et totaux.
     const QJsonObject m = st.json.value("metrics").toObject();
+    const qint64 lastTs = static_cast<qint64>(m.value("last_collect_ts").toDouble());
+    const QString lastCollect = lastTs > 0
+        ? QDateTime::fromSecsSinceEpoch(lastTs).toString("dd/MM/yyyy HH:mm")
+        : QStringLiteral("jamais");
+    const QString dailyAt = collectorTime_->time().toString("HH:mm");
     collectorState_->setText(QString(
-        "Connecté à <b>%1</b> (%2) — %3 objet(s), %4 conservés, %5 source(s).")
+        "Service <b>%1</b> v%2 à %3 — collecte quotidienne à %4.<br>"
+        "%5 fichier(s) téléchargé(s), %6 conservés, %7 source(s). "
+        "Dernière collecte : %8.")
         .arg(st.json.value("host").toString().toHtmlEscaped())
+        .arg(st.json.value("version").toString().toHtmlEscaped())
         .arg(url.toHtmlEscaped())
+        .arg(dailyAt)
         .arg(m.value("objects").toInt())
         .arg(QString::number(m.value("bytes").toDouble() / (1024.0 * 1024.0), 'f', 1) + " Mo")
-        .arg(m.value("sources").toInt()));
+        .arg(m.value("sources").toInt())
+        .arg(lastCollect));
+
+    // Tableau des sites confiés : état côté collecteur + fichiers téléchargés.
+    const CollectorClient::Reply sr = CollectorClient::getSources(url);
+    const QJsonArray sources = sr.json.value("sources").toArray();
+    collectorSites_->setRowCount(sources.size());
+    for (int row = 0; row < sources.size(); ++row) {
+        const QJsonObject s = sources.at(row).toObject();
+        const QString admin = s.value("admin_state").toString();
+        const QString oper  = s.value("operational_state").toString();
+
+        auto* siteItem = new QTableWidgetItem(s.value("label").toString());
+        auto* stateItem = new QTableWidgetItem(stateLabel(admin, oper));
+        stateItem->setForeground(QColor(Theme::instance().color(stateColorToken(admin, oper))));
+        const QString err = s.value("last_error").toString();
+        if (!err.isEmpty())
+            stateItem->setToolTip(err);
+        auto* filesItem = new QTableWidgetItem(
+            QString::number(static_cast<qint64>(s.value("objects").toDouble())));
+        filesItem->setTextAlignment(Qt::AlignCenter);
+        auto* sizeItem = new QTableWidgetItem(
+            humanSize(static_cast<qint64>(s.value("bytes").toDouble())));
+        sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+        collectorSites_->setItem(row, 0, siteItem);
+        collectorSites_->setItem(row, 1, stateItem);
+        collectorSites_->setItem(row, 2, filesItem);
+        collectorSites_->setItem(row, 3, sizeItem);
+    }
 
     refreshCollectorFiles();
+}
+
+// (Re)dépose les secrets de chaque site vers le coffre du collecteur. Idempotent :
+// le collecteur écrase la valeur pour une même référence. Sert avant une collecte
+// forcée pour garantir que le coffre n'est pas vide (redéploiement, réinitialisation).
+void SettingsDialog::pushAllCredentials(const QString& url) {
+    for (const SiteConfig& s : config_.sites) {
+        QJsonObject secret;
+        if (!s.user.empty())     secret["user"]     = QString::fromStdString(s.user);
+        if (!s.password.empty()) secret["password"] = QString::fromStdString(s.password);
+        if (!s.keyFile.empty())  secret["key_file"] = QString::fromStdString(s.keyFile);
+        if (secret.isEmpty())
+            continue;
+        const QString ref = QStringLiteral("sw-") + QString::fromStdString(s.id);
+        CollectorClient::pushCredentials(url, ref, secret);
+    }
+}
+
+void SettingsDialog::collectNowAll() {
+    const QString url = collectorUrl();
+    if (url.isEmpty()) {
+        collectorState_->setText("Aucun collecteur joignable.");
+        return;
+    }
+    const CollectorClient::Reply sr = CollectorClient::getSources(url);
+    const QJsonArray sources = sr.json.value("sources").toArray();
+    if (sources.isEmpty()) {
+        QMessageBox::information(this, "Collecter maintenant",
+            "Le collecteur ne connaît encore aucun site. Cliquez sur « Envoyer la config » "
+            "pour lui confier vos sites, puis relancez la collecte.");
+        return;
+    }
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    // Le coffre a pu être vidé (redéploiement) : on redépose les secrets d'abord.
+    pushAllCredentials(url);
+    for (const QJsonValue& v : sources)
+        CollectorClient::collectNow(url, v.toObject().value("source_id").toString());
+    QApplication::restoreOverrideCursor();
+    collectorState_->setText("Collecte lancée… actualisation dans quelques secondes.");
+    // La collecte est asynchrone côté collecteur ; on relit l'état après un délai.
+    QTimer::singleShot(3500, this, &SettingsDialog::refreshCollector);
+}
+
+void SettingsDialog::resetCollector() {
+    const QString url = collectorUrl();
+    if (url.isEmpty()) {
+        collectorState_->setText("Aucun collecteur joignable.");
+        return;
+    }
+    const CollectorClient::Reply sr = CollectorClient::getSources(url);
+    const QJsonArray sources = sr.json.value("sources").toArray();
+    if (sources.isEmpty()) {
+        QMessageBox::information(this, "Réinitialiser",
+            "Le collecteur ne connaît encore aucun site. Cliquez sur « Envoyer la config » "
+            "d'abord.");
+        return;
+    }
+    if (QMessageBox::question(this, "Réinitialiser morfCollector",
+            "Effacer TOUTES les copies conservées sur le collecteur puis les re-télécharger "
+            "depuis l'hébergeur ?\n\nLes fichiers déjà présents dans le cache local de "
+            "SiteWatch ne sont pas touchés.")
+            != QMessageBox::Yes)
+        return;
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    pushAllCredentials(url);   // garantit un coffre non vide avant de re-collecter
+    for (const QJsonValue& v : sources) {
+        const QString id = v.toObject().value("source_id").toString();
+        CollectorClient::deleteSourceObjects(url, id);   // vide les copies -> lève la déduplication
+        CollectorClient::collectNow(url, id);            // re-télécharge tout ce qui est dispo
+    }
+    QApplication::restoreOverrideCursor();
+    collectorState_->setText("Réinitialisation lancée… actualisation dans quelques secondes.");
+    QTimer::singleShot(4000, this, &SettingsDialog::refreshCollector);
 }
 
 void SettingsDialog::refreshCollectorFiles() {

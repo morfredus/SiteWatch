@@ -188,12 +188,22 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
     }
 
     // 4. Secrets : les nouveaux sites toujours, tous si demande explicitement.
+    // AUTO-GUERISON : si le coffre du collecteur porte moins de secrets qu'on a de
+    // sites a lui confier (redeploiement, coffre reinitialise), on repousse tout.
+    // Sans cela, apres un reset du coffre, la synchro d'ouverture repousse le
+    // manifeste mais jamais les secrets -> sources bloquees en auth_failed.
+    int localSecrets = 0;
+    for (const SiteConfig& s : cfg.sites)
+        if (!buildSecret(s).isEmpty()) ++localSecrets;
+    const int remoteRefs = res.metrics.value(QStringLiteral("credentials_refs")).toInt();
+    const bool vaultShort = remoteRefs < localSecrets;
+
     const QSet<QString> added(res.addedLabels.begin(), res.addedLabels.end());
     for (const SiteConfig& s : cfg.sites) {
         const QJsonObject secret = buildSecret(s);
         if (secret.isEmpty()) continue;
         const bool isNew = added.contains(QString::fromStdString(s.name));
-        if (!forceCredentials && !isNew && !st.sourceIds.isEmpty())
+        if (!forceCredentials && !vaultShort && !isNew && !st.sourceIds.isEmpty())
             continue;
         const QString ref = QStringLiteral("sw-") + QString::fromStdString(s.id);
         if (CollectorClient::pushCredentials(baseUrl, ref, secret).status == 204)

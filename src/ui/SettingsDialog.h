@@ -20,6 +20,7 @@ class QFormLayout;
 class QComboBox;
 class QVBoxLayout;
 class QTimeEdit;
+class QTableWidget;
 
 // -----------------------------------------------------------------------------
 // SettingsDialog : édition graphique de la configuration (config.json).
@@ -58,6 +59,9 @@ private:
     void buildCollectorGroup(QVBoxLayout* root);   // groupe morfCollector
     void refreshCollector();                        // se connecter : état + fichiers
     void refreshCollectorFiles();                   // fichiers du site sélectionné seulement
+    void collectNowAll();                           // déclenche une collecte immédiate (toutes sources)
+    void resetCollector();                          // efface les copies du Pi puis re-télécharge
+    void pushAllCredentials(const QString& url);    // (re)dépose les secrets de tous les sites
     QString collectorUrl() const;                   // URL effective (champ, sinon découverte)
     void refreshSiteList();
     void loadSiteToForm(int index);
@@ -97,7 +101,8 @@ private:
     // --- morfCollector ---
     QLineEdit*   collectorEdit_  = nullptr;   // URL (vide = découverte)
     QTimeEdit*   collectorTime_  = nullptr;   // heure de collecte quotidienne
-    QLabel*      collectorState_ = nullptr;   // état du collecteur
+    QLabel*      collectorState_ = nullptr;   // état / config du collecteur (synthèse)
+    QTableWidget* collectorSites_ = nullptr;  // sites confiés : état + nb de fichiers + taille
     QComboBox*   collectorSite_  = nullptr;   // site dont on liste les copies
     QListWidget* collectorFiles_ = nullptr;   // fichiers conservés (object_id en UserRole)
 };
