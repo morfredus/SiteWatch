@@ -230,6 +230,14 @@ SiteWatch cible o2switch mais reste ouvert :
 
 ## 7. Aide
 
+### Analyses avancées avec morfAnalytics
+
+Si morfAnalytics est détecté sur le réseau local, le bouton **Analyses avancées**
+est disponible en haut de SiteWatch. Il transmet la synthèse de l'analyse en
+cours puis ouvre la page dédiée. Après une courte synchronisation automatique,
+elle présente notamment les erreurs HTTP, robots, pages touchées et tentatives
+sensibles. En l'absence du service, le bouton reste grisé et explique pourquoi.
+
 - **Aide → Aide** (`F1`) : rappel de la prise en main.
 - **Aide → À propos** : version et crédits.
 

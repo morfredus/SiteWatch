@@ -4,6 +4,19 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-07-31
+
+### Fixed
+
+- Le bouton **Analyses avancées** republie la synthèse courante avant d'ouvrir
+  morfAnalytics. Cela évite une page vide lorsqu'elle est ouverte avant la fin
+  de la publication automatique.
+
+### Added
+
+- Les synthèses transmises à morfAnalytics incluent les pages les plus visitées,
+  les pages ciblées, les robots actifs et leur évolution journalière.
+
 ## [1.11.1] - 2026-07-31
 
 ### Fixed

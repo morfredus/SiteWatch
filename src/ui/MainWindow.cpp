@@ -628,7 +628,10 @@ void MainWindow::buildUi() {
     analyticsButton_->setEnabled(false);
     analyticsButton_->setToolTip("morfAnalytics n'est pas disponible");
     connect(analyticsButton_, &QPushButton::clicked, this, [this] {
-        if (!analyticsUrl_.isEmpty()) QDesktopServices::openUrl(QUrl(analyticsUrl_ + "/sitewatch"));
+        if (!analyticsUrl_.isEmpty()) {
+            publishAnalytics();
+            QDesktopServices::openUrl(QUrl(analyticsUrl_ + "/sitewatch"));
+        }
     });
     topBar->addWidget(analyticsButton_);
 

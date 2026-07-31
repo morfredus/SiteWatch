@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.10.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.11.2-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -15,6 +15,10 @@
 > Qt 6.4) et **Raspberry Pi 4** (Raspberry Pi OS 64 bits).
 
 **Outil de bureau multiplateforme d'investigation des journaux d'accès Apache et LiteSpeed.**
+
+Lorsque morfAnalytics est disponible sur le réseau local, SiteWatch lui transmet
+chaque analyse et active le bouton **Analyses avancées**. Son ouverture republie
+la synthèse courante ; la page se met alors à jour automatiquement.
 
 SiteWatch est une **application Qt / C++17 multiplateforme** dédiée à
 l'administration et à la supervision de sites web. Elle s'exécute nativement sous
