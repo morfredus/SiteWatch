@@ -1909,10 +1909,14 @@ void MainWindow::onAnalyze() {
 void MainWindow::publishAnalytics() {
     const SiteConfig* site = currentSite();
     if (!site || analyticsUrl_.isEmpty()) return;
+    auto mapJson = [](const std::map<std::string, long>& values) { QJsonObject out; for (const auto& [k, v] : values) out[QString::fromStdString(k)] = static_cast<double>(v); return out; };
     QJsonObject stats{{"requests", static_cast<double>(lastStats_.totalRequests)},
         {"bots", static_cast<double>(lastStats_.bots)}, {"attacks", static_cast<double>(sumAttacks(lastStats_))},
         {"errors_404", static_cast<double>(lastStats_.errors404)}, {"errors_403", static_cast<double>(lastStats_.errors403)},
-        {"errors_500", static_cast<double>(lastStats_.errors500)}};
+        {"errors_500", static_cast<double>(lastStats_.errors500)},
+        {"top_pages", mapJson(lastStats_.topPages)}, {"top_attacked", mapJson(lastStats_.topAttacked)},
+        {"bot_counts", mapJson(lastStats_.botCounts)}, {"daily_404", mapJson(lastStats_.daily404)},
+        {"daily_bots", mapJson(lastStats_.dailyBots)}, {"daily_attacks", mapJson(lastStats_.dailyAttacks)}};
     QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
         {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
     auto* nam = new QNetworkAccessManager(this);
