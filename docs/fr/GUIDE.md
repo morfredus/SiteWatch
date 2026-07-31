@@ -239,7 +239,10 @@ elle présente notamment les erreurs HTTP, robots, pages touchées et tentatives
 sensibles, ainsi que les jours qui ont concentré ces événements. Pour rester
 rapide même avec des journaux volumineux, seuls les 20 éléments les plus
 significatifs de chaque classement et les 90 derniers jours sont transmis. En
-l'absence du service, le bouton reste grisé et explique pourquoi.
+l'absence du service, le bouton reste grisé et explique pourquoi. Ces données
+agrégées permettent à morfAnalytics de comparer les analyses successives,
+détecter des pics et signaler les nouveaux robots, sans lui donner accès aux
+journaux source.
 
 - **Aide → Aide** (`F1`) : rappel de la prise en main.
 - **Aide → À propos** : version et crédits.

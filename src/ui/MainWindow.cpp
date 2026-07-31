@@ -1949,8 +1949,10 @@ void MainWindow::publishAnalytics() {
         {"errors_404", static_cast<double>(lastStats_.errors404)}, {"errors_403", static_cast<double>(lastStats_.errors403)},
         {"errors_500", static_cast<double>(lastStats_.errors500)},
         {"top_pages", rankedMapJson(lastStats_.topPages)}, {"top_attacked", rankedMapJson(lastStats_.topAttacked)},
-        {"bot_counts", rankedMapJson(lastStats_.botCounts)}, {"daily_404", dailyMapJson(lastStats_.daily404)},
-        {"daily_bots", dailyMapJson(lastStats_.dailyBots)}, {"daily_attacks", dailyMapJson(lastStats_.dailyAttacks)}};
+        {"bot_counts", rankedMapJson(lastStats_.botCounts)}, {"daily_humans", dailyMapJson(lastStats_.dailyHumans)},
+        {"daily_bots", dailyMapJson(lastStats_.dailyBots)}, {"daily_ai", dailyMapJson(lastStats_.dailyAI)},
+        {"daily_seo", dailyMapJson(lastStats_.dailySEO)}, {"daily_404", dailyMapJson(lastStats_.daily404)},
+        {"daily_attacks", dailyMapJson(lastStats_.dailyAttacks)}, {"daily_normal", dailyMapJson(lastStats_.dailyNormal)}};
     QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
         {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
     auto* nam = new QNetworkAccessManager(this);

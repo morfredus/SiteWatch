@@ -4,6 +4,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.4] - 2026-08-01
+
+### Added
+
+- La synthèse destinée à morfAnalytics inclut les séries quotidiennes de trafic
+  humain, robots IA/SEO et activité normale. Elles permettent les analyses
+  temporelles avancées sans transférer les journaux source.
+
 ## [1.11.3] - 2026-07-31
 
 ### Fixed

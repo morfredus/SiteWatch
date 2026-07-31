@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.11.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.11.4-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -19,6 +19,8 @@
 Lorsque morfAnalytics est disponible sur le réseau local, SiteWatch lui transmet
 chaque analyse et active le bouton **Analyses avancées**. Son ouverture republie
 la synthèse courante ; la page se met alors à jour automatiquement.
+Les séries quotidiennes utiles aux analyses temporelles sont partagées sous
+forme agrégée : les journaux d'accès bruts restent exclusivement dans SiteWatch.
 
 SiteWatch est une **application Qt / C++17 multiplateforme** dédiée à
 l'administration et à la supervision de sites web. Elle s'exécute nativement sous
