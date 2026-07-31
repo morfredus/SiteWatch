@@ -461,12 +461,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                     caps << v.toString();
                 QString host = sender.toString();
                 if (host.startsWith(QStringLiteral("::ffff:"))) host = host.mid(7);
+                const bool analyticsJustFound = caps.contains(QStringLiteral("advanced_analysis")) && analyticsUrl_.isEmpty();
                 if (caps.contains(QStringLiteral("advanced_analysis")))
                     analyticsUrl_ = QString("http://%1:%2").arg(host).arg(o.value("status_port").toInt());
                 if (!analyticsUrl_.isEmpty() && analyticsButton_) {
                     analyticsButton_->setEnabled(true);
                     analyticsButton_->setToolTip("Ouvrir les analyses avancées dans morfAnalytics");
                 }
+                if (analyticsJustFound && lastStats_.totalRequests > 0)
+                    publishAnalytics(); // ne pas exiger une nouvelle analyse après découverte
                 if (!caps.contains(QStringLiteral("collection"))) continue;
                 collectorUrl_ = QString("http://%1:%2")
                     .arg(host).arg(o.value("status_port").toInt());
@@ -1920,8 +1923,14 @@ void MainWindow::publishAnalytics() {
     QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
         {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
     auto* nam = new QNetworkAccessManager(this);
-    auto* reply = nam->post(QNetworkRequest(QUrl(analyticsUrl_ + "/sitewatch/ingest")), QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, reply, [reply, nam] { reply->deleteLater(); nam->deleteLater(); });
+    QNetworkRequest request(QUrl(analyticsUrl_ + "/sitewatch/ingest"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    auto* reply = nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, reply, [this, reply, nam] {
+        if (reply->error() != QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200)
+            statusBar()->showMessage("Publication morfAnalytics échouée : " + reply->errorString(), 8000);
+        reply->deleteLater(); nam->deleteLater();
+    });
 }
 
 void MainWindow::displayStats(const Stats& s) {

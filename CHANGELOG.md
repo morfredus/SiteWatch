@@ -4,6 +4,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-07-31
+
+### Fixed
+
+- Publication vers morfAnalytics fiabilisée : corps explicitement JSON et
+  republication automatique de la dernière analyse quand le service est détecté
+  après coup. Un échec est signalé dans la barre d'état.
+
 ## [1.11.0] - 2026-07-31
 
 ### Added
