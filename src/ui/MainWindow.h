@@ -101,6 +101,7 @@ private:
     // Au démarrage : pousse la config au collecteur si présent, et ALERTE sur les
     // sites ajoutés / retirés (un retrait n'efface JAMAIS les copies du Pi).
     void startupCollectorSync();
+    void publishAnalytics();
     // « Tout synchroniser » : en une passe, tous les sites.
     void syncAllViaCollector();   // récupère les copies locales depuis le collecteur
     void syncAllLocal();          // télécharge en direct (SFTP), site par site
@@ -142,6 +143,8 @@ private:
     Config  config_;
     QString configError_;
     QString collectorUrl_;   // URL du morfCollector découvert (vide si absent)
+    QString analyticsUrl_;   // URL morfAnalytics découverte (vide si absent)
+    QPushButton* analyticsButton_ = nullptr;
     Stats   lastStats_;
     std::vector<LogEntry> entries_;   // entrées de la dernière analyse (pour le détail)
 

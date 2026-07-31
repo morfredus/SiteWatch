@@ -16,6 +16,10 @@
 
 **Cross-platform desktop investigation tool for Apache and LiteSpeed access logs.**
 
+When morfAnalytics is available on the local network, SiteWatch automatically
+publishes each site analysis and exposes an **Advanced analyses** button leading
+to the SiteWatch dashboard.
+
 SiteWatch is a **cross-platform Qt / C++17 application** for website
 administration and monitoring. It runs natively on **Windows, Linux (x86_64 and
 ARM64) and Raspberry Pi** - Windows is one supported platform among others, not

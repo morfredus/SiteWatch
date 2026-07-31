@@ -4,6 +4,15 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-31
+
+### Added
+
+- **Intégration morfAnalytics.** SiteWatch détecte le service sur le réseau,
+  publie automatiquement la synthèse d'un site après analyse et propose le
+  bouton **Analyses avancées**. Il reste grisé avec une infobulle explicite tant
+  que morfAnalytics n'est pas disponible.
+
 ## [1.10.0] - 2026-07-28
 
 ### Added

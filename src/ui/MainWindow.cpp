@@ -79,6 +79,7 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QFileDialog>
+#include <QDesktopServices>
 #include <QUdpSocket>
 #include <QHostAddress>
 #include <QVector>
@@ -458,10 +459,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                 QStringList caps;
                 for (const QJsonValue& v : o.value("capabilities").toArray())
                     caps << v.toString();
-                if (!caps.contains(QStringLiteral("collection")))
-                    continue;                       // on cherche la capacité, pas le nom
                 QString host = sender.toString();
                 if (host.startsWith(QStringLiteral("::ffff:"))) host = host.mid(7);
+                if (caps.contains(QStringLiteral("advanced_analysis")))
+                    analyticsUrl_ = QString("http://%1:%2").arg(host).arg(o.value("status_port").toInt());
+                if (!analyticsUrl_.isEmpty() && analyticsButton_) {
+                    analyticsButton_->setEnabled(true);
+                    analyticsButton_->setToolTip("Ouvrir les analyses avancées dans morfAnalytics");
+                }
+                if (!caps.contains(QStringLiteral("collection"))) continue;
                 collectorUrl_ = QString("http://%1:%2")
                     .arg(host).arg(o.value("status_port").toInt());
             }
@@ -615,6 +621,13 @@ void MainWindow::buildUi() {
     auto* analyzeBtn = new QPushButton("Analyser");
     connect(analyzeBtn, &QPushButton::clicked, this, &MainWindow::onAnalyze);
     topBar->addWidget(analyzeBtn);
+    analyticsButton_ = new QPushButton("Analyses avancées");
+    analyticsButton_->setEnabled(false);
+    analyticsButton_->setToolTip("morfAnalytics n'est pas disponible");
+    connect(analyticsButton_, &QPushButton::clicked, this, [this] {
+        if (!analyticsUrl_.isEmpty()) QDesktopServices::openUrl(QUrl(analyticsUrl_ + "/sitewatch"));
+    });
+    topBar->addWidget(analyticsButton_);
 
     // « Tout synchroniser » : bouton a menu, deux modes (collecteur / direct).
     auto* syncAllBtn = new QToolButton;
@@ -1876,6 +1889,7 @@ void MainWindow::onAnalyze() {
 
     lastStats_ = engine.result();
     displayStats(lastStats_);
+    publishAnalytics();
 
     // Ligne d'en-tete permanente.
     metaHeader_->setText(QString(
@@ -1890,6 +1904,20 @@ void MainWindow::onAnalyze() {
     statusRight_->setText("Dernière analyse : " +
         QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm:ss") + "  ✓");
     refreshSitesOverview();
+}
+
+void MainWindow::publishAnalytics() {
+    const SiteConfig* site = currentSite();
+    if (!site || analyticsUrl_.isEmpty()) return;
+    QJsonObject stats{{"requests", static_cast<double>(lastStats_.totalRequests)},
+        {"bots", static_cast<double>(lastStats_.bots)}, {"attacks", static_cast<double>(sumAttacks(lastStats_))},
+        {"errors_404", static_cast<double>(lastStats_.errors404)}, {"errors_403", static_cast<double>(lastStats_.errors403)},
+        {"errors_500", static_cast<double>(lastStats_.errors500)}};
+    QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
+        {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
+    auto* nam = new QNetworkAccessManager(this);
+    auto* reply = nam->post(QNetworkRequest(QUrl(analyticsUrl_ + "/sitewatch/ingest")), QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, reply, [reply, nam] { reply->deleteLater(); nam->deleteLater(); });
 }
 
 void MainWindow::displayStats(const Stats& s) {
