@@ -236,7 +236,10 @@ Si morfAnalytics est détecté sur le réseau local, le bouton **Analyses avanc�
 est disponible en haut de SiteWatch. Il transmet la synthèse de l'analyse en
 cours puis ouvre la page dédiée. Après une courte synchronisation automatique,
 elle présente notamment les erreurs HTTP, robots, pages touchées et tentatives
-sensibles. En l'absence du service, le bouton reste grisé et explique pourquoi.
+sensibles, ainsi que les jours qui ont concentré ces événements. Pour rester
+rapide même avec des journaux volumineux, seuls les 20 éléments les plus
+significatifs de chaque classement et les 90 derniers jours sont transmis. En
+l'absence du service, le bouton reste grisé et explique pourquoi.
 
 - **Aide → Aide** (`F1`) : rappel de la prise en main.
 - **Aide → À propos** : version et crédits.

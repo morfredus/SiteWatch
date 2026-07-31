@@ -1915,14 +1915,42 @@ void MainWindow::onAnalyze() {
 void MainWindow::publishAnalytics() {
     const SiteConfig* site = currentSite();
     if (!site || analyticsUrl_.isEmpty()) return;
-    auto mapJson = [](const std::map<std::string, long>& values) { QJsonObject out; for (const auto& [k, v] : values) out[QString::fromStdString(k)] = static_cast<double>(v); return out; };
+    // Le rapport est destiné à une synthèse Web, non à une copie exhaustive des
+    // journaux. Envoyer toutes les URL d'un gros site peut dépasser la taille
+    // maximale d'une requête HTTP et empêcher complètement sa publication.
+    auto rankedMapJson = [](const std::map<std::string, long>& values) {
+        std::vector<std::pair<std::string, long>> ranked(values.begin(), values.end());
+        std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+            return a.second != b.second ? a.second > b.second : a.first < b.first;
+        });
+        QJsonObject out;
+        constexpr size_t kMaximumItems = 20;
+        constexpr int kMaximumLabelLength = 180;
+        for (size_t i = 0; i < ranked.size() && i < kMaximumItems; ++i) {
+            QString label = QString::fromStdString(ranked[i].first);
+            if (label.size() > kMaximumLabelLength)
+                label = label.left(kMaximumLabelLength - 1) + QChar(0x2026);
+            out[label] = static_cast<double>(ranked[i].second);
+        }
+        return out;
+    };
+    auto dailyMapJson = [](const std::map<std::string, long>& values) {
+        QJsonObject out;
+        constexpr size_t kMaximumDays = 90;
+        const size_t skip = values.size() > kMaximumDays ? values.size() - kMaximumDays : 0;
+        size_t index = 0;
+        for (const auto& [day, count] : values) {
+            if (index++ >= skip) out[QString::fromStdString(day)] = static_cast<double>(count);
+        }
+        return out;
+    };
     QJsonObject stats{{"requests", static_cast<double>(lastStats_.totalRequests)},
         {"bots", static_cast<double>(lastStats_.bots)}, {"attacks", static_cast<double>(sumAttacks(lastStats_))},
         {"errors_404", static_cast<double>(lastStats_.errors404)}, {"errors_403", static_cast<double>(lastStats_.errors403)},
         {"errors_500", static_cast<double>(lastStats_.errors500)},
-        {"top_pages", mapJson(lastStats_.topPages)}, {"top_attacked", mapJson(lastStats_.topAttacked)},
-        {"bot_counts", mapJson(lastStats_.botCounts)}, {"daily_404", mapJson(lastStats_.daily404)},
-        {"daily_bots", mapJson(lastStats_.dailyBots)}, {"daily_attacks", mapJson(lastStats_.dailyAttacks)}};
+        {"top_pages", rankedMapJson(lastStats_.topPages)}, {"top_attacked", rankedMapJson(lastStats_.topAttacked)},
+        {"bot_counts", rankedMapJson(lastStats_.botCounts)}, {"daily_404", dailyMapJson(lastStats_.daily404)},
+        {"daily_bots", dailyMapJson(lastStats_.dailyBots)}, {"daily_attacks", dailyMapJson(lastStats_.dailyAttacks)}};
     QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
         {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
     auto* nam = new QNetworkAccessManager(this);

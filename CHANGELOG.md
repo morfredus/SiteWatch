@@ -4,6 +4,19 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-07-31
+
+### Fixed
+
+- Les classements envoyés à morfAnalytics sont bornés aux informations les plus
+  utiles. Une analyse avec un très grand nombre d'URL ne peut plus dépasser la
+  taille admise par le service et disparaître de la page d'analyses.
+
+### Changed
+
+- Les évolutions journalières transmises couvrent les 90 derniers jours, tandis
+  que chaque classement conserve ses 20 éléments les plus significatifs.
+
 ## [1.11.2] - 2026-07-31
 
 ### Fixed
