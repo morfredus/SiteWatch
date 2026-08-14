@@ -4,6 +4,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.5] - 2026-08-14
+
+### Changed
+
+- Resynchronisation de la copie vendorée de **morfBeacon**
+  (`third_party/morf/beacon`) en 0.6.0, alignée sur le dépôt source
+  (`IMetricsProvider.h`, `StatusServer.cpp`). Aucun changement de comportement.
+
 ## [1.11.4] - 2026-08-01
 
 ### Added
