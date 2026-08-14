@@ -4,6 +4,17 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-08-14
+
+### Corrigé
+
+- Resynchronisation de la copie vendorée de **morfBeacon**
+  (`third_party/morf/beacon`) en 0.6.1, qui corrige la troncature des grandes réponses
+  `/status` : `StatusServer` fermait la connexion sans drainer son tampon d'écriture,
+  donc un `/status` dépassant la taille du tampon socket (~20 Ko) arrivait coupé côté
+  client. On attend désormais que `bytesToWrite()` retombe à zéro avant de fermer.
+  Aucun changement d'API pour SiteWatch.
+
 ## [1.11.5] - 2026-08-14
 
 ### Changed
