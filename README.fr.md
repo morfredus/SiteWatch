@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.12.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.13.2-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -130,6 +130,7 @@ horaire et quotidienne, avec copie et export CSV partout.
 - Recherche avancée et fenêtres de détail interactives
 - Copie dans le presse-papiers et export CSV
 - Cache local avec nettoyage
+- Contrôle de cohérence entre o2switch, le collecteur et le cache local (métadonnées seulement)
 - Configuration entièrement graphique
 - Thèmes clair / sombre / système (suit automatiquement l'apparence de l'OS)
 - Intégration de l'API o2switch pour l'ouverture automatique du pare-feu

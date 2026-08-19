@@ -105,6 +105,12 @@ QTreeWidget::item, QTableWidget::item, QListWidget::item { padding: 4px; }
 QTreeWidget::item:selected, QTableWidget::item:selected, QListWidget::item:selected {
     background: @{selectionBg}; color: @{selectionText};
 }
+/* Survol : sans cette règle, le style natif Windows peint la cellule survolée
+   avec la couleur d'accent du système (souvent vive), au texte illisible. On
+   impose un fond doux et un texte contrasté, cohérent avec le thème. */
+QTreeWidget::item:hover, QTableWidget::item:hover, QListWidget::item:hover {
+    background: @{hoverBg}; color: @{hoverText};
+}
 /* En-tête : le border-right rend visibles les séparateurs de colonnes
    (et donc la poignée de redimensionnement, invisible auparavant). */
 QHeaderView::section {

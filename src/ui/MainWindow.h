@@ -58,6 +58,7 @@ private slots:
     void onOpenSettings();   // ouvre la fenetre de configuration
     void onSearch();         // recherche dans les entrees (IP/URL/robot/date/code)
     void onCleanCache();     // suppression de logs telecharges
+    void onCoherenceCheck(); // panneau de controle de coherence (B2)
     void onHelp();           // fenetre d'aide
     void onAbout();          // fenetre a propos
     void onPresetChanged();  // applique une periode predefinie
@@ -146,7 +147,7 @@ private:
     Config  config_;
     QString configError_;
     QString collectorUrl_;   // morfCollector de LECTURE découvert (1er vu ; vide si absent)
-    QMap<QString, QString> collectorSeen_;  // baseUrl -> app : TOUS les collecteurs vus
+    QMap<QString, QString> collectorSeen_;  // baseUrl -> "app (hote)" : TOUS les collecteurs vus
     QString analyticsUrl_;   // URL morfAnalytics découverte (vide si absent)
     QPushButton* analyticsButton_ = nullptr;
     Stats   lastStats_;

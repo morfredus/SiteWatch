@@ -88,6 +88,7 @@
 #include "ui/SettingsDialog.h"
 #include "ui/DetailDialog.h"
 #include "ui/CacheCleanupDialog.h"
+#include "ui/CoherenceDialog.h"
 #include "ui/UrlReport.h"
 #include "ui/Theme.h"
 #include "ui/Icons.h"
@@ -476,7 +477,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                 // chacun mais ne LIT que la source choisie (config, sinon le 1er).
                 const QString curl = QString("http://%1:%2")
                     .arg(host).arg(o.value("status_port").toInt());
-                collectorSeen_.insert(curl, o.value("app").toString());
+                // Libelle du collecteur : appli + NOM D'HOTE annonce (champ `host`
+                // du heartbeat, ex. "pi4fred"), pour distinguer deux Pi d'un coup
+                // d'oeil dans le menu de selection. `host` local ci-dessus est l'IP
+                // de l'emetteur : le nom lisible, lui, vient du heartbeat.
+                const QString app  = o.value("app").toString();
+                const QString hn   = o.value("host").toString();
+                collectorSeen_.insert(curl, hn.isEmpty() ? app
+                                                         : app + " (" + hn + ")");
                 if (collectorUrl_.isEmpty())
                     collectorUrl_ = curl;   // 1er vu = source de lecture par defaut
             }
@@ -553,6 +561,8 @@ void MainWindow::buildUi() {
     fichier->addSeparator();
     QAction* actClean = fichier->addAction("Effacer les logs téléchargés…");
     connect(actClean, &QAction::triggered, this, &MainWindow::onCleanCache);
+    QAction* actCoherence = fichier->addAction("Contrôle de cohérence…");
+    connect(actCoherence, &QAction::triggered, this, &MainWindow::onCoherenceCheck);
     fichier->addSeparator();
     QAction* actQuit = fichier->addAction("Quitter");
     actQuit->setShortcut(QKeySequence::Quit);
@@ -640,6 +650,10 @@ void MainWindow::buildUi() {
         }
     });
     topBar->addWidget(analyticsButton_);
+    auto* coherenceBtn = new QPushButton("Cohérence");
+    coherenceBtn->setToolTip("Contrôle de cohérence : o2switch, collecteur et cache (métadonnées seulement).");
+    connect(coherenceBtn, &QPushButton::clicked, this, &MainWindow::onCoherenceCheck);
+    topBar->addWidget(coherenceBtn);
 
     // « Tout synchroniser » : bouton a menu, deux modes (collecteur / direct).
     auto* syncAllBtn = new QToolButton;
@@ -2355,6 +2369,20 @@ void MainWindow::onCleanCache() {
     const QString url = config_.collectorUrl.empty()
         ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
     CacheCleanupDialog dlg(QString::fromStdString(config_.cacheRoot), names, colSites, url, this);
+    dlg.exec();
+}
+
+void MainWindow::onCoherenceCheck() {
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        QMessageBox::information(this, "Contrôle de cohérence",
+            "Aucun site configuré. Ajoutez au moins un site (Fichier → Configuration…).");
+        return;
+    }
+    // Collecteur de LECTURE : endpoint configuré, sinon capté par l'écouteur. Pas
+    // de découverte bloquante ici (l'écouteur permanent alimente collectorSeen_).
+    const QString url = config_.collectorUrl.empty()
+        ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
+    CoherenceDialog dlg(config_, url, collectorSeen_, this);
     dlg.exec();
 }
 

@@ -207,6 +207,23 @@ Le choix est mémorisé et réappliqué au prochain démarrage.
 - **Outils → Effacer des logs téléchargés…** : supprime des `.gz` du cache. Filtre
   par site (ou tous), par étendue (tout / antérieurs à un mois / période), avec
   une liste cochable pour affiner. Confirmation avant suppression.
+- **Fichier → Contrôle de cohérence…** (ou bouton **Cohérence** de la vue Sites) :
+  confronte, pour chaque fichier de chaque site, ses **trois** états - le fichier
+  chez o2switch (source primaire), la copie du **collecteur** morfCollector
+  sélectionné, et le fichier du **cache local**. Le contrôle ne lit que des
+  **métadonnées** (tailles, aucun `.gz` téléchargé pour vérifier). Il repose sur la
+  **taille** : les logs mensuels o2switch sont des `.gz` qui se complètent au fil
+  du mois, la taille suffit à distinguer une copie à jour d'une copie en retard.
+
+  Chaque ligne porte un état : *à jour*, *collecteur en retard*, *cache SiteWatch
+  en retard*, *absent du collecteur*, *absent du cache*, *source o2switch
+  inaccessible*, *collecteur inaccessible* ou *divergence inexpliquée*. Une source
+  injoignable donne un contrôle **partiel** (jamais « absent ») ; un vieux mois
+  purgé du serveur mais conservé reste *à jour (archivé)*. Rien n'est réparé
+  automatiquement : selon le cas, un bouton propose de **remplir depuis le
+  collecteur**, de **télécharger en direct** ou de **relancer la collecte** - c'est
+  vous qui déclenchez. Avec plusieurs collecteurs, le contrôle porte sur celui
+  choisi pour la lecture ; les autres sont mentionnés pour information.
 
 ---
 

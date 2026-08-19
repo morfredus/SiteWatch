@@ -4,6 +4,61 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-08-19
+
+### Modifié
+
+- **Nom d'hôte dans le sélecteur de collecteur** (Configuration → morfCollector) :
+  le menu des collecteurs annoncés affiche désormais le nom d'hôte annoncé (ex.
+  « morfCollector (pi4fred) — http://… »), pour distinguer deux Pi d'un coup d'œil.
+
+## [1.13.1] - 2026-08-19
+
+### Corrigé
+
+- **Survol de cellule illisible.** Le style natif Windows peignait la cellule
+  survolée avec la couleur d'accent du système (souvent vive), rendant le texte
+  illisible. Une règle `:hover` de thème impose désormais un fond doux et un texte
+  contrasté (jeton `hoverBg`/`hoverText`, clair et sombre).
+- **Bouton « Relancer la collecte » tronqué** dans le contrôle de cohérence : la
+  hauteur de ligne par défaut coupait le libellé. Les lignes s'ajustent au contenu
+  et les boutons d'action ont une hauteur minimale.
+
+## [1.13.0] - 2026-08-19
+
+### Ajouté
+
+- **Contrôle de cohérence.** SiteWatch sait désormais signaler lui-même qu'un
+  chemin d'alimentation ne lui donne pas le même état que la source primaire.
+  Panneau dédié *Fichier → Contrôle de cohérence…* (et bouton « Cohérence » de la
+  vue Sites) qui confronte, par site et par fichier, les **trois** états d'un log -
+  o2switch (source primaire), objet du **collecteur sélectionné**, cache local -
+  en **métadonnées seulement** (aucun `.gz` téléchargé pour le contrôle).
+  - Critère : la **taille**. Les `.gz` mensuels sont append-only ; les horodatages
+    ont trois sémantiques distinctes (mtime source / date de collecte / date
+    d'écriture locale) et ne servent jamais de test croisé. Le hash est exclu (il
+    imposerait un transfert).
+  - États : `à jour`, `collecteur en retard`, `cache SiteWatch en retard`, `absent
+    du collecteur`, `absent du cache`, `source o2switch inaccessible`, `collecteur
+    inaccessible`, `divergence inexpliquée`. Une source injoignable est un contrôle
+    **partiel**, jamais une absence ; un fichier purgé de la source mais archivé
+    est « à jour (archivé) », pas une divergence.
+  - **Aucune auto-réparation** : le panneau détecte, explique, et propose des
+    actions déclenchées par l'utilisateur (remplir depuis le collecteur,
+    télécharger en direct, relancer la collecte).
+  - Multi-collecteur : le contrôle porte sur le collecteur **sélectionné** (celui
+    qui alimente le cache) ; les autres collecteurs vus sont mentionnés pour
+    information, sans mélange de leurs données.
+
+### Détails techniques
+
+- Architecture en deux couches : `CoherenceEngine` (décision **pure**, sans E/S ni
+  Qt, testée par `sitewatch-coherence-selftest`, 10 cas) et `CoherenceCheck`
+  (adaptateur réutilisant `SftpClient`, `CollectorClient::getObjects` et un scan du
+  cache). Outil headless `sitewatch-coherence` pour la vérification en ligne de
+  commande. Nécessite morfCollector ≥ 0.5.1 (lecture des objets archivés sans
+  manifeste poussé).
+
 ## [1.12.0] - 2026-08-19
 
 ### Ajouté

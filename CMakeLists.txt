@@ -83,6 +83,7 @@ set(UI_SOURCES
     src/ui/DetailDialog.cpp
     src/ui/UrlReport.cpp
     src/ui/CacheCleanupDialog.cpp
+    src/ui/CoherenceDialog.cpp
 )
 
 set(UI_HEADERS
@@ -93,6 +94,7 @@ set(UI_HEADERS
     src/ui/DetailDialog.h
     src/ui/UrlReport.h
     src/ui/CacheCleanupDialog.h
+    src/ui/CoherenceDialog.h
 )
 
 # Integration morfCollector (cote fournisseur). Qt Network ; appele par l'UI.
@@ -103,6 +105,20 @@ set(COLLECTOR_SOURCES
 set(COLLECTOR_HEADERS
     src/collector/CollectorClient.h
     src/collector/CollectorSync.h
+)
+
+# Controle de coherence (chantier B1). Le MOTEUR est pur (aucune E/S, aucune
+# dependance Qt) : teste seul. L'ADAPTATEUR construit les trois vues reelles
+# (SFTP o2switch, GET /objects collecteur, scan du cache) : depend de Qt/libssh2.
+set(COHERENCE_SOURCES
+    src/coherence/CoherenceEngine.cpp
+)
+set(COHERENCE_HEADERS
+    src/coherence/CoherenceEngine.h
+    src/coherence/CoherenceCheck.h
+)
+set(COHERENCE_IO_SOURCES
+    src/coherence/CoherenceCheck.cpp
 )
 
 # Ressources : icone Qt (barre de titre) + .rc Windows (icone de l'exe).
@@ -116,6 +132,9 @@ add_executable(SiteWatch WIN32
     ${CORE_HEADERS}
     ${COLLECTOR_SOURCES}
     ${COLLECTOR_HEADERS}
+    ${COHERENCE_SOURCES}
+    ${COHERENCE_IO_SOURCES}
+    ${COHERENCE_HEADERS}
     ${UI_SOURCES}
     ${UI_HEADERS}
     ${APP_RESOURCES}
@@ -180,6 +199,52 @@ target_link_libraries(sitewatch-collector-sync PRIVATE
 )
 if(MSVC)
     target_compile_options(sitewatch-collector-sync PRIVATE /utf-8)
+endif()
+
+# --- Auto-test du moteur de coherence (chantier B1) -----------------------
+# Console PURE (aucune E/S, aucune dependance Qt) : verifie que chaque scenario
+# des trois vues (source / collecteur / cache) produit l'etat attendu. Sert de
+# banc de demonstration avant tout cablage d'interface.
+add_executable(sitewatch-coherence-selftest
+    src/coherence/coherence_selftest.cpp
+    ${COHERENCE_SOURCES}
+    ${COHERENCE_HEADERS}
+)
+target_include_directories(sitewatch-coherence-selftest PRIVATE src)
+if(MSVC)
+    target_compile_options(sitewatch-coherence-selftest PRIVATE /utf-8)
+endif()
+
+# --- CLI headless : contrôle de cohérence end-to-end ----------------------
+# Construit les trois vues REELLES (SFTP o2switch, collecteur, cache) et affiche
+# l'etat par fichier. Metadonnees seulement, aucun .gz telecharge. Sert de
+# verification reelle avant l'UI ; la GUI reutilisera checkSite().
+add_executable(sitewatch-coherence
+    src/coherence/coherence_main.cpp
+    ${COHERENCE_SOURCES}
+    ${COHERENCE_IO_SOURCES}
+    ${COHERENCE_HEADERS}
+    src/collector/CollectorClient.cpp
+    src/collector/CollectorClient.h
+    src/core/net/SftpClient.cpp
+    src/core/net/SftpClient.h
+    src/core/net/LogDiscovery.cpp
+    src/core/net/LogDiscovery.h
+    src/config/Config.cpp
+    src/config/Config.h
+)
+target_include_directories(sitewatch-coherence PRIVATE src)
+target_link_libraries(sitewatch-coherence PRIVATE
+    Qt6::Core
+    Qt6::Network
+    nlohmann_json::nlohmann_json
+    ${LIBSSH2_TARGET}
+)
+if(WIN32)
+    target_link_libraries(sitewatch-coherence PRIVATE ws2_32)
+endif()
+if(MSVC)
+    target_compile_options(sitewatch-coherence PRIVATE /utf-8)
 endif()
 
 # MinGW/MSYS2 : windeployqt ne copie QUE les DLL Qt. Ce script complete avec les

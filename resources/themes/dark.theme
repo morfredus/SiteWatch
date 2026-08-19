@@ -27,6 +27,9 @@ accentText    = #ffffff
 # Sélection dans les tableaux
 selectionBg   = #2f4a6b
 selectionText = #f2f3f5
+# Survol de cellule (doux, texte lisible ; remplace l'accent Windows natif)
+hoverBg       = #30333a
+hoverText     = #e3e5e8
 headerText    = #9aa0a6
 
 # États désactivés
