@@ -6,6 +6,8 @@
 
 #pragma once
 #include <QMainWindow>
+#include <QMap>
+#include <QStringList>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -98,6 +100,7 @@ private:
     // Localise morfCollector (découverte morfBeacon), en mémorisant l'URL. "" si
     // aucun collecteur n'est présent (SiteWatch reste autonome).
     QString ensureCollector(int discoverTimeoutMs);
+    QStringList knownCollectorUrls() const;   // tous les collecteurs a qui pousser
     // Au démarrage : pousse la config au collecteur si présent, et ALERTE sur les
     // sites ajoutés / retirés (un retrait n'efface JAMAIS les copies du Pi).
     void startupCollectorSync();
@@ -142,7 +145,8 @@ private:
 
     Config  config_;
     QString configError_;
-    QString collectorUrl_;   // URL du morfCollector découvert (vide si absent)
+    QString collectorUrl_;   // morfCollector de LECTURE découvert (1er vu ; vide si absent)
+    QMap<QString, QString> collectorSeen_;  // baseUrl -> app : TOUS les collecteurs vus
     QString analyticsUrl_;   // URL morfAnalytics découverte (vide si absent)
     QPushButton* analyticsButton_ = nullptr;
     Stats   lastStats_;

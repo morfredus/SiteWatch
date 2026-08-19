@@ -471,8 +471,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                 if (analyticsJustFound && lastStats_.totalRequests > 0)
                     publishAnalytics(); // ne pas exiger une nouvelle analyse après découverte
                 if (!caps.contains(QStringLiteral("collection"))) continue;
-                collectorUrl_ = QString("http://%1:%2")
+                // On MEMORISE chaque collecteur vu (dedup par URL) : plusieurs Pi
+                // peuvent annoncer la capacite 'collection'. SiteWatch pousse a
+                // chacun mais ne LIT que la source choisie (config, sinon le 1er).
+                const QString curl = QString("http://%1:%2")
                     .arg(host).arg(o.value("status_port").toInt());
+                collectorSeen_.insert(curl, o.value("app").toString());
+                if (collectorUrl_.isEmpty())
+                    collectorUrl_ = curl;   // 1er vu = source de lecture par defaut
             }
         });
     }
@@ -1149,7 +1155,7 @@ void MainWindow::onOpenSettings() {
     // le dialogue s'en sert sans jamais relancer de découverte.
     const QString known = config_.collectorUrl.empty()
         ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
-    SettingsDialog dlg(config_, known, this);
+    SettingsDialog dlg(config_, known, collectorSeen_, this);
     if (dlg.exec() != QDialog::Accepted) return;
 
     config_ = dlg.result();
@@ -1170,23 +1176,31 @@ void MainWindow::onOpenSettings() {
     statusBar()->showMessage("Configuration enregistrée : " + configFilePath());
 
     // Envoi explicite de la configuration à morfCollector (bouton dédié).
+    // On pousse à CHAQUE collecteur vu (redondance d'archive « les deux collectent »).
     if (pushRequested) {
-        const QString url = ensureCollector(3000);
-        if (url.isEmpty()) {
+        const QStringList all = knownCollectorUrls();
+        const QString readUrl = ensureCollector(3000);
+        if (all.isEmpty()) {
             showBanner(BannerLevel::Warning,
                 "Configuration enregistrée, mais <b>aucun morfCollector détecté</b> "
                 "pour lui envoyer la configuration. Renseignez son adresse dans "
                 "l'onglet morfCollector, ou vérifiez qu'il tourne.");
             return;
         }
-        const collectorsync::SyncResult r =
-            collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/true);
+        collectorsync::SyncResult r;
+        bool haveRead = false;
+        for (const QString& u : all) {
+            const collectorsync::SyncResult one =
+                collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/true);
+            if (u == readUrl || !haveRead) { r = one; haveRead = true; }
+        }
         if (!r.ok)
             showBanner(BannerLevel::Error, "Envoi refusé : " + r.error.toHtmlEscaped());
         else
             showBanner(BannerLevel::Success,
-                QString("<b>Configuration envoyée à morfCollector</b> (révision %1, %2 site(s)).")
-                    .arg(r.revision).arg(r.sources));
+                QString("<b>Configuration envoyée à morfCollector</b> (%1 collecteur(s), "
+                        "révision %2, %3 site(s)).")
+                    .arg(all.size()).arg(r.revision).arg(r.sources));
     }
 }
 
@@ -1476,15 +1490,40 @@ QString MainWindow::ensureCollector(int /*discoverTimeoutMs*/) {
     return collectorUrl_;
 }
 
+// Tous les collecteurs à qui pousser le manifeste (redondance d'archive : « les
+// deux collectent »). = ceux vus par l'écouteur + l'éventuel épinglé manuel de la
+// config. La LECTURE (fillCache) ne vise, elle, que ensureCollector().
+QStringList MainWindow::knownCollectorUrls() const {
+    QStringList urls = collectorSeen_.keys();
+    const QString pinned = QString::fromStdString(config_.collectorUrl);
+    if (!pinned.isEmpty() && !urls.contains(pinned))
+        urls.prepend(pinned);
+    return urls;
+}
+
 void MainWindow::startupCollectorSync() {
     if (!configError_.isEmpty() || config_.sites.empty())
         return;
-    const QString url = ensureCollector(2500);
-    if (url.isEmpty())
+    const QStringList all = knownCollectorUrls();
+    if (all.isEmpty())
         return;   // aucun collecteur : SiteWatch reste autonome (silencieux)
+    const QString readUrl = ensureCollector(2500);
 
-    const collectorsync::SyncResult r =
-        collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/false);
+    // « Les deux collectent » : on pousse le manifeste (et les secrets) à CHAQUE
+    // collecteur vu. La synchro est idempotente ; le diff ajouts/retraits n'est
+    // calculé qu'au 1er passage (l'état local est ensuite à jour) : on le capte.
+    collectorsync::SyncResult r;   // résultat retenu = celui de la source de lecture
+    QStringList added, removed;
+    bool haveRead = false;
+    for (const QString& u : all) {
+        const collectorsync::SyncResult sr =
+            collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/false);
+        if (!sr.addedLabels.isEmpty())   added   = sr.addedLabels;
+        if (!sr.removedLabels.isEmpty()) removed = sr.removedLabels;
+        if (u == readUrl || !haveRead) { r = sr; haveRead = true; }
+    }
+    r.addedLabels   = added;
+    r.removedLabels = removed;
     if (!r.ok) {
         showBanner(BannerLevel::Warning,
             "morfCollector détecté mais synchronisation impossible : " + r.error.toHtmlEscaped());
@@ -1519,8 +1558,9 @@ void MainWindow::syncAllViaCollector() {
         return;
     }
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    const QString url = ensureCollector(3000);
-    if (url.isEmpty()) {
+    const QStringList all = knownCollectorUrls();
+    const QString url = ensureCollector(3000);   // source de LECTURE (fillCache)
+    if (all.isEmpty() || url.isEmpty()) {
         QApplication::restoreOverrideCursor();
         showBanner(BannerLevel::Warning,
             "<b>Aucun morfCollector détecté</b> sur le réseau.<br>"
@@ -1529,16 +1569,23 @@ void MainWindow::syncAllViaCollector() {
         return;
     }
 
-    // 1. Aligner la configuration sur le collecteur (manifeste + secrets).
-    const collectorsync::SyncResult sr =
-        collectorsync::synchronize(url, config_, configFilePath(), /*forceCredentials=*/true);
+    // 1. Aligner la configuration sur CHAQUE collecteur (manifeste + secrets).
+    //    « Les deux collectent » : tous reçoivent le manifeste (redondance).
+    collectorsync::SyncResult sr;   // retenu = celui de la source de lecture
+    bool haveRead = false;
+    for (const QString& u : all) {
+        const collectorsync::SyncResult one =
+            collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/true);
+        if (u == url || !haveRead) { sr = one; haveRead = true; }
+    }
     if (!sr.ok) {
         QApplication::restoreOverrideCursor();
         showBanner(BannerLevel::Error, "Synchronisation refusée : " + sr.error.toHtmlEscaped());
         return;
     }
 
-    // 2. Remplir le cache local depuis les copies conservées (tous les sites).
+    // 2. Remplir le cache local depuis la source de LECTURE choisie (tous les
+    //    sites). On ne lit qu'UN collecteur pour éviter tout doublon de données.
     int totalDl = 0, totalSkip = 0;
     QStringList problems;
     for (const SiteConfig& s : config_.sites) {

@@ -173,8 +173,10 @@ bool firewallWhitelist(const SiteConfig& site, QString& error) {
 } // namespace
 
 // ---------------------------------------------------------------------------
-SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUrl, QWidget* parent)
-    : QDialog(parent), config_(config), discoveredUrl_(discoveredUrl) {
+SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUrl,
+                               const QMap<QString, QString>& discoveredCollectors, QWidget* parent)
+    : QDialog(parent), config_(config), discoveredUrl_(discoveredUrl),
+      discoveredCollectors_(discoveredCollectors) {
     setWindowTitle("Configuration — SiteWatch");
     setMinimumWidth(780);
 
@@ -575,8 +577,36 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     auto* v = new QVBoxLayout(box);
 
     auto* form = new QFormLayout;
+
+    // Choix du collecteur quand PLUSIEURS morfCollector sont présents sur le
+    // réseau. Tous reçoivent le manifeste (redondance d'archive) ; celui choisi
+    // ici devient la source de LECTURE (copies locales) et l'adresse épinglée.
+    // « Automatique » = pas d'épingle : SiteWatch lit le 1er collecteur détecté.
+    if (discoveredCollectors_.size() >= 2) {
+        collectorPick_ = new QComboBox;
+        collectorPick_->addItem("Automatique (1er détecté)", QString());
+        for (auto it = discoveredCollectors_.constBegin();
+             it != discoveredCollectors_.constEnd(); ++it) {
+            const QString app = it.value().isEmpty() ? QStringLiteral("morfCollector") : it.value();
+            collectorPick_->addItem(QStringLiteral("%1 — %2").arg(app, it.key()), it.key());
+        }
+        // Présélectionner l'URL déjà épinglée dans la config, si elle correspond.
+        const int idx = collectorPick_->findData(QString::fromStdString(config_.collectorUrl));
+        collectorPick_->setCurrentIndex(idx >= 0 ? idx : 0);
+        addRow(form, "Collecteur à utiliser :", collectorPick_);
+    }
+
     collectorEdit_ = new QLineEdit(QString::fromStdString(config_.collectorUrl));
     collectorEdit_->setPlaceholderText("http://pi4fred:8792  (vide = découverte automatique)");
+    // Le sélecteur remplit le champ : choisir un collecteur l'épingle comme source
+    // de lecture ; « Automatique » vide le champ. On rafraîchit alors l'état.
+    if (collectorPick_) {
+        connect(collectorPick_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                [this](int) {
+            collectorEdit_->setText(collectorPick_->currentData().toString());
+            refreshCollector();
+        });
+    }
     auto* connectBtn = new QPushButton("Se connecter");
     connectBtn->setToolTip("Vérifie l'adresse et affiche l'état du collecteur.");
     auto* pushBtn = new QPushButton("Envoyer la config");

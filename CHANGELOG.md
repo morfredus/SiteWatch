@@ -4,6 +4,31 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-08-19
+
+### Ajouté
+
+- **Gestion de plusieurs morfCollector.** Quand plusieurs collecteurs sont
+  présents sur le réseau, l'onglet *Fichier → Configuration → morfCollector*
+  affiche un sélecteur « Collecteur à utiliser » : chacun peut être inspecté
+  (état, sites, copies) et l'un d'eux devient la **source de lecture** épinglée.
+  L'écouteur morfBeacon mémorise désormais **tous** les collecteurs vus au lieu
+  du seul dernier.
+
+### Modifié
+
+- **« Les deux collectent, lecture d'un seul ».** SiteWatch pousse le manifeste
+  (et les secrets) à **chaque** collecteur détecté - redondance d'archive - mais
+  ne remplit son cache local (`fillCache`) que depuis la source de lecture
+  choisie. Aucun risque de doublon de données côté SiteWatch. S'applique à la
+  synchro d'ouverture, à « Tout synchroniser via collector » et au bouton
+  « Envoyer la config ».
+
+### Détails techniques
+
+- `CollectorClient::discoverAll()` : écoute toute la fenêtre et renvoie tous les
+  collecteurs (dédupliqués par hôte), au lieu de s'arrêter au premier.
+
 ## [1.11.6] - 2026-08-14
 
 ### Corrigé

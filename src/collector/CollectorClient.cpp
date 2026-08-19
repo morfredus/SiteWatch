@@ -16,6 +16,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QElapsedTimer>
+#include <QSet>
 #include <QUrl>
 
 namespace {
@@ -113,6 +114,63 @@ bool CollectorClient::discover(int timeoutMs, Discovered& out, QString& error) {
     }
     error = QStringLiteral("aucun morfCollector (capacite 'collection') vu en %1 ms").arg(timeoutMs);
     return false;
+}
+
+QVector<CollectorClient::Discovered> CollectorClient::discoverAll(int timeoutMs) {
+    QVector<Discovered> found;
+    QSet<QString>       seenHosts;   // deduplication : un heartbeat par cycle et par hote
+
+    QUdpSocket sock;
+    if (!sock.bind(QHostAddress::AnyIPv4, kBeaconUdpPort,
+                   QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint))
+        return found;
+
+    QElapsedTimer clock;
+    clock.start();
+    // On ne s'arrete PAS au premier : on ecoute toute la fenetre pour capter les
+    // annonces de chaque collecteur (elles arrivent a des instants differents).
+    while (clock.elapsed() < timeoutMs) {
+        if (!sock.hasPendingDatagrams()) {
+            QEventLoop loop;
+            QTimer t;
+            t.setSingleShot(true);
+            QObject::connect(&t, &QTimer::timeout, &loop, &QEventLoop::quit);
+            QObject::connect(&sock, &QUdpSocket::readyRead, &loop, &QEventLoop::quit);
+            t.start(static_cast<int>(timeoutMs - clock.elapsed()));
+            loop.exec();
+        }
+        while (sock.hasPendingDatagrams()) {
+            QByteArray buf(int(sock.pendingDatagramSize()), '\0');
+            QHostAddress sender;
+            sock.readDatagram(buf.data(), buf.size(), &sender);
+
+            const QJsonObject o = QJsonDocument::fromJson(buf).object();
+            if (!o.value(QStringLiteral("proto")).toString().startsWith(QStringLiteral("morfbeacon/")))
+                continue;
+
+            QStringList caps;
+            for (const QJsonValue& v : o.value(QStringLiteral("capabilities")).toArray())
+                caps << v.toString();
+            if (!caps.contains(QStringLiteral("collection")))
+                continue;
+
+            QString host = sender.toString();
+            if (host.startsWith(QStringLiteral("::ffff:")))   // IPv4 mappee
+                host = host.mid(7);
+            if (seenHosts.contains(host))
+                continue;
+            seenHosts.insert(host);
+
+            Discovered d;
+            d.found        = true;
+            d.host         = host;
+            d.statusPort   = static_cast<quint16>(o.value(QStringLiteral("status_port")).toInt());
+            d.app          = o.value(QStringLiteral("app")).toString();
+            d.capabilities = caps;
+            found.push_back(d);
+        }
+    }
+    return found;
 }
 
 bool CollectorClient::checkCompatible(const QString& baseUrl, const QString& wantedProto,

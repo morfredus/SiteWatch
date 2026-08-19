@@ -8,6 +8,7 @@
 #include <QDialog>
 #include <vector>
 #include <QString>
+#include <QMap>
 #include <QIcon>
 #include "config/Config.h"
 
@@ -31,10 +32,13 @@ class QTableWidget;
 class SettingsDialog : public QDialog {
     Q_OBJECT
 public:
-    // `discoveredUrl` : URL du collecteur déjà connue (écouteur permanent de la
-    // fenêtre principale). Le dialogue ne relance JAMAIS de découverte lui-même
-    // (éviter de rebinder le port UDP 45454, ce qui casse l'écoute permanente).
+    // `discoveredUrl` : URL du collecteur de LECTURE déjà connue (écouteur
+    // permanent de la fenêtre principale). `discoveredCollectors` : TOUS les
+    // collecteurs vus (baseUrl -> app), pour en choisir un dans l'onglet. Le
+    // dialogue ne relance JAMAIS de découverte lui-même (éviter de rebinder le
+    // port UDP 45454, ce qui casse l'écoute permanente).
     explicit SettingsDialog(const Config& config, const QString& discoveredUrl,
+                            const QMap<QString, QString>& discoveredCollectors,
                             QWidget* parent = nullptr);
 
     // Configuration éditée (valide après acceptation).
@@ -73,7 +77,8 @@ private:
     QIcon stateIcon(int index) const;
 
     Config config_;
-    QString discoveredUrl_;               // URL du collecteur fournie par MainWindow
+    QString discoveredUrl_;               // URL du collecteur de lecture (MainWindow)
+    QMap<QString, QString> discoveredCollectors_;   // baseUrl -> app : tous les vus
     std::vector<int>     siteState_;      // 0 à tester, 1 valide, 2 erreur
     std::vector<QString> lastReport_;     // dernier rapport de test par site
     int  current_ = -1;
@@ -103,6 +108,7 @@ private:
     QTimeEdit*   collectorTime_  = nullptr;   // heure de collecte quotidienne
     QLabel*      collectorState_ = nullptr;   // état / config du collecteur (synthèse)
     QTableWidget* collectorSites_ = nullptr;  // sites confiés : état + nb de fichiers + taille
+    QComboBox*   collectorPick_  = nullptr;   // choix du collecteur (si plusieurs)
     QComboBox*   collectorSite_  = nullptr;   // site dont on liste les copies
     QListWidget* collectorFiles_ = nullptr;   // fichiers conservés (object_id en UserRole)
 };
