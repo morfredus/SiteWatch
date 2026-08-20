@@ -20,6 +20,16 @@ set(CMAKE_AUTORCC ON)
 # Qt6 fournit l'interface, les graphiques (Charts) et le reseau.
 find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Network)
 # zlib : lecture des fichiers de log compresses (.gz).
+# Avec MinGW, CMake lancé depuis PowerShell ne déduit pas toujours le préfixe
+# de la toolchain à partir du compilateur. Le retrouver évite de figer un chemin
+# MSYS2 tout en laissant les autres plateformes à leur détection normale.
+if(WIN32 AND MINGW AND NOT ZLIB_ROOT)
+    get_filename_component(SITEWATCH_MINGW_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(SITEWATCH_MINGW_ROOT "${SITEWATCH_MINGW_BIN}" DIRECTORY)
+    if(EXISTS "${SITEWATCH_MINGW_ROOT}/include/zlib.h")
+        set(ZLIB_ROOT "${SITEWATCH_MINGW_ROOT}")
+    endif()
+endif()
 find_package(ZLIB REQUIRED)
 # nlohmann-json : lecture du fichier de configuration.
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -251,7 +261,27 @@ endif()
 # DLL non-Qt de /mingw64/bin (libssh2, freetype, runtime gcc, zlib, openssl...)
 # pour rendre l'exe lancable en dehors du shell MSYS2 (double-clic).
 if(WIN32 AND NOT MSVC)
-    add_custom_command(TARGET SiteWatch POST_BUILD
-        COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/windows/deploy-mingw.sh" "$<TARGET_FILE_DIR:SiteWatch>"
-        COMMENT "Copie des DLL MinGW a cote de l'executable")
+    function(sitewatch_msys_path windows_path output)
+        string(REGEX REPLACE "^([A-Za-z]):/" "/\\1/" converted "${windows_path}")
+        string(SUBSTRING "${converted}" 1 1 drive)
+        string(TOLOWER "${drive}" drive)
+        string(SUBSTRING "${converted}" 2 -1 tail)
+        set(${output} "/${drive}${tail}" PARENT_SCOPE)
+    endfunction()
+    sitewatch_msys_path("${CMAKE_SOURCE_DIR}/scripts/windows/deploy-mingw.sh"
+                        SITEWATCH_DEPLOY_SCRIPT)
+    sitewatch_msys_path("${CMAKE_CURRENT_BINARY_DIR}" SITEWATCH_TARGET_DIR)
+    get_filename_component(SITEWATCH_COMPILER_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(SITEWATCH_MINGW_ROOT "${SITEWATCH_COMPILER_BIN}" DIRECTORY)
+    get_filename_component(SITEWATCH_MSYS_ROOT "${SITEWATCH_MINGW_ROOT}" DIRECTORY)
+    set(SITEWATCH_MSYS_BASH "${SITEWATCH_MSYS_ROOT}/usr/bin/bash.exe")
+    if(EXISTS "${SITEWATCH_MSYS_BASH}")
+        add_custom_command(TARGET SiteWatch POST_BUILD
+            # PATH peut résoudre `bash` vers WSL, sans accès au workspace
+            # Windows. On utilise donc le Bash MSYS2 lié au compilateur actif.
+            COMMAND "${SITEWATCH_MSYS_BASH}" "${SITEWATCH_DEPLOY_SCRIPT}" "${SITEWATCH_TARGET_DIR}"
+            COMMENT "Copie des DLL MinGW a cote de l'executable")
+    else()
+        message(WARNING "MSYS2 Bash not found; non-Qt MinGW DLL collection is skipped")
+    endif()
 endif()

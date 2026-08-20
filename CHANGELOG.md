@@ -4,6 +4,13 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.13.3] - 2026-08-20
+
+### Corrigé
+
+- Le build Windows retrouve Zlib depuis la toolchain MinGW active et lance le
+  collecteur de DLL avec son Bash MSYS2, sans dépendre de WSL.
+
 ## [1.13.2] - 2026-08-19
 
 ### Modifié
