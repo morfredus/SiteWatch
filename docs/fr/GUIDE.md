@@ -71,7 +71,22 @@ Dernière connexion : 06/07/2026 22:10
 
 En cas d'échec, le message indique l'étape fautive (pare-feu, connexion, auth).
 
-Cliquer **Enregistrer** pour valider.
+Cliquer **Enregistrer** pour valider. **Envoyer la config** (onglets Sites,
+GitHub ou morfCollector) enregistre *et* pousse la configuration : ensuite
+morfCollector collecte tout seul à l'heure prévue.
+
+### GitHub
+
+L'onglet **GitHub** suit des dépôts (vues, clones, téléchargements), distinct
+des sites Web. Indiquer le propriétaire et le jeton, cliquer **Lister les
+dépôts**, cocher ceux à suivre, puis **Envoyer la config**.
+
+**Collecter maintenant** interroge GitHub tout de suite, enregistre la vérité
+dans SiteWatch, complète les absences depuis morfCollector, puis actualise
+l'écran. **Actualiser** relit seulement le déjà connu. morfAnalytics reçoit
+cette consolidation (`POST /github/ingest`) et n'analyse rien d'autre.
+
+Le jeton reste dans la config locale de SiteWatch, jamais dans le manifeste.
 
 ### Confier la collecte à morfCollector (facultatif)
 

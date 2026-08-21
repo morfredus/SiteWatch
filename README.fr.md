@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.13.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.18.0-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -14,13 +14,19 @@
 > (MSYS2/MinGW, Qt 6.11), **Linux Mint 22.3 « Zena »** (base Ubuntu 24.04 LTS,
 > Qt 6.4) et **Raspberry Pi 4** (Raspberry Pi OS 64 bits).
 
-**Outil de bureau multiplateforme d'investigation des journaux d'accès Apache et LiteSpeed.**
+**Outil de bureau multiplateforme d'investigation des journaux d'accès Apache et LiteSpeed, et de la présence GitHub publique des projets morfSystem.**
+
+SiteWatch — surveillance des sites et présences en ligne.
 
 Lorsque morfAnalytics est disponible sur le réseau local, SiteWatch lui transmet
 chaque analyse et active le bouton **Analyses avancées**. Son ouverture republie
 la synthèse courante ; la page se met alors à jour automatiquement.
 Les séries quotidiennes utiles aux analyses temporelles sont partagées sous
 forme agrégée : les journaux d'accès bruts restent exclusivement dans SiteWatch.
+
+L'écran GitHub reprend le choix du collecteur (automatique ou manuel), comme
+pour les sites. Les analyses avancées GitHub ouvrent le morfAnalytics du même
+hôte que ce collecteur, pas le premier vu sur le réseau.
 
 SiteWatch est une **application Qt / C++17 multiplateforme** dédiée à
 l'administration et à la supervision de sites web. Elle s'exécute nativement sous
@@ -135,6 +141,7 @@ horaire et quotidienne, avec copie et export CSV partout.
 - Thèmes clair / sombre / système (suit automatiquement l'apparence de l'OS)
 - Intégration de l'API o2switch pour l'ouverture automatique du pare-feu
 - Diffusion de présence sur le réseau local + endpoint de métriques (`/status`) pour une supervision centralisée
+- Présence GitHub : collecteur et morfAnalytics au choix, automatique (même hôte) ou épinglé
 - Vérification des mises à jour via les *releases* GitHub (silencieuse au démarrage, à la demande depuis le menu Aide)
 
 ---

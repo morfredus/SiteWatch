@@ -12,5 +12,13 @@
       "cpanelToken": "JETON_API_CPANEL_POUR_AUTORISATION_PARE_FEU",
       "logMatch": ""
     }
-  ]
+  ],
+  "github": {
+    "enabled": false,
+    "owner": "morfredus",
+    "repositories": [
+      { "name": "morfCollector", "enabled": true }
+    ],
+    "schedule": { "daily_at": "02:30" }
+  }
 }

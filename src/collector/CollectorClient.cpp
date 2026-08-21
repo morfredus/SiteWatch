@@ -210,13 +210,16 @@ CollectorClient::Reply CollectorClient::getSources(const QString& baseUrl) {
 }
 
 CollectorClient::Reply CollectorClient::getObjects(const QString& baseUrl, const QString& sourceId) {
-    return httpGet(baseUrl + QStringLiteral("/sources/") + sourceId + QStringLiteral("/objects"));
+    return httpGet(baseUrl + QStringLiteral("/sources/")
+                   + QString::fromUtf8(QUrl::toPercentEncoding(sourceId))
+                   + QStringLiteral("/objects"));
 }
 
 QByteArray CollectorClient::download(const QString& baseUrl, const QString& objectId,
                                      bool& ok, QString& error) {
     QNetworkAccessManager nam;
-    QNetworkRequest req((QUrl(baseUrl + QStringLiteral("/objects/") + objectId)));
+    QNetworkRequest req((QUrl(baseUrl + QStringLiteral("/objects/")
+        + QString::fromUtf8(QUrl::toPercentEncoding(objectId)))));
     QNetworkReply* reply = nam.get(req);
 
     QEventLoop loop;
@@ -243,29 +246,41 @@ CollectorClient::Reply CollectorClient::getStatus(const QString& baseUrl) {
 }
 
 CollectorClient::Reply CollectorClient::collectNow(const QString& baseUrl, const QString& sourceId) {
-    return httpPost(baseUrl + QStringLiteral("/sources/") + sourceId + QStringLiteral("/collect"),
+    return httpPost(baseUrl + QStringLiteral("/sources/")
+                    + QString::fromUtf8(QUrl::toPercentEncoding(sourceId))
+                    + QStringLiteral("/collect"),
                     QJsonObject{});
 }
 
 CollectorClient::Reply CollectorClient::suspend(const QString& baseUrl, const QString& sourceId) {
-    return httpPost(baseUrl + QStringLiteral("/sources/") + sourceId + QStringLiteral("/suspend"),
+    return httpPost(baseUrl + QStringLiteral("/sources/")
+                    + QString::fromUtf8(QUrl::toPercentEncoding(sourceId))
+                    + QStringLiteral("/suspend"),
                     QJsonObject{});
 }
 
 CollectorClient::Reply CollectorClient::resume(const QString& baseUrl, const QString& sourceId) {
-    return httpPost(baseUrl + QStringLiteral("/sources/") + sourceId + QStringLiteral("/resume"),
+    return httpPost(baseUrl + QStringLiteral("/sources/")
+                    + QString::fromUtf8(QUrl::toPercentEncoding(sourceId))
+                    + QStringLiteral("/resume"),
                     QJsonObject{});
 }
 
 CollectorClient::Reply CollectorClient::deleteObject(const QString& baseUrl, const QString& objectId) {
-    return httpRequest(baseUrl + QStringLiteral("/objects/") + objectId, "DELETE", QByteArray());
+    return httpRequest(baseUrl + QStringLiteral("/objects/")
+                       + QString::fromUtf8(QUrl::toPercentEncoding(objectId)),
+                       "DELETE", QByteArray());
 }
 
 CollectorClient::Reply CollectorClient::deleteSourceObjects(const QString& baseUrl, const QString& sourceId) {
-    return httpRequest(baseUrl + QStringLiteral("/sources/") + sourceId + QStringLiteral("/objects"),
+    return httpRequest(baseUrl + QStringLiteral("/sources/")
+                       + QString::fromUtf8(QUrl::toPercentEncoding(sourceId))
+                       + QStringLiteral("/objects"),
                        "DELETE", QByteArray());
 }
 
 CollectorClient::Reply CollectorClient::deleteSource(const QString& baseUrl, const QString& sourceId) {
-    return httpRequest(baseUrl + QStringLiteral("/sources/") + sourceId, "DELETE", QByteArray());
+    return httpRequest(baseUrl + QStringLiteral("/sources/")
+                       + QString::fromUtf8(QUrl::toPercentEncoding(sourceId)),
+                       "DELETE", QByteArray());
 }

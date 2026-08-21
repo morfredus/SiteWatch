@@ -4,6 +4,81 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-08-21
+
+### Ajouté
+
+- L'écran GitHub choisit le collecteur et morfAnalytics (automatique ou
+  manuel), affiche lequel est lu, et confirme l'envoi de config.
+- En automatique, les analyses visent l'instance du **même hôte** que le
+  collecteur (pi4dev avec pi4dev, plus le premier vu sur le réseau).
+
+## [1.17.1] - 2026-08-21
+
+### Corrigé
+
+- Le magasin GitHub SQLite restait ouvert via un handle Qt local : la connexion
+  se fermait à la fin de `open()`, et le redémarrage relisait une base vide.
+  Le connu est rechargé dès le démarrage. morfCollector ne comble ensuite que
+  les jours absents, sans relancer GitHub tout seul.
+- Publication vers morfAnalytics : HTTP 405 venait d'une cible GET-only (beacon
+  ou binaire trop ancien). SiteWatch vérifie `/status` avant d'envoyer l'ingest.
+
+## [1.17.0] - 2026-08-21
+
+### Corrigé
+
+- La vérité GitHub est publiée vers morfAnalytics dès que le service est vu sur
+  le réseau, pas seulement après un clic. Un échec d'ingest s'affiche dans
+  l'écran GitHub. L'export SQLite ne mêle plus deux requêtes actives.
+
+### Ajouté
+
+- Tri des colonnes de l'écran GitHub. Pages, référents et assets sont conservés
+  dans la vérité consolidée et transmis à l'analyse.
+
+## [1.16.0] - 2026-08-21
+
+### Modifié
+
+- **SiteWatch est la source de vérité GitHub.** L'écran n'attend plus 02:30.
+  **Collecter maintenant** interroge GitHub, consolide localement, complète les
+  absences depuis morfCollector, puis publie vers morfAnalytics.
+  **Actualiser** relit seulement le connu. Une archive collecteur ne remplace
+  jamais une mesure déjà consolidée (écart journalisé).
+
+## [1.15.1] - 2026-08-21
+
+### Corrigé
+
+- L'écran GitHub n'affiche plus que les dépôts **cochés** dans la configuration.
+  Les autres restent dans la liste de l'onglet Configuration, mais ne sont plus
+  poussés à morfCollector (plus de sources `suspended` pour les décochés).
+
+## [1.15.0] - 2026-08-21
+
+### Ajouté
+
+- **Liste des dépôts GitHub.** L'onglet Configuration → GitHub interroge l'API
+  pour afficher les dépôts du compte (ou de l'organisation) : on coche ceux à
+  suivre au lieu de saisir les noms. Les nouveaux restent décochés. Un dépôt
+  déjà suivi mais absent de la liste GitHub reste visible.
+- **Envoyer la config** aussi dans les onglets Sites et GitHub (en plus de
+  morfCollector). Un envoi pousse les deux familles pour que le collecteur
+  tourne ensuite seul à l'heure prévue.
+
+## [1.14.0] - 2026-08-20
+
+### Ajouté
+
+- **Métriques GitHub.** SiteWatch possède désormais une famille distincte des
+  sites Web : liste explicite de dépôts, horaire quotidien, jeton PAT local.
+  Un manifeste `github-traffic` distinct est poussé à morfCollector (instance
+  `SiteWatch.github@hôte`). Le jeton n'entre jamais dans le manifeste.
+- Navigation de premier niveau **Sites** / **GitHub** et page de synthèse
+  (état de collecte, vues 14 j, clones, téléchargements cumulés, dernière
+  release), avec lien vers morfAnalytics `/github`.
+
 ## [1.13.3] - 2026-08-20
 
 ### Corrigé

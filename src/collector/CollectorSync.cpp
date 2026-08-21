@@ -28,8 +28,8 @@ QString providerInstance() {
     return QStringLiteral("SiteWatch@") + QSysInfo::machineHostName();
 }
 
-QJsonObject buildManifest(const Config& cfg, const QString& instance,
-                          const QString& generation, qint64 revision) {
+QJsonObject buildWebManifest(const Config& cfg, const QString& instance,
+                             const QString& generation, qint64 revision) {
     // Collecte quotidienne à l'heure configurée (défaut 02:00, cf. contrat §1.2.1).
     const QString dailyAt = cfg.collectorDailyAt.empty()
         ? QStringLiteral("02:00") : QString::fromStdString(cfg.collectorDailyAt);
@@ -47,11 +47,65 @@ QJsonObject buildManifest(const Config& cfg, const QString& instance,
                 {"remote_dir", QString::fromStdString(s.remoteLogDir)},
                 {"match", QString::fromStdString(s.logMatch)},
                 {"site_key", QString::fromStdString(s.name)},
+                {"source_key", QStringLiteral("sitewatch:web:")
+                    + QString::fromStdString(s.domain.empty() ? s.name : s.domain)},
             }},
             {"credentials_ref", QStringLiteral("sw-") + QString::fromStdString(s.id)},
             {"schedule", schedule},
             {"retention", QJsonObject{ {"mode", "keep_forever"} }},
         });
+    }
+    return QJsonObject{
+        {"proto", "morfcollect/1"},
+        {"provider", QJsonObject{ {"app", "SiteWatch"}, {"instance", instance} }},
+        {"manifest_generation", generation},
+        {"revision", static_cast<double>(revision)},
+        {"sources", sources},
+    };
+}
+
+QString githubProviderInstance() {
+    return QStringLiteral("SiteWatch.github@") + QSysInfo::machineHostName();
+}
+
+QString githubSourceId(const Config& cfg, const GitHubRepoConfig& repo) {
+    return QStringLiteral("sitewatch:github:")
+        + QString::fromStdString(cfg.github.owner) + QLatin1Char('/')
+        + QString::fromStdString(repo.name);
+}
+
+QString githubCredentialsRef(const Config& cfg) {
+    return QStringLiteral("sw-github-") + QString::fromStdString(cfg.github.owner);
+}
+
+QJsonObject buildGithubManifest(const Config& cfg, const QString& instance,
+                                const QString& generation, qint64 revision) {
+    const QString dailyAt = !cfg.github.dailyAt.empty()
+        ? QString::fromStdString(cfg.github.dailyAt)
+        : (cfg.collectorDailyAt.empty()
+               ? QStringLiteral("02:30") : QString::fromStdString(cfg.collectorDailyAt));
+    const QJsonObject schedule{ {"daily_at", dailyAt} };
+
+    QJsonArray sources;
+    if (cfg.github.enabled && !cfg.github.owner.empty()) {
+        for (const GitHubRepoConfig& r : cfg.github.repositories) {
+            // Decoche = non suivi : absent du manifeste, pas une source suspendue.
+            if (!r.enabled)
+                continue;
+            sources.append(QJsonObject{
+                {"source_id", githubSourceId(cfg, r)},
+                {"label", QString::fromStdString(cfg.github.owner + "/" + r.name)},
+                {"enabled", r.enabled},
+                {"connector", QJsonObject{ {"name", "github-traffic"}, {"version", 1} }},
+                {"params", QJsonObject{
+                    {"owner", QString::fromStdString(cfg.github.owner)},
+                    {"repository", QString::fromStdString(r.name)},
+                }},
+                {"credentials_ref", githubCredentialsRef(cfg)},
+                {"schedule", schedule},
+                {"retention", QJsonObject{ {"mode", "keep_forever"} }},
+            });
+        }
     }
     return QJsonObject{
         {"proto", "morfcollect/1"},
@@ -167,7 +221,7 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
     }
 
     // 3. Decision de push (generation + revision).
-    QJsonObject probe = buildManifest(cfg, providerInstance(), st.generation, st.revision);
+    QJsonObject probe = buildWebManifest(cfg, providerInstance(), st.generation, st.revision);
     const QString hash = sourcesHash(probe);
     CollectorClient::Reply remote = CollectorClient::manifestState(baseUrl, providerInstance());
     const bool serverInSync = remote.ok()
@@ -177,7 +231,7 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
 
     if (contentChanged || !serverInSync) {
         if (contentChanged) st.revision += 1;
-        QJsonObject manifest = buildManifest(cfg, providerInstance(), st.generation, st.revision);
+        QJsonObject manifest = buildWebManifest(cfg, providerInstance(), st.generation, st.revision);
         CollectorClient::Reply pr = CollectorClient::pushManifest(baseUrl, manifest);
         if (!pr.ok()) {
             res.error = QStringLiteral("POST /manifest -> HTTP %1").arg(pr.status);
@@ -195,6 +249,8 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
     int localSecrets = 0;
     for (const SiteConfig& s : cfg.sites)
         if (!buildSecret(s).isEmpty()) ++localSecrets;
+    if (cfg.github.enabled && !cfg.github.token.empty())
+        ++localSecrets;
     const int remoteRefs = res.metrics.value(QStringLiteral("credentials_refs")).toInt();
     const bool vaultShort = remoteRefs < localSecrets;
 
@@ -215,9 +271,58 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
     st.labelsById = curLabels;
     saveState(configPath, st);
 
+    // 6. Manifeste GitHub DISTINCT : autre instance fournisseur pour que la
+    // reconciliation SFTP ne retire jamais les sources github-traffic, et
+    // inversement. Le jeton n'entre jamais dans le manifeste.
+    State gst = loadState(configPath + QStringLiteral(".github"));
+    if (gst.generation.isEmpty()) {
+        gst.generation = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        gst.revision = 0;
+    }
+    const QString ghInstance = githubProviderInstance();
+    QJsonObject ghProbe = buildGithubManifest(cfg, ghInstance, gst.generation, gst.revision);
+    const QString ghHash = sourcesHash(ghProbe);
+    CollectorClient::Reply ghRemote = CollectorClient::manifestState(baseUrl, ghInstance);
+    const bool ghInSync = ghRemote.ok()
+        && ghRemote.json.value("generation").toString() == gst.generation
+        && static_cast<qint64>(ghRemote.json.value("revision").toDouble()) == gst.revision;
+    const bool ghChanged = (ghHash != gst.hash);
+    if (ghChanged || !ghInSync) {
+        if (ghChanged) gst.revision += 1;
+        QJsonObject ghManifest = buildGithubManifest(cfg, ghInstance, gst.generation, gst.revision);
+        CollectorClient::Reply pr = CollectorClient::pushManifest(baseUrl, ghManifest);
+        if (!pr.ok()) {
+            res.error = QStringLiteral("POST /manifest (GitHub) -> HTTP %1").arg(pr.status);
+            return res;
+        }
+        gst.hash = ghHash;
+        res.pushed = true;
+    }
+    if (cfg.github.enabled && !cfg.github.token.empty()
+        && (forceCredentials || vaultShort || ghChanged || gst.sourceIds.isEmpty())) {
+        const QJsonObject secret{{QStringLiteral("token"),
+                                  QString::fromStdString(cfg.github.token)}};
+        if (CollectorClient::pushCredentials(baseUrl, githubCredentialsRef(cfg), secret).status == 204)
+            ++res.credentialsPushed;
+    }
+    QStringList ghIds;
+    QJsonObject ghLabels;
+    if (cfg.github.enabled) {
+        for (const GitHubRepoConfig& r : cfg.github.repositories) {
+            if (!r.enabled)
+                continue;
+            const QString id = githubSourceId(cfg, r);
+            ghIds << id;
+            ghLabels[id] = QString::fromStdString(cfg.github.owner + "/" + r.name);
+        }
+    }
+    gst.sourceIds = ghIds;
+    gst.labelsById = ghLabels;
+    saveState(configPath + QStringLiteral(".github"), gst);
+
     res.ok = true;
     res.revision = st.revision;
-    res.sources = static_cast<int>(cfg.sites.size());
+    res.sources = static_cast<int>(cfg.sites.size() + ghIds.size());
     return res;
 }
 

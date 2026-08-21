@@ -31,6 +31,8 @@ class QCheckBox;
 class QFrame;
 class QPushButton;
 class QToolButton;
+class QStackedWidget;
+class GitHubPage;
 QT_BEGIN_NAMESPACE
 class QChartView;
 QT_END_NAMESPACE
@@ -101,7 +103,12 @@ private:
     // Localise morfCollector (découverte morfBeacon), en mémorisant l'URL. "" si
     // aucun collecteur n'est présent (SiteWatch reste autonome).
     QString ensureCollector(int discoverTimeoutMs);
+    QString ensureAnalytics() const;
     QStringList knownCollectorUrls() const;   // tous les collecteurs a qui pousser
+    void applyGithubServices();
+    void pinCollectorUrl(const QString& url);
+    void pinAnalyticsUrl(const QString& url);
+    void pushGithubConfig();
     // Au démarrage : pousse la config au collecteur si présent, et ALERTE sur les
     // sites ajoutés / retirés (un retrait n'efface JAMAIS les copies du Pi).
     void startupCollectorSync();
@@ -148,8 +155,13 @@ private:
     QString configError_;
     QString collectorUrl_;   // morfCollector de LECTURE découvert (1er vu ; vide si absent)
     QMap<QString, QString> collectorSeen_;  // baseUrl -> "app (hote)" : TOUS les collecteurs vus
-    QString analyticsUrl_;   // URL morfAnalytics découverte (vide si absent)
+    QMap<QString, QString> analyticsSeen_;  // baseUrl -> "app (hote)" : morfAnalytics vus
+    QString analyticsUrl_;   // dernier vu (repli si pas d'épingle ni même hôte)
     QPushButton* analyticsButton_ = nullptr;
+    QStackedWidget* domainStack_ = nullptr;
+    QPushButton* sitesDomainBtn_ = nullptr;
+    QPushButton* githubDomainBtn_ = nullptr;
+    GitHubPage*  githubPage_ = nullptr;
     Stats   lastStats_;
     std::vector<LogEntry> entries_;   // entrées de la dernière analyse (pour le détail)
 

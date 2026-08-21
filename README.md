@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.13.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.18.0-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -14,12 +14,19 @@
 > **Linux Mint 22.3 “Zena”** (Ubuntu 24.04 LTS base, Qt 6.4) and **Raspberry Pi 4**
 > (Raspberry Pi OS 64-bit).
 
-**Cross-platform desktop investigation tool for Apache and LiteSpeed access logs.**
+**Cross-platform desktop investigation tool for Apache and LiteSpeed access logs,
+and for the public GitHub presence of morfSystem projects.**
+
+SiteWatch — surveillance des sites et présences en ligne.
 
 When morfAnalytics is available on the local network, SiteWatch automatically
 publishes each site analysis and exposes an **Advanced analyses** button leading
 to the SiteWatch dashboard. Opening this dashboard republishes the current
 summary; the dashboard refreshes automatically as soon as it is received.
+
+The GitHub screen uses the same collector choice as the sites (automatic or
+pinned). Advanced GitHub analyses open the morfAnalytics instance on that
+collector's host, not the first one seen on the network.
 
 SiteWatch is a **cross-platform Qt / C++17 application** for website
 administration and monitoring. It runs natively on **Windows, Linux (x86_64 and
@@ -129,6 +136,7 @@ traffic, bots, AI bots, Google, HTTP errors, WordPress activity).
 - Light / dark / system themes (follows the OS appearance automatically)
 - o2switch API integration for automatic firewall opening
 - LAN presence broadcast and live metrics endpoint (`/status`) for central monitoring
+- GitHub presence: collector and morfAnalytics can be chosen automatically (same host) or pinned
 - Update check against GitHub Releases (silent at startup, on demand from the Help menu)
 
 ---

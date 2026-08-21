@@ -10,6 +10,7 @@
 #include <QString>
 #include <QMap>
 #include <QIcon>
+#include <QSet>
 #include "config/Config.h"
 
 class QLineEdit;
@@ -22,6 +23,7 @@ class QComboBox;
 class QVBoxLayout;
 class QTimeEdit;
 class QTableWidget;
+class QCheckBox;
 
 // -----------------------------------------------------------------------------
 // SettingsDialog : édition graphique de la configuration (config.json).
@@ -39,6 +41,7 @@ public:
     // port UDP 45454, ce qui casse l'écoute permanente).
     explicit SettingsDialog(const Config& config, const QString& discoveredUrl,
                             const QMap<QString, QString>& discoveredCollectors,
+                            const QMap<QString, QString>& discoveredAnalytics,
                             QWidget* parent = nullptr);
 
     // Configuration éditée (valide après acceptation).
@@ -61,6 +64,11 @@ private slots:
 private:
     void buildUi();
     void buildCollectorGroup(QVBoxLayout* root);   // groupe morfCollector
+    void buildGithubGroup(QVBoxLayout* root);
+    void requestPushAndAccept();          // Enregistrer puis pousser vers morfCollector
+    void onListGithubRepos();             // Liste API : decocher = ne pas suivre
+    QMap<QString, bool> githubSelection() const;
+    void addGithubRepoRow(const QString& name, bool enabled, const QString& access);
     void refreshCollector();                        // se connecter : état + fichiers
     void refreshCollectorFiles();                   // fichiers du site sélectionné seulement
     void collectNowAll();                           // déclenche une collecte immédiate (toutes sources)
@@ -79,6 +87,7 @@ private:
     Config config_;
     QString discoveredUrl_;               // URL du collecteur de lecture (MainWindow)
     QMap<QString, QString> discoveredCollectors_;   // baseUrl -> app : tous les vus
+    QMap<QString, QString> discoveredAnalytics_;    // baseUrl -> app : morfAnalytics vus
     std::vector<int>     siteState_;      // 0 à tester, 1 valide, 2 erreur
     std::vector<QString> lastReport_;     // dernier rapport de test par site
     int  current_ = -1;
@@ -111,4 +120,14 @@ private:
     QComboBox*   collectorPick_  = nullptr;   // choix du collecteur (si plusieurs)
     QComboBox*   collectorSite_  = nullptr;   // site dont on liste les copies
     QListWidget* collectorFiles_ = nullptr;   // fichiers conservés (object_id en UserRole)
+
+    QComboBox*    githubCollectorPick_ = nullptr;
+    QComboBox*    githubAnalyticsPick_ = nullptr;
+    QLineEdit*    githubAnalyticsEdit_ = nullptr;
+    QCheckBox*    githubEnabled_ = nullptr;
+    QLineEdit*    githubOwner_   = nullptr;
+    QLineEdit*    githubToken_   = nullptr;
+    QTimeEdit*    githubTime_    = nullptr;
+    QTableWidget* githubRepos_       = nullptr;
+    QLabel*       githubListStatus_  = nullptr;
 };

@@ -18,7 +18,7 @@ set(CMAKE_AUTORCC ON)
 
 # --- Dependances ----------------------------------------------------------
 # Qt6 fournit l'interface, les graphiques (Charts) et le reseau.
-find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Network Sql)
 # zlib : lecture des fichiers de log compresses (.gz).
 # Avec MinGW, CMake lancé depuis PowerShell ne déduit pas toujours le préfixe
 # de la toolchain à partir du compilateur. Le retrouver évite de figer un chemin
@@ -94,6 +94,10 @@ set(UI_SOURCES
     src/ui/UrlReport.cpp
     src/ui/CacheCleanupDialog.cpp
     src/ui/CoherenceDialog.cpp
+    src/ui/GitHubPage.cpp
+    src/github/GitHubRepoCatalog.cpp
+    src/github/GitHubTrafficClient.cpp
+    src/github/GitHubAuthorityStore.cpp
 )
 
 set(UI_HEADERS
@@ -105,6 +109,10 @@ set(UI_HEADERS
     src/ui/UrlReport.h
     src/ui/CacheCleanupDialog.h
     src/ui/CoherenceDialog.h
+    src/ui/GitHubPage.h
+    src/github/GitHubRepoCatalog.h
+    src/github/GitHubTrafficClient.h
+    src/github/GitHubAuthorityStore.h
 )
 
 # Integration morfCollector (cote fournisseur). Qt Network ; appele par l'UI.
@@ -164,6 +172,7 @@ target_link_libraries(SiteWatch PRIVATE
     Qt6::Widgets
     Qt6::Charts
     Qt6::Network
+    Qt6::Sql
     ZLIB::ZLIB
     nlohmann_json::nlohmann_json
     ${LIBSSH2_TARGET}

@@ -60,7 +60,8 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
         return false;
     }
     out.collectorUrl     = getStr(j, "collectorUrl");     // facultatif (découverte sinon)
-    out.collectorDailyAt = getStr(j, "collectorDailyAt"); // facultatif (défaut 02:00)
+    out.collectorDailyAt = getStr(j, "collectorDailyAt");
+    out.analyticsUrl     = getStr(j, "analyticsUrl");     // facultatif (même hôte que le collecteur)
 
     out.sites.clear();
     if (j.contains("sites") && j["sites"].is_array()) {
@@ -88,6 +89,31 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
         }
     }
 
+    // Famille GitHub : modele distinct des sites Web, jamais un faux site.
+    out.github = GitHubConfig{};
+    if (j.contains("github") && j["github"].is_object()) {
+        const auto& g = j["github"];
+        if (g.contains("enabled") && g["enabled"].is_boolean())
+            out.github.enabled = g["enabled"].get<bool>();
+        out.github.owner = getStr(g, "owner");
+        out.github.token = getStr(g, "token");
+        if (g.contains("schedule") && g["schedule"].is_object())
+            out.github.dailyAt = getStr(g["schedule"], "daily_at");
+        if (out.github.dailyAt.empty())
+            out.github.dailyAt = getStr(g, "daily_at");
+        if (g.contains("repositories") && g["repositories"].is_array()) {
+            for (const auto& r : g["repositories"]) {
+                GitHubRepoConfig repo;
+                repo.name = getStr(r, "name");
+                repo.enabled = true;
+                if (r.contains("enabled") && r["enabled"].is_boolean())
+                    repo.enabled = r["enabled"].get<bool>();
+                if (!repo.name.empty())
+                    out.github.repositories.push_back(repo);
+            }
+        }
+    }
+
     return true;
 }
 
@@ -96,6 +122,7 @@ bool Config::save(const std::string& path, const Config& config, std::string& er
     j["cacheRoot"] = config.cacheRoot;
     if (!config.collectorUrl.empty())     j["collectorUrl"]     = config.collectorUrl;
     if (!config.collectorDailyAt.empty()) j["collectorDailyAt"] = config.collectorDailyAt;
+    if (!config.analyticsUrl.empty())     j["analyticsUrl"]     = config.analyticsUrl;
 
     json sites = json::array();
     for (const auto& s : config.sites) {
@@ -113,6 +140,25 @@ bool Config::save(const std::string& path, const Config& config, std::string& er
         sites.push_back(o);
     }
     j["sites"] = sites;
+
+    json github;
+    github["enabled"] = config.github.enabled;
+    github["owner"] = config.github.owner;
+    if (!config.github.token.empty())
+        github["token"] = config.github.token;
+    json schedule;
+    schedule["daily_at"] = config.github.dailyAt.empty() ? std::string("02:30")
+                                                         : config.github.dailyAt;
+    github["schedule"] = schedule;
+    json repos = json::array();
+    for (const auto& r : config.github.repositories) {
+        json o;
+        o["name"] = r.name;
+        o["enabled"] = r.enabled;
+        repos.push_back(o);
+    }
+    github["repositories"] = repos;
+    j["github"] = github;
 
     std::ofstream out(path);
     if (!out) {

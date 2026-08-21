@@ -44,14 +44,18 @@
 #include <QTime>
 #include <QMessageBox>
 #include <QAbstractItemView>
+#include <QCheckBox>
 #include <QTableWidget>
 #include <QHeaderView>
 #include <QJsonArray>
+#include <QMap>
+#include <QSet>
 
 #include <cctype>
 
 #include "core/net/SftpClient.h"
 #include "collector/CollectorClient.h"
+#include "github/GitHubRepoCatalog.h"
 
 // ---------------------------------------------------------------------------
 namespace {
@@ -170,13 +174,26 @@ bool firewallWhitelist(const SiteConfig& site, QString& error) {
     return true;
 }
 
+void fillUrlCombo(QComboBox* box, const QMap<QString, QString>& seen,
+                  const QString& current, const QString& autoLabel) {
+    box->addItem(autoLabel, QString());
+    for (auto it = seen.constBegin(); it != seen.constEnd(); ++it) {
+        const QString app = it.value().isEmpty() ? QStringLiteral("service") : it.value();
+        box->addItem(QStringLiteral("%1 - %2").arg(app, it.key()), it.key());
+    }
+    const int idx = box->findData(current);
+    box->setCurrentIndex(idx >= 0 ? idx : 0);
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
 SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUrl,
-                               const QMap<QString, QString>& discoveredCollectors, QWidget* parent)
+                               const QMap<QString, QString>& discoveredCollectors,
+                               const QMap<QString, QString>& discoveredAnalytics, QWidget* parent)
     : QDialog(parent), config_(config), discoveredUrl_(discoveredUrl),
-      discoveredCollectors_(discoveredCollectors) {
+      discoveredCollectors_(discoveredCollectors),
+      discoveredAnalytics_(discoveredAnalytics) {
     setWindowTitle("Configuration — SiteWatch");
     setMinimumWidth(780);
 
@@ -213,6 +230,11 @@ void SettingsDialog::buildUi() {
     auto* localPage = new QWidget;
     auto* localLayout = new QVBoxLayout(localPage);
     localLayout->setSpacing(12);
+    auto* githubPage = new QWidget;
+    auto* githubLayout = new QVBoxLayout(githubPage);
+    githubLayout->setSpacing(12);
+    buildGithubGroup(githubLayout);
+    githubLayout->addStretch();
     auto* collectorPage = new QWidget;
     auto* collectorLayout = new QVBoxLayout(collectorPage);
     collectorLayout->setSpacing(12);
@@ -312,12 +334,21 @@ void SettingsDialog::buildUi() {
     testResult_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     testResult_->setWordWrap(true);
     rightCol->addWidget(testResult_);
+
+    // Meme geste que l'onglet GitHub : enregistrer et confier la collecte au
+    // Pi, sinon SiteWatch garde la config locale et morfCollector n'agit pas.
+    auto* sitesPushBtn = new QPushButton(QStringLiteral("Envoyer la config"));
+    sitesPushBtn->setToolTip(
+        QStringLiteral("Enregistre et pousse sites + GitHub vers morfCollector."));
+    connect(sitesPushBtn, &QPushButton::clicked, this, &SettingsDialog::requestPushAndAccept);
+    rightCol->addWidget(sitesPushBtn);
     rightCol->addStretch();
 
     sitesLayout->addLayout(rightCol, 1);
     localLayout->addWidget(sitesBox);
 
-    tabs->addTab(localPage, "SiteWatch");
+    tabs->addTab(localPage, "Sites");
+    tabs->addTab(githubPage, "GitHub");
     tabs->addTab(collectorPage, "morfCollector");
     root->addWidget(tabs);
 
@@ -335,6 +366,18 @@ void SettingsDialog::buildUi() {
     connect(nameEdit_, &QLineEdit::textChanged, this, &SettingsDialog::onNameEdited);
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::onAccept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+
+    if (githubCollectorPick_ && collectorEdit_) {
+        connect(githubCollectorPick_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this](int) {
+            collectorEdit_->setText(githubCollectorPick_->currentData().toString());
+            if (collectorPick_) {
+                const int i = collectorPick_->findData(githubCollectorPick_->currentData());
+                if (i >= 0)
+                    collectorPick_->setCurrentIndex(i);
+            }
+        });
+    }
 }
 
 QIcon SettingsDialog::stateIcon(int index) const {
@@ -557,10 +600,227 @@ void SettingsDialog::onAccept() {
     config_.cacheRoot = cacheEdit_->text().trimmed().toStdString();
     config_.collectorUrl = collectorEdit_->text().trimmed().toStdString();
     config_.collectorDailyAt = collectorTime_->time().toString("HH:mm").toStdString();
+    if (githubAnalyticsEdit_)
+        config_.analyticsUrl = githubAnalyticsEdit_->text().trimmed().toStdString();
+    if (githubEnabled_) {
+        config_.github.enabled = githubEnabled_->isChecked();
+        config_.github.owner = githubOwner_->text().trimmed().toStdString();
+        const QString tok = githubToken_->text().trimmed();
+        if (!tok.isEmpty())
+            config_.github.token = tok.toStdString();
+        config_.github.dailyAt = githubTime_->time().toString("HH:mm").toStdString();
+        config_.github.repositories.clear();
+        for (int i = 0; i < githubRepos_->rowCount(); ++i) {
+            auto* nameItem = githubRepos_->item(i, 1);
+            if (!nameItem)
+                nameItem = githubRepos_->item(i, 0);
+            if (!nameItem || nameItem->text().trimmed().isEmpty())
+                continue;
+            GitHubRepoConfig r;
+            r.name = nameItem->text().trimmed().toStdString();
+            auto* chk = qobject_cast<QCheckBox*>(githubRepos_->cellWidget(i, 0));
+            if (!chk)
+                chk = qobject_cast<QCheckBox*>(githubRepos_->cellWidget(i, 1));
+            r.enabled = chk ? chk->isChecked() : true;
+            config_.github.repositories.push_back(r);
+        }
+    }
     accept();
 }
 
-// --- morfCollector -----------------------------------------------------------
+void SettingsDialog::buildGithubGroup(QVBoxLayout* root) {
+    auto* intro = new QLabel(QStringLiteral(
+        "Les dépôts GitHub font partie de la présence en ligne. "
+        "Listez le compte, cochez ceux à suivre, puis envoyez la config : "
+        "morfCollector collectera seul à l'heure indiquée. "
+        "Le jeton (fine-grained PAT, Administration en lecture) reste local "
+        "et n'est jamais écrit dans le manifeste."));
+    intro->setWordWrap(true);
+    intro->setProperty("muted", true);
+    root->addWidget(intro);
+
+    auto* box = new QGroupBox(QStringLiteral("Compte GitHub"));
+    auto* form = new QFormLayout(box);
+
+    githubEnabled_ = new QCheckBox(QStringLiteral("Collecter les métriques GitHub"));
+    githubEnabled_->setChecked(config_.github.enabled);
+    form->addRow(githubEnabled_);
+
+    githubOwner_ = new QLineEdit(QString::fromStdString(config_.github.owner));
+    githubOwner_->setPlaceholderText(QStringLiteral("morfredus"));
+    addRow(form, QStringLiteral("Propriétaire :"), githubOwner_);
+
+    githubToken_ = new QLineEdit;
+    githubToken_->setEchoMode(QLineEdit::Password);
+    githubToken_->setPlaceholderText(config_.github.token.empty()
+        ? QStringLiteral("PAT (jamais affiché ensuite)")
+        : QStringLiteral("conservé - laisser vide pour ne pas changer"));
+    addRow(form, QStringLiteral("Jeton GitHub :"),
+           fieldWith(githubToken_, makeEye(githubToken_)));
+
+    githubTime_ = new QTimeEdit;
+    githubTime_->setDisplayFormat(QStringLiteral("HH:mm"));
+    QTime t = QTime::fromString(QString::fromStdString(config_.github.dailyAt),
+                                QStringLiteral("HH:mm"));
+    if (!t.isValid())
+        t = QTime(2, 30);
+    githubTime_->setTime(t);
+    addRow(form, QStringLiteral("Collecte quotidienne à :"), githubTime_);
+
+    githubCollectorPick_ = new QComboBox;
+    fillUrlCombo(githubCollectorPick_, discoveredCollectors_,
+                 QString::fromStdString(config_.collectorUrl),
+                 QStringLiteral("Automatique (1er détecté)"));
+    addRow(form, QStringLiteral("Collecteur :"), githubCollectorPick_);
+    githubAnalyticsPick_ = new QComboBox;
+    fillUrlCombo(githubAnalyticsPick_, discoveredAnalytics_,
+                 QString::fromStdString(config_.analyticsUrl),
+                 QStringLiteral("Automatique (même hôte que le collecteur)"));
+    addRow(form, QStringLiteral("Analyses avancées :"), githubAnalyticsPick_);
+    githubAnalyticsEdit_ = new QLineEdit(QString::fromStdString(config_.analyticsUrl));
+    githubAnalyticsEdit_->setPlaceholderText(
+        QStringLiteral("http://pi4dev:8799  (vide = même hôte que le collecteur)"));
+    addRow(form, QStringLiteral("URL d'analyse :"), githubAnalyticsEdit_);
+    connect(githubAnalyticsPick_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) {
+        githubAnalyticsEdit_->setText(githubAnalyticsPick_->currentData().toString());
+    });
+    root->addWidget(box);
+
+    githubRepos_ = new QTableWidget(0, 3);
+    githubRepos_->setHorizontalHeaderLabels(
+        {QStringLiteral("Suivre"), QStringLiteral("Dépôt"), QStringLiteral("Accès")});
+    githubRepos_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    githubRepos_->verticalHeader()->setVisible(false);
+    githubRepos_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    githubRepos_->setMinimumHeight(220);
+    for (const GitHubRepoConfig& r : config_.github.repositories)
+        addGithubRepoRow(QString::fromStdString(r.name), r.enabled, QString());
+    root->addWidget(githubRepos_);
+
+    githubListStatus_ = new QLabel;
+    githubListStatus_->setProperty("muted", true);
+    githubListStatus_->setWordWrap(true);
+    githubListStatus_->setText(QStringLiteral(
+        "Cliquez sur « Lister les dépôts » pour les charger depuis GitHub, "
+        "puis cochez ceux à suivre."));
+    root->addWidget(githubListStatus_);
+
+    auto* btnRow = new QHBoxLayout;
+    auto* listBtn = new QPushButton(QStringLiteral("Lister les dépôts"));
+    listBtn->setToolTip(QStringLiteral(
+        "Interroge GitHub (compte ou organisation) sans envoyer le jeton au collecteur."));
+    connect(listBtn, &QPushButton::clicked, this, &SettingsDialog::onListGithubRepos);
+    auto* addBtn = new QPushButton(QStringLiteral("+ Nom manuel"));
+    auto* remBtn = new QPushButton(QStringLiteral("− Retirer"));
+    connect(addBtn, &QPushButton::clicked, this, [this] {
+        addGithubRepoRow(QString(), true, QString());
+        githubRepos_->editItem(githubRepos_->item(githubRepos_->rowCount() - 1, 1));
+    });
+    connect(remBtn, &QPushButton::clicked, this, [this] {
+        const int row = githubRepos_->currentRow();
+        if (row >= 0)
+            githubRepos_->removeRow(row);
+    });
+    auto* pushBtn = new QPushButton(QStringLiteral("Envoyer la config"));
+    pushBtn->setToolTip(QStringLiteral(
+        "Enregistre et pousse sites + GitHub vers morfCollector, qui collectera ensuite seul."));
+    connect(pushBtn, &QPushButton::clicked, this, &SettingsDialog::requestPushAndAccept);
+    btnRow->addWidget(listBtn);
+    btnRow->addWidget(addBtn);
+    btnRow->addWidget(remBtn);
+    btnRow->addStretch();
+    btnRow->addWidget(pushBtn);
+    root->addLayout(btnRow);
+}
+
+void SettingsDialog::requestPushAndAccept() {
+    pushRequested_ = true;
+    onAccept();
+}
+
+QMap<QString, bool> SettingsDialog::githubSelection() const {
+    QMap<QString, bool> sel;
+    if (!githubRepos_)
+        return sel;
+    for (int i = 0; i < githubRepos_->rowCount(); ++i) {
+        auto* nameItem = githubRepos_->item(i, 1);
+        if (!nameItem || nameItem->text().trimmed().isEmpty())
+            continue;
+        auto* chk = qobject_cast<QCheckBox*>(githubRepos_->cellWidget(i, 0));
+        sel.insert(nameItem->text().trimmed(), chk ? chk->isChecked() : true);
+    }
+    return sel;
+}
+
+void SettingsDialog::addGithubRepoRow(const QString& name, bool enabled,
+                                      const QString& access) {
+    const int row = githubRepos_->rowCount();
+    githubRepos_->insertRow(row);
+    auto* chk = new QCheckBox;
+    chk->setChecked(enabled);
+    githubRepos_->setCellWidget(row, 0, chk);
+    auto* nameItem = new QTableWidgetItem(name);
+    githubRepos_->setItem(row, 1, nameItem);
+    auto* accItem = new QTableWidgetItem(access);
+    accItem->setFlags(accItem->flags() & ~Qt::ItemIsEditable);
+    githubRepos_->setItem(row, 2, accItem);
+}
+
+void SettingsDialog::onListGithubRepos() {
+    const QString owner = githubOwner_->text().trimmed();
+    QString token = githubToken_->text().trimmed();
+    if (token.isEmpty())
+        token = QString::fromStdString(config_.github.token);
+    if (owner.isEmpty()) {
+        githubListStatus_->setText(QStringLiteral("Indiquez d'abord le propriétaire GitHub."));
+        return;
+    }
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    githubListStatus_->setText(QStringLiteral("Interrogation de GitHub…"));
+    QApplication::processEvents();
+    const GitHubRepoCatalog::Result listed = GitHubRepoCatalog::listOwned(owner, token);
+    QApplication::restoreOverrideCursor();
+
+    if (!listed.ok) {
+        githubListStatus_->setText(listed.error);
+        return;
+    }
+
+    const QMap<QString, bool> prev = githubSelection();
+    githubRepos_->setRowCount(0);
+
+    QSet<QString> seen;
+    for (const GitHubRepoCatalog::Repo& r : listed.repos) {
+        seen.insert(r.name.toLower());
+        QString access = r.isPrivate ? QStringLiteral("privé") : QStringLiteral("public");
+        if (r.archived)
+            access += QStringLiteral(", archivé");
+        const bool enabled = prev.contains(r.name) ? prev.value(r.name) : false;
+        addGithubRepoRow(r.name, enabled, access);
+    }
+
+    // Un depot deja suivi mais absent de l'API reste visible pour ne pas le
+    // perdre silencieusement (renomme, prive sans jeton, etc.).
+    int orphans = 0;
+    for (auto it = prev.constBegin(); it != prev.constEnd(); ++it) {
+        if (seen.contains(it.key().toLower()))
+            continue;
+        addGithubRepoRow(it.key(), it.value(),
+                         QStringLiteral("absent de la liste GitHub"));
+        ++orphans;
+    }
+
+    githubListStatus_->setText(
+        QStringLiteral("%1 dépôt(s) trouvés. Cochez ceux à suivre, puis "
+                       "« Envoyer la config ».")
+            .arg(listed.repos.size())
+        + (orphans > 0
+               ? QStringLiteral(" %1 déjà suivi(s) n'apparaissent plus chez GitHub.")
+                     .arg(orphans)
+               : QString()));
+}
 
 QString SettingsDialog::collectorUrl() const {
     const QString typed = collectorEdit_->text().trimmed();
@@ -618,7 +878,7 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     urlRowL->addWidget(connectBtn);
     urlRowL->addWidget(pushBtn);
     addRow(form, "Adresse du collecteur :", urlRow);
-    connect(pushBtn, &QPushButton::clicked, this, [this] { pushRequested_ = true; onAccept(); });
+    connect(pushBtn, &QPushButton::clicked, this, &SettingsDialog::requestPushAndAccept);
 
     collectorTime_ = new QTimeEdit;
     collectorTime_->setDisplayFormat("HH:mm");
@@ -631,7 +891,8 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
 
     auto* schedHint = new QLabel(
         "morfCollector récupère les fichiers une fois par jour à cette heure (heure du Pi). "
-        "Si le Pi était éteint, la collecte a lieu au démarrage suivant.");
+        "Si le Pi était éteint, la collecte a lieu au démarrage suivant. "
+        "Le même bouton existe dans les onglets Sites et GitHub : un envoi couvre les deux familles.");
     schedHint->setProperty("muted", true);
     schedHint->setWordWrap(true);
     v->addWidget(schedHint);

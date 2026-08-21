@@ -86,6 +86,8 @@
 #include <QPair>
 #include "core/net/LogDiscovery.h"
 #include "ui/SettingsDialog.h"
+#include "ui/GitHubPage.h"
+#include <QStackedWidget>
 #include "ui/DetailDialog.h"
 #include "ui/CacheCleanupDialog.h"
 #include "ui/CoherenceDialog.h"
@@ -410,10 +412,15 @@ void replaceLast(QLayout* layout, QWidget* fresh) {
 
 // ---------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowTitle(QStringLiteral("SiteWatch %1").arg(QString::fromLatin1(SITEWATCH_VERSION)));
+    setWindowTitle(QStringLiteral("SiteWatch %1 — surveillance des sites et présences en ligne")
+                       .arg(QString::fromLatin1(SITEWATCH_VERSION)));
     resize(1180, 720);
     buildUi();
     loadConfiguration();
+    if (githubPage_) {
+        githubPage_->setConfig(config_);
+        githubPage_->refresh();
+    }
 
     // --- Supervision LAN : présence UDP + endpoint /status (morfBeacon) -----
     // Heartbeat « je suis actif » broadcast, plus /status interrogé à la demande
@@ -462,31 +469,40 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                     caps << v.toString();
                 QString host = sender.toString();
                 if (host.startsWith(QStringLiteral("::ffff:"))) host = host.mid(7);
-                const bool analyticsJustFound = caps.contains(QStringLiteral("advanced_analysis")) && analyticsUrl_.isEmpty();
-                if (caps.contains(QStringLiteral("advanced_analysis")))
-                    analyticsUrl_ = QString("http://%1:%2").arg(host).arg(o.value("status_port").toInt());
-                if (!analyticsUrl_.isEmpty() && analyticsButton_) {
-                    analyticsButton_->setEnabled(true);
-                    analyticsButton_->setToolTip("Ouvrir les analyses avancées dans morfAnalytics");
+                const QString app = o.value("app").toString();
+                const QString hn   = o.value("host").toString();
+                const QString label = hn.isEmpty() ? app : app + " (" + hn + ")";
+                const bool isAnalytics = caps.contains(QStringLiteral("advanced_analysis"))
+                    && app != QLatin1String("morfBeacon");
+                if (isAnalytics) {
+                    QString url = QString("http://%1:%2").arg(host).arg(o.value("status_port").toInt());
+                    while (url.endsWith(QLatin1Char('/')))
+                        url.chop(1);
+                    const bool analyticsJustFound = !analyticsSeen_.contains(url);
+                    analyticsSeen_.insert(url, label.isEmpty() ? QStringLiteral("morfAnalytics") : label);
+                    if (analyticsUrl_.isEmpty())
+                        analyticsUrl_ = url;
+                    if (!ensureAnalytics().isEmpty() && analyticsButton_) {
+                        analyticsButton_->setEnabled(true);
+                        analyticsButton_->setToolTip("Ouvrir les analyses avancées dans morfAnalytics");
+                    }
+                    if (analyticsJustFound) {
+                        applyGithubServices();
+                        if (lastStats_.totalRequests > 0)
+                            publishAnalytics();
+                        if (githubPage_)
+                            githubPage_->publishToAnalytics();
+                    }
                 }
-                if (analyticsJustFound && lastStats_.totalRequests > 0)
-                    publishAnalytics(); // ne pas exiger une nouvelle analyse après découverte
                 if (!caps.contains(QStringLiteral("collection"))) continue;
-                // On MEMORISE chaque collecteur vu (dedup par URL) : plusieurs Pi
-                // peuvent annoncer la capacite 'collection'. SiteWatch pousse a
-                // chacun mais ne LIT que la source choisie (config, sinon le 1er).
                 const QString curl = QString("http://%1:%2")
                     .arg(host).arg(o.value("status_port").toInt());
-                // Libelle du collecteur : appli + NOM D'HOTE annonce (champ `host`
-                // du heartbeat, ex. "pi4fred"), pour distinguer deux Pi d'un coup
-                // d'oeil dans le menu de selection. `host` local ci-dessus est l'IP
-                // de l'emetteur : le nom lisible, lui, vient du heartbeat.
-                const QString app  = o.value("app").toString();
-                const QString hn   = o.value("host").toString();
-                collectorSeen_.insert(curl, hn.isEmpty() ? app
-                                                         : app + " (" + hn + ")");
+                const bool collectorJustFound = !collectorSeen_.contains(curl);
+                collectorSeen_.insert(curl, label.isEmpty() ? QStringLiteral("morfCollector") : label);
                 if (collectorUrl_.isEmpty())
-                    collectorUrl_ = curl;   // 1er vu = source de lecture par defaut
+                    collectorUrl_ = curl;
+                if (collectorJustFound)
+                    applyGithubServices();
             }
         });
     }
@@ -626,6 +642,49 @@ void MainWindow::buildUi() {
     mainLayout->setContentsMargins(14, 12, 14, 8);
     mainLayout->setSpacing(12);
 
+    auto* domainBar = new QHBoxLayout;
+    sitesDomainBtn_ = new QPushButton(QStringLiteral("Sites"));
+    githubDomainBtn_ = new QPushButton(QStringLiteral("GitHub"));
+    sitesDomainBtn_->setCheckable(true);
+    githubDomainBtn_->setCheckable(true);
+    sitesDomainBtn_->setChecked(true);
+    domainBar->addWidget(sitesDomainBtn_);
+    domainBar->addWidget(githubDomainBtn_);
+    domainBar->addStretch();
+    mainLayout->addLayout(domainBar);
+
+    domainStack_ = new QStackedWidget;
+    auto* webPage = new QWidget;
+    auto* webLayout = new QVBoxLayout(webPage);
+    webLayout->setContentsMargins(0, 0, 0, 0);
+    webLayout->setSpacing(12);
+    githubPage_ = new GitHubPage;
+    domainStack_->addWidget(webPage);
+    domainStack_->addWidget(githubPage_);
+    mainLayout->addWidget(domainStack_, 1);
+    connect(sitesDomainBtn_, &QPushButton::clicked, this, [this] {
+        sitesDomainBtn_->setChecked(true);
+        githubDomainBtn_->setChecked(false);
+        domainStack_->setCurrentIndex(0);
+    });
+    connect(githubDomainBtn_, &QPushButton::clicked, this, [this] {
+        githubDomainBtn_->setChecked(true);
+        sitesDomainBtn_->setChecked(false);
+        domainStack_->setCurrentIndex(1);
+        githubPage_->setConfig(config_);
+        applyGithubServices();
+        githubPage_->refresh();
+    });
+    connect(githubPage_, &GitHubPage::openAnalyticsRequested, this, [this] {
+        const QString url = ensureAnalytics();
+        if (!url.isEmpty())
+            QDesktopServices::openUrl(QUrl(url + "/github"));
+    });
+    connect(githubPage_, &GitHubPage::collectorChosen, this, &MainWindow::pinCollectorUrl);
+    connect(githubPage_, &GitHubPage::analyticsChosen, this, &MainWindow::pinAnalyticsUrl);
+    connect(githubPage_, &GitHubPage::pushConfigRequested, this, &MainWindow::pushGithubConfig);
+    applyGithubServices();
+
     // --- En-tete : site + analyser + periode ---
     auto* topBar = new QHBoxLayout;
     topBar->setSpacing(8);
@@ -644,9 +703,10 @@ void MainWindow::buildUi() {
     analyticsButton_->setEnabled(false);
     analyticsButton_->setToolTip("morfAnalytics n'est pas disponible");
     connect(analyticsButton_, &QPushButton::clicked, this, [this] {
-        if (!analyticsUrl_.isEmpty()) {
+        const QString url = ensureAnalytics();
+        if (!url.isEmpty()) {
             publishAnalytics();
-            QDesktopServices::openUrl(QUrl(analyticsUrl_ + "/sitewatch"));
+            QDesktopServices::openUrl(QUrl(url + "/sitewatch"));
         }
     });
     topBar->addWidget(analyticsButton_);
@@ -697,7 +757,7 @@ void MainWindow::buildUi() {
     applyBtn->setToolTip("Recalculer l'analyse pour la période choisie");
     connect(applyBtn, &QPushButton::clicked, this, &MainWindow::onAnalyze);
     topBar->addWidget(applyBtn);
-    mainLayout->addLayout(topBar);
+    webLayout->addLayout(topBar);
 
     // --- Bannière intégrée (messages non bloquants) ---
     banner_ = new QFrame;
@@ -731,12 +791,12 @@ void MainWindow::buildUi() {
     bannerClose_->setCursor(Qt::PointingHandCursor);
     connect(bannerClose_, &QToolButton::clicked, this, &MainWindow::hideBanner);
     bannerRow->addWidget(bannerClose_, 0, Qt::AlignTop);
-    mainLayout->addWidget(banner_);
+    webLayout->addWidget(banner_);
 
     // --- Ligne permanente : site / periode / fichiers / taille ---
     metaHeader_ = new QLabel("Sélectionnez un site puis cliquez sur Analyser.");
     metaHeader_->setProperty("muted", true);
-    mainLayout->addWidget(metaHeader_);
+    webLayout->addWidget(metaHeader_);
 
     // --- Rangee de cartes KPI ---
     auto* cards = new QHBoxLayout;
@@ -747,7 +807,7 @@ void MainWindow::buildUi() {
     cards->addWidget(makeKpiCard(icons::Glyph::Warn,   "Erreurs 404",    "warn404", k404_));
     cards->addWidget(makeKpiCard(icons::Glyph::Shield, "Erreurs 403",    "warn403", k403_));
     cards->addWidget(makeKpiCard(icons::Glyph::Ban,    "Erreurs 500",     "danger",  k500_));
-    mainLayout->addLayout(cards);
+    webLayout->addLayout(cards);
 
     // --- Onglets ---
     tabs_ = new QTabWidget;
@@ -1024,7 +1084,7 @@ void MainWindow::buildUi() {
         if (current && current != sitesTab_) previousDetailTab_ = current;
     });
 
-    mainLayout->addWidget(tabs_);
+    webLayout->addWidget(tabs_);
     setCentralWidget(central);
 
     // --- Barre de statut ---
@@ -1160,6 +1220,7 @@ void MainWindow::loadConfiguration() {
     configError_.clear();
     populateSiteSelector();
     refreshSitesOverview();
+    applyGithubServices();
     if (config_.sites.empty())
         statusBar()->showMessage("Aucun site défini — Fichier → Configuration…");
 }
@@ -1169,7 +1230,7 @@ void MainWindow::onOpenSettings() {
     // le dialogue s'en sert sans jamais relancer de découverte.
     const QString known = config_.collectorUrl.empty()
         ? collectorUrl_ : QString::fromStdString(config_.collectorUrl);
-    SettingsDialog dlg(config_, known, collectorSeen_, this);
+    SettingsDialog dlg(config_, known, collectorSeen_, analyticsSeen_, this);
     if (dlg.exec() != QDialog::Accepted) return;
 
     config_ = dlg.result();
@@ -1187,6 +1248,10 @@ void MainWindow::onOpenSettings() {
     configError_.clear();
     populateSiteSelector();
     refreshSitesOverview();
+    if (githubPage_) {
+        applyGithubServices();
+        githubPage_->refresh();
+    }
     statusBar()->showMessage("Configuration enregistrée : " + configFilePath());
 
     // Envoi explicite de la configuration à morfCollector (bouton dédié).
@@ -1208,13 +1273,29 @@ void MainWindow::onOpenSettings() {
                 collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/true);
             if (u == readUrl || !haveRead) { r = one; haveRead = true; }
         }
-        if (!r.ok)
+        if (!r.ok) {
             showBanner(BannerLevel::Error, "Envoi refusé : " + r.error.toHtmlEscaped());
-        else
-            showBanner(BannerLevel::Success,
-                QString("<b>Configuration envoyée à morfCollector</b> (%1 collecteur(s), "
-                        "révision %2, %3 site(s)).")
-                    .arg(all.size()).arg(r.revision).arg(r.sources));
+            if (githubPage_)
+                githubPage_->setNotice(QStringLiteral("Envoi de config refusé : ") + r.error);
+        } else {
+            int ghFollowed = 0;
+            if (config_.github.enabled) {
+                for (const GitHubRepoConfig& repo : config_.github.repositories) {
+                    if (repo.enabled)
+                        ++ghFollowed;
+                }
+            }
+            const QString ok = QString(
+                "<b>Configuration envoyée à morfCollector</b> (%1 collecteur(s), "
+                "révision %2, %3 site(s), %4 dépôt(s) GitHub). Lecture : %5")
+                .arg(all.size()).arg(r.revision).arg(config_.sites.size()).arg(ghFollowed)
+                .arg(readUrl.toHtmlEscaped());
+            showBanner(BannerLevel::Success, ok);
+            if (githubPage_)
+                githubPage_->setNotice(
+                    QStringLiteral("Configuration envoyée (%1). Collecteur lu : %2")
+                        .arg(all.size()).arg(readUrl));
+        }
     }
 }
 
@@ -1504,6 +1585,95 @@ QString MainWindow::ensureCollector(int /*discoverTimeoutMs*/) {
     return collectorUrl_;
 }
 
+QString MainWindow::ensureAnalytics() const {
+    if (!config_.analyticsUrl.empty())
+        return QString::fromStdString(config_.analyticsUrl);
+    const QString col = !config_.collectorUrl.empty()
+        ? QString::fromStdString(config_.collectorUrl) : collectorUrl_;
+    const QString colHost = QUrl(col).host();
+    if (!colHost.isEmpty()) {
+        for (auto it = analyticsSeen_.constBegin(); it != analyticsSeen_.constEnd(); ++it) {
+            if (QUrl(it.key()).host().compare(colHost, Qt::CaseInsensitive) == 0)
+                return it.key();
+        }
+        return {};
+    }
+    return analyticsUrl_;
+}
+
+void MainWindow::applyGithubServices() {
+    if (!githubPage_)
+        return;
+    githubPage_->setConfig(config_);
+    githubPage_->setCollectorUrl(ensureCollector(0));
+    githubPage_->setAnalyticsUrl(ensureAnalytics());
+    githubPage_->setDiscoveredPeers(collectorSeen_, analyticsSeen_);
+}
+
+void MainWindow::pinCollectorUrl(const QString& url) {
+    config_.collectorUrl = url.toStdString();
+    std::string err;
+    Config::save(configFilePath().toStdString(), config_, err);
+    applyGithubServices();
+    if (githubPage_)
+        githubPage_->setNotice(url.isEmpty()
+            ? QStringLiteral("Collecteur : automatique (1er détecté).")
+            : QStringLiteral("Collecteur épinglé : %1").arg(url));
+}
+
+void MainWindow::pinAnalyticsUrl(const QString& url) {
+    config_.analyticsUrl = url.toStdString();
+    std::string err;
+    Config::save(configFilePath().toStdString(), config_, err);
+    applyGithubServices();
+    if (githubPage_)
+        githubPage_->setNotice(url.isEmpty()
+            ? QStringLiteral("Analyses : automatique (même hôte que le collecteur).")
+            : QStringLiteral("Analyses épinglées : %1").arg(url));
+}
+
+void MainWindow::pushGithubConfig() {
+    const QStringList all = knownCollectorUrls();
+    const QString readUrl = ensureCollector(3000);
+    if (all.isEmpty()) {
+        showBanner(BannerLevel::Warning,
+            "Aucun morfCollector pour envoyer la configuration.");
+        if (githubPage_)
+            githubPage_->setNotice(QStringLiteral(
+                "Aucun collecteur : envoi impossible. Choisissez-en un dans la liste."));
+        return;
+    }
+    collectorsync::SyncResult r;
+    bool haveRead = false;
+    for (const QString& u : all) {
+        const collectorsync::SyncResult one =
+            collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/true);
+        if (u == readUrl || !haveRead) { r = one; haveRead = true; }
+    }
+    if (!r.ok) {
+        showBanner(BannerLevel::Error, "Envoi refusé : " + r.error.toHtmlEscaped());
+        if (githubPage_)
+            githubPage_->setNotice(QStringLiteral("Envoi de config refusé : ") + r.error);
+        return;
+    }
+    int ghFollowed = 0;
+    if (config_.github.enabled) {
+        for (const GitHubRepoConfig& repo : config_.github.repositories) {
+            if (repo.enabled)
+                ++ghFollowed;
+        }
+    }
+    showBanner(BannerLevel::Success,
+        QString("<b>Configuration envoyée</b> (%1 collecteur(s), révision %2, "
+                "%3 site(s), %4 dépôt(s) GitHub). Lecture : %5")
+            .arg(all.size()).arg(r.revision).arg(config_.sites.size()).arg(ghFollowed)
+            .arg(readUrl.toHtmlEscaped()));
+    if (githubPage_)
+        githubPage_->setNotice(
+            QStringLiteral("Configuration envoyée au collecteur lu : %1 (révision %2).")
+                .arg(readUrl).arg(r.revision));
+}
+
 // Tous les collecteurs à qui pousser le manifeste (redondance d'archive : « les
 // deux collectent »). = ceux vus par l'écouteur + l'éventuel épinglé manuel de la
 // config. La LECTURE (fillCache) ne vise, elle, que ensureCollector().
@@ -1516,7 +1686,9 @@ QStringList MainWindow::knownCollectorUrls() const {
 }
 
 void MainWindow::startupCollectorSync() {
-    if (!configError_.isEmpty() || config_.sites.empty())
+    if (!configError_.isEmpty())
+        return;
+    if (config_.sites.empty() && !config_.github.enabled)
         return;
     const QStringList all = knownCollectorUrls();
     if (all.isEmpty())
@@ -1563,6 +1735,10 @@ void MainWindow::startupCollectorSync() {
     }
     if (r.pushed)
         statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(r.revision));
+    if (githubPage_) {
+        applyGithubServices();
+        githubPage_->reconcileFromCollector();
+    }
 }
 
 void MainWindow::syncAllViaCollector() {
@@ -1975,7 +2151,8 @@ void MainWindow::onAnalyze() {
 
 void MainWindow::publishAnalytics() {
     const SiteConfig* site = currentSite();
-    if (!site || analyticsUrl_.isEmpty()) return;
+    const QString analytics = ensureAnalytics();
+    if (!site || analytics.isEmpty()) return;
     // Le rapport est destiné à une synthèse Web, non à une copie exhaustive des
     // journaux. Envoyer toutes les URL d'un gros site peut dépasser la taille
     // maximale d'une requête HTTP et empêcher complètement sa publication.
@@ -2017,7 +2194,7 @@ void MainWindow::publishAnalytics() {
     QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
         {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
     auto* nam = new QNetworkAccessManager(this);
-    QNetworkRequest request(QUrl(analyticsUrl_ + "/sitewatch/ingest"));
+    QNetworkRequest request(QUrl(analytics + "/sitewatch/ingest"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     auto* reply = nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, reply, [this, reply, nam] {
