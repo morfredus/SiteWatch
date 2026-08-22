@@ -7,6 +7,15 @@ string(STRIP "${SITEWATCH_VERSION_FROM_FILE}" SITEWATCH_VERSION_FROM_FILE)
 
 project(SiteWatch VERSION "${SITEWATCH_VERSION_FROM_FILE}" LANGUAGES CXX)
 
+
+# --- Enregistrement des compilations (best-effort) ------------------------
+# Chronometre le vrai travail des compilateurs et signale la duree a
+# morfAnalytics (POST /api/monitor/activity), QUEL QUE SOIT le declencheur :
+# `cmake --build` direct, `morf upgrade` ou un deploiement morfDeploy (un
+# marqueur evite le double comptage cote morfDeploy). Sans URL configuree
+# (machine hors parc), c'est un no-op silencieux. A appeler AVANT les cibles.
+include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/morf/morfdeploy/record_compile.cmake")
+morf_enable_compile_recording()
 # --- Standard C++ ---------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -188,7 +197,8 @@ endif()
 
 # Copie automatique des DLL Qt a cote de l'exe apres compilation (Windows).
 if(WIN32)
-    find_program(WINDEPLOYQT_EXE windeployqt HINTS "${Qt6_DIR}/../../../bin")
+    find_program(WINDEPLOYQT_EXE windeployqt
+        HINTS "${Qt6_DIR}/../../../bin" "$ENV{QT_ROOT}/bin")
     if(WINDEPLOYQT_EXE)
         add_custom_command(TARGET SiteWatch POST_BUILD
             COMMAND "${WINDEPLOYQT_EXE}" --no-translations --compiler-runtime "$<TARGET_FILE:SiteWatch>"
@@ -280,17 +290,28 @@ if(WIN32 AND NOT MSVC)
     sitewatch_msys_path("${CMAKE_SOURCE_DIR}/scripts/windows/deploy-mingw.sh"
                         SITEWATCH_DEPLOY_SCRIPT)
     sitewatch_msys_path("${CMAKE_CURRENT_BINARY_DIR}" SITEWATCH_TARGET_DIR)
-    get_filename_component(SITEWATCH_COMPILER_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    set(_sitewatch_cxx "${CMAKE_CXX_COMPILER}")
+    if(NOT EXISTS "${_sitewatch_cxx}")
+        find_program(_sitewatch_cxx NAMES "${CMAKE_CXX_COMPILER}" g++.exe)
+    endif()
+    get_filename_component(SITEWATCH_COMPILER_BIN "${_sitewatch_cxx}" DIRECTORY)
     get_filename_component(SITEWATCH_MINGW_ROOT "${SITEWATCH_COMPILER_BIN}" DIRECTORY)
     get_filename_component(SITEWATCH_MSYS_ROOT "${SITEWATCH_MINGW_ROOT}" DIRECTORY)
-    set(SITEWATCH_MSYS_BASH "${SITEWATCH_MSYS_ROOT}/usr/bin/bash.exe")
-    if(EXISTS "${SITEWATCH_MSYS_BASH}")
+    find_program(SITEWATCH_MSYS_BASH bash.exe
+        HINTS "${SITEWATCH_MSYS_ROOT}/usr/bin"
+        NO_DEFAULT_PATH)
+    if(SITEWATCH_MSYS_BASH)
         add_custom_command(TARGET SiteWatch POST_BUILD
-            # PATH peut résoudre `bash` vers WSL, sans accès au workspace
-            # Windows. On utilise donc le Bash MSYS2 lié au compilateur actif.
-            COMMAND "${SITEWATCH_MSYS_BASH}" "${SITEWATCH_DEPLOY_SCRIPT}" "${SITEWATCH_TARGET_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                "PATH=${SITEWATCH_MSYS_ROOT}/usr/bin;${SITEWATCH_COMPILER_BIN}"
+                --
+                "${SITEWATCH_MSYS_BASH}" "${SITEWATCH_DEPLOY_SCRIPT}" "${SITEWATCH_TARGET_DIR}"
+            VERBATIM
             COMMENT "Copie des DLL MinGW a cote de l'executable")
     else()
         message(WARNING "MSYS2 Bash not found; non-Qt MinGW DLL collection is skipped")
     endif()
 endif()
+
+# Signale la duree de compile a morfAnalytics apres le lien de l'executable.
+morf_record_target_build(SiteWatch "SiteWatch")
