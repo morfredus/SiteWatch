@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.5] - 2026-08-25
+
+### Modifié
+
+- Resynchronisation de la copie vendorée de morfUpdate vers 0.4.8 (stratégie d'installation `source-bundle` ajoutée au moteur ; aucun changement fonctionnel côté cette application).
+
 ## [Unreleased]
 
 ## [1.18.4] - 2026-08-22
