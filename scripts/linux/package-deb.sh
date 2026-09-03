@@ -124,8 +124,13 @@ else
 fi
 
 # --- Arborescence du paquet ------------------------------------------------
-PKGDIR="$ROOT/dist/deb/${CMD}_${VERSION}_${ARCH}"
-rm -rf "$PKGDIR"
+# Preparer l'arborescence du paquet dans le systeme de fichiers NATIF (ext4 sous
+# WSL, ou le disque du Pi), JAMAIS sur /mnt/c : DrvFs force le mode 777 sur les
+# fichiers du lecteur Windows et y ignore chmod, or dpkg-deb refuse un dossier de
+# controle DEBIAN/ en 777 (il exige <= 0775). Seul le .deb final ira dans dist/.
+STAGE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$STAGE_ROOT"' EXIT
+PKGDIR="$STAGE_ROOT/${CMD}_${VERSION}_${ARCH}"
 install -Dm755 "$BINARY" "$PKGDIR/usr/bin/$CMD"
 
 # .desktop : on fige le chemin absolu du binaire installé.
@@ -195,6 +200,7 @@ EOF
 
 # --- Construction ----------------------------------------------------------
 OUT="$ROOT/dist/${CMD}_${VERSION}_${ARCH}.deb"
+install -d "$ROOT/dist"   # le staging n'est plus sous dist/ : creer la cible du .deb
 # --root-owner-group : les fichiers appartiennent à root (dpkg >= 1.19).
 if dpkg-deb --help 2>&1 | grep -q -- '--root-owner-group'; then
     dpkg-deb --build --root-owner-group "$PKGDIR" "$OUT"
