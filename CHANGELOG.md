@@ -2,6 +2,16 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.7] - 2026-09-04
+
+### Fixed
+
+- `scripts/linux/package-appimage.sh` now validates the cached linuxdeploy tools
+  (ELF magic + minimum size) and re-downloads a corrupt one instead of reusing it
+  forever, fixing "Failed to open squashfs image / Failed to extract AppImage"
+  from a half-written tool in the cache. The icon is also installed into
+  `usr/share/pixmaps/` as a size-agnostic fallback for linuxdeploy's icon lookup.
+
 ## [1.18.6] - 2026-09-03
 
 ### Fixed
