@@ -100,7 +100,16 @@ fetch "$QT_URL/linuxdeploy-plugin-qt-$ARCH.AppImage"    "$PLUGIN_QT"
 APPDIR="$ROOT/dist/AppDir"
 rm -rf "$APPDIR"
 install -Dm755 "$BINARY" "$APPDIR/usr/bin/$CMD"
-install -Dm644 "$SCRIPT_DIR/sitewatch.desktop" "$APPDIR/usr/share/applications/$CMD.desktop"
+
+# Fichier .desktop : le normaliser en LF avant de le confier a linuxdeploy.
+# Un .desktop en CRLF (checkout Windows / edition sous WSL) fait lire
+# « Icon=nom\r » a linuxdeploy, qui cherche alors une icone litteralement nommee
+# « nom\r » et abandonne avec « Could not find suitable icon for Icon entry ».
+# On retire donc tout retour chariot de fin de ligne, quel que soit l'etat de la source.
+DESKTOP_DST="$APPDIR/usr/share/applications/$CMD.desktop"
+mkdir -p "$(dirname "$DESKTOP_DST")"
+sed 's/\r$//' "$SCRIPT_DIR/sitewatch.desktop" > "$DESKTOP_DST"
+chmod 644 "$DESKTOP_DST"
 
 # Icône : tailles standard si ImageMagick est présent, sinon l'image d'origine.
 # --- Icone : garantir une icone AUX BONNES DIMENSIONS, sans outil externe ----

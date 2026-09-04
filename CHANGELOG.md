@@ -2,6 +2,19 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.9] - 2026-09-04
+
+### Fixed
+
+- AppImage hardening (defensive, no functional change here). `package-appimage.sh`
+  now strips any trailing CR from the `.desktop` file before handing it to
+  linuxdeploy. A CRLF `.desktop` makes linuxdeploy read `Icon=sitewatch\r` and fail
+  with "Could not find suitable icon for Icon entry" (the fault that hit
+  ComponentHub, whose `.gitattributes` lacked the `*.desktop` LF rule SiteWatch
+  already has). SiteWatch was not affected, but the shared packaging script now
+  guarantees a LF desktop file regardless of how it was checked out, keeping both
+  AppImage scripts identical.
+
 ## [1.18.8] - 2026-09-04
 
 ### Fixed
