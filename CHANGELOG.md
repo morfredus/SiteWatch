@@ -2,6 +2,18 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.8] - 2026-09-04
+
+### Fixed
+
+- AppImage, real fix on two counts. (1) The cached-tool size floor is raised to
+  4 MB: a truncated 1.5 MB `linuxdeploy` had passed the old 100 KB check and failed
+  with "Failed to open squashfs image"; it is now re-downloaded. (2) The icon is
+  installed into `hicolor/<w>x<h>/apps/` using the PNG's real dimensions read from
+  its IHDR header (no external tool), so linuxdeploy always finds a suitable icon;
+  a *native* (`/usr/bin`) ImageMagick, if present, adds standard sizes -- the
+  Windows `magick.exe` on the WSL PATH is never used (it cannot read `/mnt` paths).
+
 ## [1.18.7] - 2026-09-04
 
 ### Fixed
