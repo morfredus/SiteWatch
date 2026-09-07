@@ -2,6 +2,15 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.10] - 2026-09-07
+
+### Changed
+
+- **Resync vendored morfBeacon to 0.7.1.** Picks up the async `/status` reply fix:
+  the beacon status server no longer blocks the event loop draining a reply to a
+  slow client, so the heartbeat can no longer be starved (which produced false
+  "service down" alerts across the parc). No API change.
+
 ## [1.18.9] - 2026-09-04
 
 ### Fixed
