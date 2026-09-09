@@ -2,6 +2,18 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.18.11] - 2026-09-10
+
+### Fixed — arm64 `.deb` cross-built from WSL, with complete dependencies
+
+- `package-deb.sh` now recognises a cross build (an aarch64 binary in
+  `build-arm64-cross/` on an x86_64 host): it labels the package `arm64` and reads
+  its `Depends` from the sysroot's `.shlibs` (vendored morfdeploy `cross_depends`),
+  where the host's `dpkg`/`ldd` cannot. With the parc tooling fix (morfTools
+  0.35.12), an x86_64 WSL run now builds SiteWatch's arm64 `.deb` with full,
+  versioned dependencies (Qt6, Qt Charts, libssh2, zlib) — no longer only from a
+  native build on the Pi.
+
 ## [1.18.10] - 2026-09-07
 
 ### Changed
