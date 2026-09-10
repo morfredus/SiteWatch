@@ -2,6 +2,23 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.0] - 2026-09-10
+
+### Added — "Rapatrier depuis le Pi" button on the GitHub tab
+
+- New dedicated button that pulls the `github-traffic/1` snapshots morfCollector
+  has already archived on the Pi into SiteWatch's local authority store, **without
+  calling the GitHub API** — so it works even when no token is configured locally,
+  and it materialises the daily collections that piled up on the Pi while SiteWatch
+  was closed. It then publishes the consolidated truth to morfAnalytics so its
+  GitHub cache stays exhaustive. Feedback reports how many snapshots were read.
+- Until now the collector reconciliation (`catchUpFromCollector`) only ran as a
+  side effect of "Collecter maintenant" (which hits GitHub directly first) or after
+  a config push, so the Pi's accumulated data never surfaced by simply browsing the
+  tab. `catchUpFromCollector` now returns the number of snapshots read and
+  `publishAuthority` returns its status message so the button can compose a clear
+  result.
+
 ## [1.18.11] - 2026-09-10
 
 ### Fixed — arm64 `.deb` cross-built from WSL, with complete dependencies

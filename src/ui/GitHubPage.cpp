@@ -149,6 +149,12 @@ GitHubPage::GitHubPage(QWidget* parent) : QWidget(parent) {
         "Interroge GitHub, enregistre, complète depuis morfCollector si besoin, puis actualise."));
     connect(collectBtn_, &QPushButton::clicked, this, &GitHubPage::collectNow);
     row->addWidget(collectBtn_);
+    catchUpBtn_ = new QPushButton(QStringLiteral("Rapatrier depuis le Pi"));
+    catchUpBtn_->setToolTip(QStringLiteral(
+        "Récupère les instantanés déjà collectés par morfCollector qui manquent en local, "
+        "sans appeler GitHub (utile même sans jeton), puis publie la vérité vers morfAnalytics."));
+    connect(catchUpBtn_, &QPushButton::clicked, this, &GitHubPage::catchUpFromPi);
+    row->addWidget(catchUpBtn_);
     auto* refreshBtn = new QPushButton(QStringLiteral("Actualiser"));
     refreshBtn->setToolTip(QStringLiteral("Recharge les données déjà consolidées, sans appeler GitHub."));
     connect(refreshBtn, &QPushButton::clicked, this, &GitHubPage::refresh);
@@ -397,9 +403,43 @@ void GitHubPage::reconcileFromCollector() {
     refresh();
 }
 
-void GitHubPage::catchUpFromCollector() {
-    if (collectorUrl_.isEmpty() || !store_ || !store_->isOpen())
+// Bouton dedie : rapatrie ce que morfCollector a deja archive sur le Pi, sans
+// jamais appeler l'API GitHub. Utile si le jeton n'est pas configure ici, ou
+// simplement pour materialiser dans SiteWatch les collectes quotidiennes du Pi
+// accumulees pendant qu'on n'ouvrait pas l'appli.
+void GitHubPage::catchUpFromPi() {
+    if (!config_.github.enabled || config_.github.owner.empty()) {
+        next_->setText(QStringLiteral(
+            "Activez GitHub dans Configuration avant de rapatrier."));
         return;
+    }
+    if (collectorUrl_.isEmpty()) {
+        next_->setText(QStringLiteral(
+            "Aucun morfCollector détecté sur le réseau : rien à rapatrier. "
+            "Vérifiez que le Pi est en ligne, puis Actualiser."));
+        return;
+    }
+    if (!ensureStore())
+        return;
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const int got = catchUpFromCollector();
+    const QString pub = publishAuthority();
+    QApplication::restoreOverrideCursor();
+    refresh();
+
+    const QString head = got > 0
+        ? QStringLiteral("Rapatriement : %1 instantané(s) lus depuis le Pi, "
+                         "vérité consolidée mise à jour.").arg(got)
+        : QStringLiteral("Rapatriement : aucun instantané disponible sur le Pi "
+                         "pour l'instant (morfCollector collecte une fois par jour).");
+    next_->setText(pub.isEmpty() ? head : head + QLatin1Char(' ') + pub);
+}
+
+int GitHubPage::catchUpFromCollector() {
+    if (collectorUrl_.isEmpty() || !store_ || !store_->isOpen())
+        return 0;
+    int ingested = 0;
     for (const GitHubRepoConfig& repo : config_.github.repositories) {
         if (!repo.enabled)
             continue;
@@ -419,8 +459,10 @@ void GitHubPage::catchUpFromCollector() {
             if (snap.value(QStringLiteral("contract")).toString() != QLatin1String("github-traffic/1"))
                 continue;
             store_->ingestSnapshot(snap, QStringLiteral("morfcollector"));
+            ++ingested;
         }
     }
+    return ingested;
 }
 
 void GitHubPage::publishToAnalytics() {
@@ -429,14 +471,15 @@ void GitHubPage::publishToAnalytics() {
     publishAuthority();
 }
 
-void GitHubPage::publishAuthority() {
+QString GitHubPage::publishAuthority() {
     if (!ensureStore())
-        return;
+        return QString();
     if (analyticsUrl_.isEmpty()) {
-        next_->setText(QStringLiteral(
+        const QString msg = QStringLiteral(
             "Données locales prêtes. morfAnalytics n'est pas encore vu sur le réseau : "
-            "la page Analyses GitHub restera vide jusqu'à la publication."));
-        return;
+            "la page Analyses GitHub restera vide jusqu'à la publication.");
+        next_->setText(msg);
+        return msg;
     }
     const QString base = analyticsBase(analyticsUrl_);
     QNetworkAccessManager nam;
@@ -450,11 +493,12 @@ void GitHubPage::publishAuthority() {
     stReply->deleteLater();
     const QString app = status.value(QStringLiteral("app")).toString();
     if (stHttp != 200 || app.isEmpty()) {
-        next_->setText(QStringLiteral(
+        const QString msg = QStringLiteral(
             "Publication : %1 ne répond pas comme morfAnalytics (HTTP %2). "
             "Vérifiez le port 8799, pas le beacon 8787.")
-                           .arg(base).arg(stHttp));
-        return;
+                                .arg(base).arg(stHttp);
+        next_->setText(msg);
+        return msg;
     }
 
     const QByteArray payload =
@@ -488,4 +532,5 @@ void GitHubPage::publishAuthority() {
     }
     reply->deleteLater();
     next_->setText(msg);
+    return msg;
 }

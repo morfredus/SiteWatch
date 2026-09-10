@@ -41,8 +41,9 @@ signals:
 private:
     bool ensureStore();
     void collectNow();
-    void catchUpFromCollector();
-    void publishAuthority();
+    void catchUpFromPi();
+    int catchUpFromCollector();
+    QString publishAuthority();
     void rebuildPeerCombos();
     void updatePeerLabels();
 
@@ -61,6 +62,7 @@ private:
     QComboBox*    analyticsPick_ = nullptr;
     QPushButton*  analyticsBtn_ = nullptr;
     QPushButton*  collectBtn_ = nullptr;
+    QPushButton*  catchUpBtn_ = nullptr;
     QPushButton*  pushBtn_ = nullptr;
     QTableWidget* table_ = nullptr;
     QString       storePath_;
