@@ -2,6 +2,15 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.1] - 2026-09-10
+
+### Fixed — update dialog offered the checksums file instead of the binary
+
+- Resynced vendored morfUpdate to 0.6.0. The "Check for updates" dialog now picks
+  the release asset matching the running OS and CPU architecture (the Windows
+  `.zip`, the arch-matched Linux `.deb`/`.AppImage`) instead of the first asset,
+  which was often `checksums.sha256`. No API change.
+
 ## [1.19.0] - 2026-09-10
 
 ### Added — "Rapatrier depuis le Pi" button on the GitHub tab
