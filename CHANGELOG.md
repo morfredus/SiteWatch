@@ -2,6 +2,25 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.3] - 2026-09-10
+
+### Changed
+
+- Resynced vendored morfUpdate to 0.8.0 (opt-in self-update, stage 2). No behaviour
+  change in this application: the affected code is the update agent, which desktop
+  apps do not run.
+
+## [1.19.2] - 2026-09-10
+
+### Changed
+
+- GitHub tab: the catch-up button is now labelled "Rapatrier depuis le collecteur"
+  instead of "depuis le Pi". morfCollector and morfAnalytics can run on any host,
+  not necessarily the Raspberry Pi; the wording (and its status messages) no longer
+  implies otherwise.
+- Resynced vendored morfUpdate to 0.7.0 (self-update state contract, stage 1, plus
+  a Windows journal-rewrite fix).
+
 ## [1.19.1] - 2026-09-10
 
 ### Fixed — update dialog offered the checksums file instead of the binary

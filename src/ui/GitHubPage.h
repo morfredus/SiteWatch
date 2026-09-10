@@ -41,7 +41,7 @@ signals:
 private:
     bool ensureStore();
     void collectNow();
-    void catchUpFromPi();
+    void pullFromCollector();
     int catchUpFromCollector();
     QString publishAuthority();
     void rebuildPeerCombos();

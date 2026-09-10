@@ -149,11 +149,11 @@ GitHubPage::GitHubPage(QWidget* parent) : QWidget(parent) {
         "Interroge GitHub, enregistre, complète depuis morfCollector si besoin, puis actualise."));
     connect(collectBtn_, &QPushButton::clicked, this, &GitHubPage::collectNow);
     row->addWidget(collectBtn_);
-    catchUpBtn_ = new QPushButton(QStringLiteral("Rapatrier depuis le Pi"));
+    catchUpBtn_ = new QPushButton(QStringLiteral("Rapatrier depuis le collecteur"));
     catchUpBtn_->setToolTip(QStringLiteral(
         "Récupère les instantanés déjà collectés par morfCollector qui manquent en local, "
         "sans appeler GitHub (utile même sans jeton), puis publie la vérité vers morfAnalytics."));
-    connect(catchUpBtn_, &QPushButton::clicked, this, &GitHubPage::catchUpFromPi);
+    connect(catchUpBtn_, &QPushButton::clicked, this, &GitHubPage::pullFromCollector);
     row->addWidget(catchUpBtn_);
     auto* refreshBtn = new QPushButton(QStringLiteral("Actualiser"));
     refreshBtn->setToolTip(QStringLiteral("Recharge les données déjà consolidées, sans appeler GitHub."));
@@ -403,11 +403,11 @@ void GitHubPage::reconcileFromCollector() {
     refresh();
 }
 
-// Bouton dedie : rapatrie ce que morfCollector a deja archive sur le Pi, sans
-// jamais appeler l'API GitHub. Utile si le jeton n'est pas configure ici, ou
-// simplement pour materialiser dans SiteWatch les collectes quotidiennes du Pi
-// accumulees pendant qu'on n'ouvrait pas l'appli.
-void GitHubPage::catchUpFromPi() {
+// Bouton dedie : rapatrie ce que morfCollector a deja archive (sur le Pi ou tout
+// autre hote ou tourne le collecteur), sans jamais appeler l'API GitHub. Utile si
+// le jeton n'est pas configure ici, ou simplement pour materialiser dans SiteWatch
+// les collectes quotidiennes accumulees pendant qu'on n'ouvrait pas l'appli.
+void GitHubPage::pullFromCollector() {
     if (!config_.github.enabled || config_.github.owner.empty()) {
         next_->setText(QStringLiteral(
             "Activez GitHub dans Configuration avant de rapatrier."));
@@ -416,7 +416,7 @@ void GitHubPage::catchUpFromPi() {
     if (collectorUrl_.isEmpty()) {
         next_->setText(QStringLiteral(
             "Aucun morfCollector détecté sur le réseau : rien à rapatrier. "
-            "Vérifiez que le Pi est en ligne, puis Actualiser."));
+            "Vérifiez que le collecteur est en ligne, puis Actualiser."));
         return;
     }
     if (!ensureStore())
@@ -429,9 +429,9 @@ void GitHubPage::catchUpFromPi() {
     refresh();
 
     const QString head = got > 0
-        ? QStringLiteral("Rapatriement : %1 instantané(s) lus depuis le Pi, "
+        ? QStringLiteral("Rapatriement : %1 instantané(s) lus depuis le collecteur, "
                          "vérité consolidée mise à jour.").arg(got)
-        : QStringLiteral("Rapatriement : aucun instantané disponible sur le Pi "
+        : QStringLiteral("Rapatriement : aucun instantané disponible sur le collecteur "
                          "pour l'instant (morfCollector collecte une fois par jour).");
     next_->setText(pub.isEmpty() ? head : head + QLatin1Char(' ') + pub);
 }
