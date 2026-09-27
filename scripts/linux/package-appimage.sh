@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# SiteWatch — construction d'une AppImage autonome (Option 2).
+# SiteWatch - construction d'une AppImage autonome (Option 2).
 #
 # Produit dist/SiteWatch-<version>-x86_64.AppImage : un fichier unique et
 # portable qui embarque Qt et ses dépendances. L'utilisateur final n'a qu'à le
-# rendre exécutable et le lancer — aucune compilation, aucune installation de Qt.
+# rendre exécutable et le lancer - aucune compilation, aucune installation de Qt.
 # C'est l'artefact à joindre aux releases GitHub.
 #
 # Prérequis : SiteWatch compilé en Release (cmake --preset linux && cmake --build
@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
         --build) BUILD_DIR="${2:-}"; shift ;;
         -h|--help)
             cat <<'EOF'
-SiteWatch — construction d'une AppImage autonome (Option 2).
+SiteWatch - construction d'une AppImage autonome (Option 2).
 Usage : scripts/linux/package-appimage.sh [--build <dossier>]
   --build <dossier>   Dossier de compilation (défaut : build)
   -h, --help          Affiche cette aide
@@ -165,5 +165,5 @@ FINAL="$ROOT/dist/${APP_NAME}-${VERSION}-${ARCH}.AppImage"
 chmod +x "$FINAL"
 
 SIZE="$(du -h "$FINAL" | cut -f1)"
-echo "OK — $FINAL ($SIZE)"
+echo "OK - $FINAL ($SIZE)"
 echo "Test rapide :  \"$FINAL\" &"

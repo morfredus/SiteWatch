@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SiteWatch — intégration au bureau Linux (Option 1).
+# SiteWatch - intégration au bureau Linux (Option 1).
 #
 # Copie un binaire SiteWatch DÉJÀ COMPILÉ dans les dossiers standards Linux et
 # crée l'icône de lancement (raccourci d'application). Utilise le Qt du système
@@ -32,7 +32,7 @@ die() { printf 'Erreur : %s\n' "$1" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-SiteWatch — intégration au bureau Linux (Option 1).
+SiteWatch - intégration au bureau Linux (Option 1).
 Copie un binaire SiteWatch déjà compilé et crée l'icône de lancement.
 
 Usage : scripts/linux/install.sh [options]

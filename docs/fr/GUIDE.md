@@ -86,6 +86,13 @@ dans SiteWatch, complète les absences depuis morfCollector, puis actualise
 l'écran. **Actualiser** relit seulement le déjà connu. morfAnalytics reçoit
 cette consolidation (`POST /github/ingest`) et n'analyse rien d'autre.
 
+**Rapatrier depuis le collecteur** récupère les instantanés `github-traffic/1`
+que morfCollector a déjà archivés sur le Pi, **sans appeler l'API GitHub** : il
+fonctionne donc même sans jeton local, et fait remonter les collectes
+quotidiennes accumulées pendant que SiteWatch était fermé. SiteWatch les range
+dans sa propre base, puis republie la vérité consolidée vers morfAnalytics. Le
+message final indique combien d'instantanés ont été lus.
+
 Le jeton reste dans la config locale de SiteWatch, jamais dans le manifeste.
 
 ### Confier la collecte à morfCollector (facultatif)

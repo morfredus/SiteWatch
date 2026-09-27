@@ -13,7 +13,7 @@
 class QWidget;
 
 // -----------------------------------------------------------------------------
-// urlreport : agrège et met en forme un sous-ensemble d'entrées analysées —
+// urlreport : agrège et met en forme un sous-ensemble d'entrées analysées -
 // pour le détail au double-clic, le presse-papier et l'export CSV. Le même
 // moteur sert à toutes les lignes de tous les onglets (URL, référent,
 // catégorie d'attaque, activité WordPress…).

@@ -412,7 +412,7 @@ void replaceLast(QLayout* layout, QWidget* fresh) {
 
 // ---------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowTitle(QStringLiteral("SiteWatch %1 — surveillance des sites et présences en ligne")
+    setWindowTitle(QStringLiteral("SiteWatch %1 - surveillance des sites et présences en ligne")
                        .arg(QString::fromLatin1(SITEWATCH_VERSION)));
     resize(1180, 720);
     buildUi();
@@ -1214,7 +1214,7 @@ void MainWindow::loadConfiguration() {
     if (!Config::load(path.toStdString(), config_, err)) {
         configError_ = QString::fromStdString(err);
         statusBar()->showMessage(
-            "Aucune configuration — menu Fichier → Configuration… pour la créer.");
+            "Aucune configuration - menu Fichier → Configuration… pour la créer.");
         return;
     }
     configError_.clear();
@@ -1222,7 +1222,7 @@ void MainWindow::loadConfiguration() {
     refreshSitesOverview();
     applyGithubServices();
     if (config_.sites.empty())
-        statusBar()->showMessage("Aucun site défini — Fichier → Configuration…");
+        statusBar()->showMessage("Aucun site défini - Fichier → Configuration…");
 }
 
 void MainWindow::onOpenSettings() {
@@ -1848,7 +1848,7 @@ QString frOp(const QString& s) {
     if (s == "error")       return QStringLiteral("Erreur");
     if (s == "auth_failed") return QStringLiteral("Auth. refusée");
     if (s == "unreachable") return QStringLiteral("Injoignable");
-    return s.isEmpty() ? QStringLiteral("—") : s;
+    return s.isEmpty() ? QStringLiteral("-") : s;
 }
 void styleTable(QTableWidget* t) {
     t->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -1867,7 +1867,7 @@ void MainWindow::buildCopiesTab() {
     v->setSpacing(10);
 
     auto* intro = new QLabel(
-        "Archives conservées par <b>morfCollector</b> — le service qui récupère les "
+        "Archives conservées par <b>morfCollector</b> - le service qui récupère les "
         "journaux avant leur disparition chez l'hébergeur et les garde localement "
         "(sur le Raspberry Pi, par exemple). SiteWatch ne modifie jamais ces fichiers "
         "directement : toutes les actions sont exécutées par le collecteur.");
@@ -2032,7 +2032,7 @@ void MainWindow::refreshCopies() {
     const CollectorClient::Reply st = CollectorClient::getStatus(url);
     const QJsonObject m = st.json.value("metrics").toObject();
     copiesStatus_->setText(QString(
-        "Collecteur <b>%1</b> — %2 objet(s), %3 conservés, dernière collecte %4, %5 erreur(s).")
+        "Collecteur <b>%1</b> - %2 objet(s), %3 conservés, dernière collecte %4, %5 erreur(s).")
         .arg(st.json.value("host").toString().toHtmlEscaped())
         .arg(m.value("objects").toInt())
         .arg(humanSize(static_cast<qint64>(m.value("bytes").toDouble())))
@@ -2566,7 +2566,7 @@ void MainWindow::onCoherenceCheck() {
 void MainWindow::onHelp() {
     QMessageBox box(this);
     box.setIcon(QMessageBox::Information);
-    box.setWindowTitle("Aide — SiteWatch");
+    box.setWindowTitle("Aide - SiteWatch");
     box.setTextFormat(Qt::RichText);
     box.setText(
         "<b>Prise en main</b>"
@@ -2581,7 +2581,7 @@ void MainWindow::onHelp() {
         "<li><b>Analyse → Tout synchroniser</b> traite <b>tous</b> les sites en une "
         "passe : <b>via morfCollector</b> (copies conservées sur le Pi) ou "
         "<b>en direct</b> (SFTP depuis l'hébergeur).</li>"
-        "<li>Choisissez la <b>période</b> en haut à droite — tous les onglets se "
+        "<li>Choisissez la <b>période</b> en haut à droite - tous les onglets se "
         "recalculent.</li>"
         "<li>Naviguez entre les onglets depuis <b>Affichage → Aller à</b> : "
         "<b>Sites</b>, Santé, Robots, Sécurité, Activité WP, Top pages, Référents, "
@@ -2609,7 +2609,7 @@ void MainWindow::onAbout() {
             "Peut confier la conservation des journaux à <b>morfCollector</b> sur le "
             "réseau local (sinon, téléchargement direct depuis l'hébergeur).<br><br>"
             "Conçu pour l'hébergement <b>o2switch</b> (pare-feu SSH cPanel, "
-            "découpage mensuel des logs) — adaptable à d'autres hébergeurs.<br><br>"
+            "découpage mensuel des logs) - adaptable à d'autres hébergeurs.<br><br>"
             "© 2026 <b>morfredus</b><br>"
             "<span style=\"color:#888;\">Licensed under the GNU GPL v3</span>")
             .arg(SITEWATCH_VERSION));
@@ -2659,7 +2659,7 @@ void MainWindow::fillHealth(const Stats& s) {
         text = "Aucune donnée à analyser sur cette période.";
         state = "neutral";
     } else if (worst == 2) {
-        text = withDot(2, "Attention — anomalies détectées");
+        text = withDot(2, "Attention - anomalies détectées");
         state = "danger";
     } else if (worst == 1) {
         text = withDot(1, "Quelques anomalies");

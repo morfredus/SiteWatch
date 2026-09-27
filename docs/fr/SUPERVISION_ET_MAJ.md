@@ -34,7 +34,7 @@ bien distincts :
 | Besoin | Canal | Sens |
 |---|---|---|
 | « L'appli est-elle en vie ? » | **Heartbeat UDP** en broadcast (port `45454`) | l'appli **émet** toutes les 15 s |
-| « Quel est son état détaillé ? » | Serveur **HTTP `/status`** (port `8788`) | le superviseur **interroge** à la demande |
+| « Quel est son état détaillé ? » | Serveur **HTTP `/status`** (port `8881`) | le superviseur **interroge** à la demande |
 
 Le superviseur se contente d'**écouter** le heartbeat : aucune configuration,
 aucune IP à connaître, découverte automatique. Une application qui n'émet plus
@@ -49,12 +49,12 @@ Heartbeat UDP (JSON compact, broadcast sur le port `45454`) :
 ```json
 {
   "proto": "morfbeacon/1", "app": "SiteWatch", "host": "supervision-pi",
-  "version": "1.4.2", "state": "ok", "status_port": 8788,
+  "version": "1.4.2", "state": "ok", "status_port": 8881,
   "instance": "SiteWatch@supervision-pi", "uptime_s": 3600, "ts": 1752400000
 }
 ```
 
-`GET http://<machine>:8788/status` :
+`GET http://<machine>:8881/status` :
 
 ```json
 {
@@ -77,7 +77,7 @@ qu'aucune analyse n'a été lancée dans la session). `GET /healthz` renvoie
 L'application lancée, dans un terminal :
 
 ```sh
-curl http://localhost:8788/status
+curl http://localhost:8881/status
 ```
 
 Ou avec le testeur fourni dans le dépôt morfBeacon (écoute le heartbeat +
@@ -93,7 +93,7 @@ C'est exactement ce que fera le morfDashboard.
 ### Les ports
 
 - **UDP `45454`** : commun à **toutes** les applications (canal d'annonce partagé).
-- **HTTP `8788`** : propre à SiteWatch. (ComponentHub utilise `8787`, GatewayLab `8789`.)
+- **HTTP `8881`** : propre à SiteWatch, réservé dans la plage des applications (8880-8899) du registre `morfTools/ecosystem.json`. (ComponentHub utilise `8880`, SiteWatch `8881`, PhotoHub `8882`, LanAtlas `8883` ; GatewayLab sert `/status` sur son port Web `80`.)
 
 ---
 

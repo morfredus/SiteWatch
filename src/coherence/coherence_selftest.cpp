@@ -31,7 +31,7 @@ struct Case {
 };
 
 std::string sz(int64_t v, bool known) {
-    if (!known) return "  —  ";      // absent / injoignable (voir *Known)
+    if (!known) return "  -  ";      // absent / injoignable (voir *Known)
     return std::to_string(v);
 }
 

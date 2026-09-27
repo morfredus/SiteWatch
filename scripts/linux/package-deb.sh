@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SiteWatch — construction d'un paquet Debian (.deb).
+# SiteWatch - construction d'un paquet Debian (.deb).
 #
 # Produit dist/sitewatch_<version>_<arch>.deb : un paquet installable avec
 #   sudo apt install ./sitewatch_<version>_<arch>.deb
@@ -60,10 +60,10 @@ while [ $# -gt 0 ]; do
         --depends)    DEPENDS_OVERRIDE="${2:-}"; shift ;;
         -h|--help)
             cat <<'EOF'
-SiteWatch — construction d'un paquet Debian (.deb).
+SiteWatch - construction d'un paquet Debian (.deb).
 Usage : scripts/linux/package-deb.sh [options]
   --build <dossier>            Dossier de compilation
-                               (défaut : auto — build/ puis build-arm64/)
+                               (défaut : auto - build/ puis build-arm64/)
   --maintainer "Nom <email>"   Champ Maintainer du paquet
   --depends "pkg, pkg…"        Force les dépendances (sinon détection auto)
   -h, --help                   Affiche cette aide
@@ -258,7 +258,7 @@ else
 fi
 
 SIZE="$(du -h "$OUT" | cut -f1)"
-echo "OK — $OUT ($SIZE, $ARCH)"
+echo "OK - $OUT ($SIZE, $ARCH)"
 echo "Dépendances : $DEPENDS"
 echo "Installation :  sudo apt install \"$OUT\""
 echo "Vérification :  lintian \"$OUT\"   (optionnel)"

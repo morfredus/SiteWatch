@@ -1,5 +1,5 @@
 /*
- * SiteWatch — feuille de style maître.
+ * SiteWatch - feuille de style maître.
  *
  * Ce fichier NE contient AUCUNE couleur en dur : il utilise des jetons de la
  * forme arobase-accolade-nom-accolade, remplacés au chargement par les valeurs

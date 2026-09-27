@@ -29,7 +29,7 @@ using namespace coherence;
 namespace {
 
 std::string sz(int64_t v, bool known) {
-    return known ? std::to_string(v) : std::string("  —  ");
+    return known ? std::to_string(v) : std::string("  -  ");
 }
 
 void printReport(const SiteReport& rep) {

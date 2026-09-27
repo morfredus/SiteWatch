@@ -1,5 +1,5 @@
 /*
- * SiteWatch — outil de synchronisation avec morfCollector (headless)
+ * SiteWatch - outil de synchronisation avec morfCollector (headless)
  * Copyright (C) 2026 morfredus
  * SPDX-License-Identifier: GPL-3.0-only
  *

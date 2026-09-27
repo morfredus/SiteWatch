@@ -26,7 +26,7 @@ namespace {
 const char* kSettingsKey = "appearance/themeMode";
 
 // QSettings à identité explicite (organisation, application) : stocke la seule
-// préférence de thème SANS dépendre de organizationName global — ce qui
+// préférence de thème SANS dépendre de organizationName global - ce qui
 // laisse QStandardPaths (donc le dossier de config.json) inchangé.
 QSettings themeSettings() {
     return QSettings(QStringLiteral("morfredus"), QStringLiteral("SiteWatch"));
@@ -73,8 +73,8 @@ void Theme::apply(Mode mode) {
     themeSettings().setValue(kSettingsKey, modeToString(mode));
 
 #if SW_HAS_SET_COLOR_SCHEME
-    // Force (ou libère) le schéma de couleurs des widgets natifs — menus,
-    // dialogues standard, ascenseurs — pour qu'ils s'accordent au thème.
+    // Force (ou libère) le schéma de couleurs des widgets natifs - menus,
+    // dialogues standard, ascenseurs - pour qu'ils s'accordent au thème.
     // Unknown = « suivre le système » (mode Système).
     switch (mode) {
         case Mode::Light:  qApp->styleHints()->setColorScheme(Qt::ColorScheme::Light);   break;

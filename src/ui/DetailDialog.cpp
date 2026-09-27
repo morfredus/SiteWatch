@@ -128,7 +128,7 @@ void DetailDialog::exportSelection(QTableWidget* table, const QString& section) 
 DetailDialog::DetailDialog(const QString& title, const QString& site,
                            const std::vector<const LogEntry*>& matches, QWidget* parent)
     : QDialog(parent), title_(title) {
-    setWindowTitle("Détail — SiteWatch");
+    setWindowTitle("Détail - SiteWatch");
     resize(940, 680);
 
     const urlreport::Aggregate a = urlreport::aggregate(matches);
@@ -143,8 +143,8 @@ DetailDialog::DetailDialog(const QString& title, const QString& site,
     // Barre d'info : site concerné + volumétrie.
     auto* sub = new QLabel(
         QString("Site : %1   •   %2 requête(s) • %3 IP distincte(s) • %4 User-Agent(s) • %5 URL(s)"
-                "   —   clic droit sur un tableau pour copier / exporter")
-            .arg(site.isEmpty() ? QStringLiteral("—") : site)
+                "   -   clic droit sur un tableau pour copier / exporter")
+            .arg(site.isEmpty() ? QStringLiteral("-") : site)
             .arg(a.total).arg(a.ips.size()).arg(a.uas.size()).arg(a.urls.size()));
     sub->setProperty("muted", true);
     sub->setWordWrap(true);

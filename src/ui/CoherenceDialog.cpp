@@ -31,10 +31,10 @@ using coherence::SiteReport;
 
 namespace {
 
-// Taille lisible : "—" absent, "?" injoignable, sinon Ko/Mo.
+// Taille lisible : "-" absent, "?" injoignable, sinon Ko/Mo.
 QString sizeCell(int64_t size, bool known, bool reachable) {
     if (!reachable) return QStringLiteral("?");
-    if (!known)     return QStringLiteral("—");
+    if (!known)     return QStringLiteral("-");
     const double ko = size / 1024.0;
     if (ko < 1024.0) return QString::number(ko, 'f', ko < 10 ? 1 : 0) + " Ko";
     return QString::number(ko / 1024.0, 'f', 1) + " Mo";
@@ -223,9 +223,9 @@ void CoherenceDialog::populate() {
 
     if (reports_.empty()) return;
     if (actionable == 0)
-        status_->setText(status_->text() + "  —  tout est cohérent.");
+        status_->setText(status_->text() + "  -  tout est cohérent.");
     else
-        status_->setText(status_->text() + QString("  —  %1 ligne(s) à traiter.").arg(actionable));
+        status_->setText(status_->text() + QString("  -  %1 ligne(s) à traiter.").arg(actionable));
 }
 
 void CoherenceDialog::fillFromCollector(const std::string& site, const std::string& file,

@@ -1,4 +1,4 @@
-# SiteWatch — thème clair.
+# SiteWatch - thème clair.
 # Format : token = valeur. Les lignes vides et celles commençant par # sont
 # ignorées. Ces jetons sont injectés dans resources/themes/app.qss.
 

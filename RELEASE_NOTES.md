@@ -1,4 +1,4 @@
-# SiteWatch 1.5.0 — Release Notes
+# SiteWatch 1.5.0 - Release Notes
 
 This release adds **LAN supervision** and an **update check**, two small modules
 shared with the other morfredus desktop tools.
@@ -8,15 +8,15 @@ shared with the other morfredus desktop tools.
 - **LAN supervision (morfBeacon).** SiteWatch announces its presence on the local
   network (a small UDP heartbeat) and exposes live metrics over a local HTTP
   `/status` endpoint, so a running instance can be watched from a central
-  dashboard (morfDashboard) — no scanning, no configuration, automatic
+  dashboard (morfDashboard) - no scanning, no configuration, automatic
   discovery.
 - **Update check (morfUpdate).** SiteWatch now checks GitHub Releases for a newer
-  version — silently at startup, and on demand via **Help → “Check for updates…”**.
+  version - silently at startup, and on demand via **Help → “Check for updates…”**.
 - Both are shared modules **vendored** in the project (`third_party/morf/`) and
-  compiled into the binary — nothing external to install, identical on Windows,
+  compiled into the binary - nothing external to install, identical on Windows,
   Linux and Raspberry Pi. See `docs/fr/SUPERVISION_ET_MAJ.md`.
 
-## Reminder — what's new in 1.4.2
+## Reminder - what's new in 1.4.2
 
 - **Icons visible everywhere.** The UI pictograms (KPI cards, health dots,
   banner, etc.) used color emoji that stayed invisible on Linux/WSL. They are now
@@ -27,7 +27,7 @@ shared with the other morfredus desktop tools.
   low-power deployments: a Raspberry Pi watching several sites, a Linux VM running
   it as a scheduled task, a Debian NAS, or a fanless mini-PC.
 
-## Reminder — what's new in 1.4.1
+## Reminder - what's new in 1.4.1
 
 - **Simplified compilation chains.** Building Linux x86_64 **from Windows** no
   longer uses a fragile cross-compilation: you now use **WSL2** and build
@@ -43,7 +43,7 @@ shared with the other morfredus desktop tools.
 
 Build details (French): [docs/fr/COMPILATION.md](docs/fr/COMPILATION.md).
 
-## Reminder — what's new in 1.4.0
+## Reminder - what's new in 1.4.0
 
 - **Log download assistant.** SiteWatch now distinguishes the different causes of
   a problem and shows them in an **inline banner** (no more blocking dialog):
@@ -51,14 +51,14 @@ Build details (French): [docs/fr/COMPILATION.md](docs/fr/COMPILATION.md).
   no log present, or logs present but not matching the filter.
 - **Automatically inferred filter.** When files exist but none match, SiteWatch
   reads the present names, proposes the right **filter** (e.g. `tabacclaouey.fr`)
-  and a **“Use this filter”** button that applies it and restarts the download —
+  and a **“Use this filter”** button that applies it and restarts the download -
   without going through the documentation.
 - **Reassuring messages** on success (files downloaded or already up to date),
   adapted to the light / dark / system themes.
 
 Step-by-step guide (French): [docs/fr/DEPANNAGE_LOGS.md](docs/fr/DEPANNAGE_LOGS.md).
 
-## Reminder — fixed in 1.3.1
+## Reminder - fixed in 1.3.1
 
 - **Linux build with Qt < 6.5** (system Qt on some distributions): theme handling
   is protected by version guards, with a fallback to palette-based detection. No
@@ -78,7 +78,7 @@ Step-by-step guide (French): [docs/fr/DEPANNAGE_LOGS.md](docs/fr/DEPANNAGE_LOGS.
 - **Incremental SFTP download** of `.gz` logs (only new or changed files are
   fetched), with a progress bar.
 - **Automatic o2switch firewall opening** via the cPanel API before each
-  connection (API token) — optional for other hosts.
+  connection (API token) - optional for other hosts.
 - **Health table** 🟢/🟠/🔴 with clickable indicators (500 errors, attacks, 404s,
   Google activity, AI bots) leading to the relevant tab.
 - **Bot detection** by category (AI, search engines, SEO, other) with a
@@ -137,16 +137,16 @@ Step-by-step guide (French): [docs/fr/DEPANNAGE_LOGS.md](docs/fr/DEPANNAGE_LOGS.
 ## Installation
 
 - **Windows (portable)**: unzip `SiteWatch-<version>-win64.zip` and run
-  `SiteWatch.exe` — no installation, no dependency to install.
+  `SiteWatch.exe` - no installation, no dependency to install.
 - **Linux (AppImage)**: download `SiteWatch-<version>-x86_64.AppImage`, make it
-  executable (`chmod +x`) and run it — no build. Details and desktop integration:
+  executable (`chmod +x`) and run it - no build. Details and desktop integration:
   [docs/fr/INSTALL_LINUX.md](docs/fr/INSTALL_LINUX.md).
 - **Build from source**: see [README.md](README.md) (Windows MSYS2/MinGW, or
   native Linux).
 
 ## Requirements
 
-- **Windows** 10 / 11 (64-bit), or **Linux** 64-bit — **x86_64 or ARM64**
+- **Windows** 10 / 11 (64-bit), or **Linux** 64-bit - **x86_64 or ARM64**
   (including Raspberry Pi). The AppImage may require FUSE 2 on some recent
   distributions (see the Linux guide).
 
@@ -173,7 +173,7 @@ To understand the concrete value of the analysis, read the
 
 ## License
 
-SiteWatch is distributed under the **GNU GPL v3.0** license — see
+SiteWatch is distributed under the **GNU GPL v3.0** license - see
 [LICENSE](LICENSE).
 
 ---

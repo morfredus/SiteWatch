@@ -59,7 +59,7 @@ CacheCleanupDialog::CacheCleanupDialog(const QString& cacheRoot, const QStringLi
                                        QWidget* parent)
     : QDialog(parent), cacheRoot_(cacheRoot), siteNames_(siteNames),
       collectorSites_(collectorSites), collectorUrl_(collectorUrl) {
-    setWindowTitle("Effacer des logs téléchargés — SiteWatch");
+    setWindowTitle("Effacer des logs téléchargés - SiteWatch");
     setMinimumWidth(560);
     buildUi();
     updateMode();
@@ -146,7 +146,7 @@ void CacheCleanupDialog::refreshCollector() {
     const CollectorClient::Reply st = CollectorClient::getStatus(url);
     if (!st.ok()) { colState_->setText("Collecteur injoignable à " + url.toHtmlEscaped() + "."); return; }
     const QJsonObject m = st.json.value("metrics").toObject();
-    colState_->setText(QString("Collecteur <b>%1</b> — %2 objet(s) conservé(s).")
+    colState_->setText(QString("Collecteur <b>%1</b> - %2 objet(s) conservé(s).")
         .arg(st.json.value("host").toString().toHtmlEscaped())
         .arg(m.value("objects").toInt()));
 
@@ -283,7 +283,7 @@ void CacheCleanupDialog::updateSummary() {
             bytes += it->data(Qt::UserRole + 1).toLongLong();
         }
     }
-    summary_->setText(QString("%1 fichier(s) — %2").arg(n).arg(humanSize(bytes)));
+    summary_->setText(QString("%1 fichier(s) - %2").arg(n).arg(humanSize(bytes)));
     if (deleteBtn_) deleteBtn_->setEnabled(n > 0);
 }
 

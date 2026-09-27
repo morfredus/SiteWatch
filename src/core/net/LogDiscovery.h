@@ -18,7 +18,7 @@
 //
 // Il répond à deux besoins :
 //   1. décider si un fichier appartient à un site (filtre avancé ou détection
-//      automatique o2switch) — logique partagée entre le téléchargement et
+//      automatique o2switch) - logique partagée entre le téléchargement et
 //      l'analyse ;
 //   2. analyser la liste des fichiers présents sur le serveur pour distinguer
 //      « aucun fichier » / « fichiers présents mais aucun ne correspond » et,

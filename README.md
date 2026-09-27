@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.19.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.19.6-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -17,7 +17,7 @@
 **Cross-platform desktop investigation tool for Apache and LiteSpeed access logs,
 and for the public GitHub presence of morfSystem projects.**
 
-SiteWatch — surveillance des sites et présences en ligne.
+SiteWatch - surveillance des sites et présences en ligne.
 
 When morfAnalytics is available on the local network, SiteWatch automatically
 publishes each site analysis and exposes an **Advanced analyses** button leading

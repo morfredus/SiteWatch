@@ -2,6 +2,48 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.6] - 2026-09-27
+
+### Changed
+
+- Re-vendored morfBeacon to 0.7.2 (documentation-only release; `include/` and
+  `src/` unchanged).
+- Re-vendored morfUpdate to 0.8.2 (vendoring-only release; `include/` and
+  `src/` unchanged).
+
+## [1.19.5] - 2026-09-27
+
+### Changed
+
+- Re-vendored morfDeploy to 0.20.7 (dead-code removal and punctuation only; no
+  behaviour change).
+
+## [1.19.4] - 2026-09-27
+
+### Fixed
+
+- **`docs/fr/COMPILATION.md` described an outdated cross-build.** It called the
+  ARM64 cross preset a future option, linked a `cmake/toolchains/` folder that no
+  longer exists and documented `SITEWATCH_SYSROOT` / `SITEWATCH_CROSS_PREFIX`. The
+  preset now uses the shared morfDeploy toolchain driven by `MORF_SYSROOT`,
+  `MORF_CROSS_PREFIX` and `MORF_QT_HOST_PATH`, and it is how release arm64 packages
+  are built.
+- **`docs/fr/SUPERVISION_ET_MAJ.md` gave the old `/status` port 8788** instead of
+  8881 (application range of `morfTools/ecosystem.json`).
+- **The "Rapatrier depuis le collecteur" button (1.19.0) was undocumented**; the
+  GitHub section of `docs/fr/GUIDE.md` now explains it.
+
+### Removed
+
+- **`CollectorClient::discoverAll`**, no longer called: pushing to every collector
+  relies on the collectors the beacon listener has seen (`collectorSeen_`).
+
+### Changed
+
+- Re-vendored morfUpdate to 0.8.1 (documentation-only release; clears the
+  `morf doctor` vendored-copy drift).
+- Em dashes replaced by `-` in the project's own files.
+
 ## [1.19.3] - 2026-09-10
 
 ### Changed
@@ -23,7 +65,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [1.19.1] - 2026-09-10
 
-### Fixed — update dialog offered the checksums file instead of the binary
+### Fixed - update dialog offered the checksums file instead of the binary
 
 - Resynced vendored morfUpdate to 0.6.0. The "Check for updates" dialog now picks
   the release asset matching the running OS and CPU architecture (the Windows
@@ -32,11 +74,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [1.19.0] - 2026-09-10
 
-### Added — "Rapatrier depuis le Pi" button on the GitHub tab
+### Added - "Rapatrier depuis le Pi" button on the GitHub tab
 
 - New dedicated button that pulls the `github-traffic/1` snapshots morfCollector
   has already archived on the Pi into SiteWatch's local authority store, **without
-  calling the GitHub API** — so it works even when no token is configured locally,
+  calling the GitHub API** - so it works even when no token is configured locally,
   and it materialises the daily collections that piled up on the Pi while SiteWatch
   was closed. It then publishes the consolidated truth to morfAnalytics so its
   GitHub cache stays exhaustive. Feedback reports how many snapshots were read.
@@ -49,14 +91,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 ## [1.18.11] - 2026-09-10
 
-### Fixed — arm64 `.deb` cross-built from WSL, with complete dependencies
+### Fixed - arm64 `.deb` cross-built from WSL, with complete dependencies
 
 - `package-deb.sh` now recognises a cross build (an aarch64 binary in
   `build-arm64-cross/` on an x86_64 host): it labels the package `arm64` and reads
   its `Depends` from the sysroot's `.shlibs` (vendored morfdeploy `cross_depends`),
   where the host's `dpkg`/`ldd` cannot. With the parc tooling fix (morfTools
   0.35.12), an x86_64 WSL run now builds SiteWatch's arm64 `.deb` with full,
-  versioned dependencies (Qt6, Qt Charts, libssh2, zlib) — no longer only from a
+  versioned dependencies (Qt6, Qt Charts, libssh2, zlib) - no longer only from a
   native build on the Pi.
 
 ## [1.18.10] - 2026-09-07
@@ -234,7 +276,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
 - **Nom d'hôte dans le sélecteur de collecteur** (Configuration → morfCollector) :
   le menu des collecteurs annoncés affiche désormais le nom d'hôte annoncé (ex.
-  « morfCollector (pi4fred) — http://… »), pour distinguer deux Pi d'un coup d'œil.
+  « morfCollector (pi4fred) - http://… »), pour distinguer deux Pi d'un coup d'œil.
 
 ## [1.13.1] - 2026-08-19
 

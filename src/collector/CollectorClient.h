@@ -50,11 +50,6 @@ public:
     // capacite `collection`. false si rien avant `timeoutMs`.
     static bool discover(int timeoutMs, Discovered& out, QString& error);
 
-    // Ecoute pendant TOUTE la fenetre `timeoutMs` et renvoie TOUS les collecteurs
-    // vus (capacite `collection`), dedupliques par hote. Necessaire quand plusieurs
-    // morfCollector coexistent : SiteWatch pousse a chacun mais n'en lit qu'un.
-    static QVector<Discovered> discoverAll(int timeoutMs);
-
     // Verifie que /status annonce un `collect.proto` compatible avec `wanted`.
     static bool checkCompatible(const QString& baseUrl, const QString& wantedProto,
                                 QJsonObject& status, QString& error);

@@ -132,29 +132,30 @@ Pi OS 64 bits).
 
 ---
 
-## Cross-compilation ARM64 (optionnel, automatisation future)
+## Cross-compilation ARM64 (depuis x86_64 ou WSL)
 
-Le preset `linux-arm64-cross` est **conservé comme base pour une future
-automatisation** (GitHub Actions, serveur CI…) : il permettra de produire des
-binaires Raspberry directement depuis une machine x86_64, sans y compiler
-nativement. Il n'est **pas nécessaire** au quotidien - la compilation native sur
-le Raspberry reste la voie recommandée aujourd'hui.
+Le preset `linux-arm64-cross` produit le binaire et le `.deb` Raspberry
+directement depuis une machine x86_64 (Linux ou WSL) : c'est ainsi que sont
+fabriqués les paquets arm64 des releases. La compilation native sur le Raspberry
+reste possible (preset `linux-arm64`).
 
 La cross-compilation d'une application **Qt** exige un **sysroot** de la cible
 contenant Qt6, zlib, libssh2 et nlohmann-json (en-têtes + bibliothèques ARM64),
-en plus d'une **toolchain croisée**. Le fichier de toolchain est dans
-[`cmake/toolchains/`](../../cmake/toolchains).
+en plus d'une **toolchain croisée**. Le fichier de toolchain est commun au parc :
+`third_party/morf/morfdeploy/cmake/linux-aarch64.cmake` (copie vendorée de
+morfDeploy).
 
-Deux variables d'environnement (optionnelles) pilotent la toolchain :
+Il est piloté par des variables d'environnement :
 
-- `SITEWATCH_SYSROOT` : chemin du sysroot de la cible ;
-- `SITEWATCH_CROSS_PREFIX` : préfixe des outils (par défaut `aarch64-linux-gnu-`).
+- `MORF_SYSROOT` (obligatoire) : chemin du sysroot de la cible ;
+- `MORF_CROSS_PREFIX` : préfixe des outils (par défaut `aarch64-linux-gnu-`) ;
+- `MORF_QT_HOST_PATH` : Qt6 de l'hôte x86_64, pour `moc`/`rcc`/`uic`.
 
 ```bash
 # toolchain croisée (Debian/Ubuntu)
 sudo apt install crossbuild-essential-arm64
 # … + un sysroot ARM64 fournissant Qt6/libssh2/zlib/nlohmann-json
-export SITEWATCH_SYSROOT=/chemin/vers/sysroot-arm64
+export MORF_SYSROOT=/chemin/vers/sysroot-arm64
 
 cmake --preset linux-arm64-cross
 cmake --build --preset linux-arm64-cross

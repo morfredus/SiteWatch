@@ -28,7 +28,7 @@ public:
     // --- Classifieurs exposes a l'interface -------------------------------
     // Ils sont publics et statiques (fonctions pures) afin que l'interface
     // puisse retrouver, au double-clic sur une ligne, les entrees d'une
-    // categorie d'attaque, d'une activite WordPress ou d'un referent — sans
+    // categorie d'attaque, d'une activite WordPress ou d'un referent - sans
     // dupliquer la logique de classification (source unique de verite).
 
     // Resultat de la classification d'une URL.

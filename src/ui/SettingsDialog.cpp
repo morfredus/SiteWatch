@@ -108,7 +108,7 @@ QString stateLabel(const QString& adminState, const QString& opState) {
     if (opState == "auth_failed")  return QStringLiteral("identifiants refusés");
     if (opState == "unreachable")  return QStringLiteral("serveur injoignable");
     if (opState == "error")        return QStringLiteral("erreur");
-    return opState.isEmpty() ? QStringLiteral("—") : opState;
+    return opState.isEmpty() ? QStringLiteral("-") : opState;
 }
 
 // Jeton de couleur (thème) pour l'état, comme la pastille des sites.
@@ -194,7 +194,7 @@ SettingsDialog::SettingsDialog(const Config& config, const QString& discoveredUr
     : QDialog(parent), config_(config), discoveredUrl_(discoveredUrl),
       discoveredCollectors_(discoveredCollectors),
       discoveredAnalytics_(discoveredAnalytics) {
-    setWindowTitle("Configuration — SiteWatch");
+    setWindowTitle("Configuration - SiteWatch");
     setMinimumWidth(780);
 
     if (config_.cacheRoot.empty()) {
@@ -421,7 +421,7 @@ void SettingsDialog::updateSummary() {
         .arg(config_.sites.size())
         .arg(humanSize(bytes))
         .arg(files)
-        .arg(newest.isValid() ? newest.toString("dd/MM/yyyy HH:mm") : "—"));
+        .arg(newest.isValid() ? newest.toString("dd/MM/yyyy HH:mm") : "-"));
 }
 
 void SettingsDialog::setFormEnabled(bool on) {
@@ -561,7 +561,7 @@ void SettingsDialog::onTestConnection() {
     QString err;
     if (!firewallWhitelist(s, err)) {
         QApplication::restoreOverrideCursor();
-        showTestResult(2, "✗ Pare-feu cPanel — " + err);
+        showTestResult(2, "✗ Pare-feu cPanel - " + err);
         return;
     }
 
@@ -569,7 +569,7 @@ void SettingsDialog::onTestConnection() {
     std::string cerr;
     if (!client.connect(s, cerr)) {
         QApplication::restoreOverrideCursor();
-        showTestResult(2, "✓ Pare-feu cPanel\n✗ Connexion SSH — " + QString::fromStdString(cerr));
+        showTestResult(2, "✓ Pare-feu cPanel\n✗ Connexion SSH - " + QString::fromStdString(cerr));
         return;
     }
 
@@ -848,7 +848,7 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
         for (auto it = discoveredCollectors_.constBegin();
              it != discoveredCollectors_.constEnd(); ++it) {
             const QString app = it.value().isEmpty() ? QStringLiteral("morfCollector") : it.value();
-            collectorPick_->addItem(QStringLiteral("%1 — %2").arg(app, it.key()), it.key());
+            collectorPick_->addItem(QStringLiteral("%1 - %2").arg(app, it.key()), it.key());
         }
         // Présélectionner l'URL déjà épinglée dans la config, si elle correspond.
         const int idx = collectorPick_->findData(QString::fromStdString(config_.collectorUrl));
@@ -897,7 +897,7 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     schedHint->setWordWrap(true);
     v->addWidget(schedHint);
 
-    collectorState_ = new QLabel("État inconnu — cliquez sur « Se connecter ».");
+    collectorState_ = new QLabel("État inconnu - cliquez sur « Se connecter ».");
     collectorState_->setProperty("muted", true);
     collectorState_->setWordWrap(true);
     v->addWidget(collectorState_);
@@ -1026,7 +1026,7 @@ void SettingsDialog::refreshCollector() {
         : QStringLiteral("jamais");
     const QString dailyAt = collectorTime_->time().toString("HH:mm");
     collectorState_->setText(QString(
-        "Service <b>%1</b> v%2 à %3 — collecte quotidienne à %4.<br>"
+        "Service <b>%1</b> v%2 à %3 - collecte quotidienne à %4.<br>"
         "%5 fichier(s) téléchargé(s), %6 conservés, %7 source(s). "
         "Dernière collecte : %8.")
         .arg(st.json.value("host").toString().toHtmlEscaped())

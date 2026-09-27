@@ -10,7 +10,7 @@ système.
 
 ## Licence et attribution
 
-- Icônes : **Font Awesome Free**, © Fonticons, Inc. — <https://fontawesome.com>
+- Icônes : **Font Awesome Free**, © Fonticons, Inc. - <https://fontawesome.com>
 - La police est distribuée sous **SIL OFL 1.1** (voir `LICENSE-FontAwesome.txt`).
 - Conformément à l'OFL, cette version modifiée (sous-ensemble) a été **renommée**
   « SiteWatch Icons » et n'utilise pas le nom de police réservé d'origine.

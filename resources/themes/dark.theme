@@ -1,4 +1,4 @@
-# SiteWatch — thème sombre.
+# SiteWatch - thème sombre.
 # Format : token = valeur. Les lignes vides et celles commençant par # sont
 # ignorées. Ces jetons sont injectés dans resources/themes/app.qss.
 # Contrastes vérifiés pour rester lisibles sur fond sombre (WCAG AA).
