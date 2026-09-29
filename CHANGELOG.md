@@ -2,6 +2,15 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.7] - 2026-09-29
+
+### Changed
+
+- **Vendored morfDeploy 0.21.0.** An update now brings the installed config fully up
+  to the example: new keys also reach modules already present (matched by `id`),
+  documentation comments follow the example, and keys a version declares in
+  `removed_keys` (service.json) are deleted after a backup.
+
 ## [1.19.6] - 2026-09-27
 
 ### Changed
