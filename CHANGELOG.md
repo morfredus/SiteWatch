@@ -2,6 +2,25 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.10] - 2026-10-10
+
+### Changed
+
+- Resync the vendored morfDeploy (0.21.2): `config push` skips identical files.
+- Resync the vendored morfUpdate (0.8.5).
+
+## [1.19.9] - 2026-10-10
+
+### Changed
+
+- Resync the vendored morfUpdate (0.8.4).
+
+## [1.19.8] - 2026-10-10
+
+### Changed
+
+- Resync the vendored morfDeploy (0.21.1): `install`/`update` now copy `VERSION` next to the binary.
+
 ## [1.19.7] - 2026-09-29
 
 ### Changed
