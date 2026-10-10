@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.19.11] - 2026-10-10
+
+### Changed
+
+- Resync the vendored morfUpdate (0.8.6).
+
 ## [1.19.10] - 2026-10-10
 
 ### Changed
