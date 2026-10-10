@@ -79,8 +79,9 @@ bool GitHubAuthorityStore::open() {
     return true;
 }
 
-void GitHubAuthorityStore::ingestDaily(const QString& full, const QString& metric,
-                                       const QJsonObject& block, const QString& provenance) {
+int GitHubAuthorityStore::ingestDaily(const QString& full, const QString& metric,
+                                      const QJsonObject& block, const QString& provenance) {
+    int added = 0;   // jours réellement nouveaux, pour prévenir l'utilisateur
     QSqlDatabase db = db_;
     const qint64 now = QDateTime::currentSecsSinceEpoch();
     // GitHub met les series journalieres dans views[] / clones[] selon le nom du bloc.
@@ -133,8 +134,10 @@ void GitHubAuthorityStore::ingestDaily(const QString& full, const QString& metri
         ins.addBindValue(uniques);
         ins.addBindValue(provenance);
         ins.addBindValue(now);
-        ins.exec();
+        if (ins.exec())
+            ++added;
     }
+    return added;
 }
 
 void GitHubAuthorityStore::upsertState(const QJsonObject& snap, const QString& provenance) {
@@ -192,19 +195,20 @@ void GitHubAuthorityStore::upsertState(const QJsonObject& snap, const QString& p
     u.exec();
 }
 
-void GitHubAuthorityStore::ingestSnapshot(const QJsonObject& snap, const QString& provenance) {
+int GitHubAuthorityStore::ingestSnapshot(const QJsonObject& snap, const QString& provenance) {
     if (!open_)
-        return;
+        return 0;
     const QString full = snap.value(QStringLiteral("full_name")).toString();
     if (full.isEmpty())
-        return;
+        return 0;
     const QJsonObject data = snap.value(QStringLiteral("data")).toObject();
-    ingestDaily(full, QStringLiteral("views"), data.value(QStringLiteral("views")).toObject(),
-                provenance);
-    ingestDaily(full, QStringLiteral("clones"), data.value(QStringLiteral("clones")).toObject(),
-                provenance);
+    int added = ingestDaily(full, QStringLiteral("views"),
+                            data.value(QStringLiteral("views")).toObject(), provenance);
+    added += ingestDaily(full, QStringLiteral("clones"),
+                         data.value(QStringLiteral("clones")).toObject(), provenance);
     upsertState(snap, provenance);
     ingestLatestLists(full, data, provenance);
+    return added;
 }
 
 bool GitHubAuthorityStore::hasConsolidatedData() const {

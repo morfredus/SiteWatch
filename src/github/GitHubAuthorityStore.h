@@ -36,13 +36,14 @@ public:
     QString lastError() const { return lastError_; }
 
     // `provenance` : github-direct | morfcollector
-    void ingestSnapshot(const QJsonObject& snap, const QString& provenance);
+    // Retourne le nombre de jours (vues + clones) nouvellement ajoutés à la base.
+    int ingestSnapshot(const QJsonObject& snap, const QString& provenance);
     Row row(const QString& fullName) const;
     QJsonObject exportAuthority() const;
     bool hasConsolidatedData() const;
 
 private:
-    void ingestDaily(const QString& full, const QString& metric, const QJsonObject& block,
+    int ingestDaily(const QString& full, const QString& metric, const QJsonObject& block,
                      const QString& provenance);
     void upsertState(const QJsonObject& snap, const QString& provenance);
     void ingestLatestLists(const QString& full, const QJsonObject& data,

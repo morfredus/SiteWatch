@@ -30,7 +30,8 @@ public:
     void setNotice(const QString& text);
     void refresh();
     void publishToAnalytics();
-    void reconcileFromCollector();
+    // Rattrape ce que le collecteur a archivé ; retourne le nombre de jours nouveaux.
+    int reconcileFromCollector();
 
 signals:
     void openAnalyticsRequested();

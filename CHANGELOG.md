@@ -2,6 +2,29 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.20.1] - 2026-10-10
+
+### Fixed
+
+- Startup catch-up: when the pinned collector address no longer answers (DHCP change),
+  read from the first collector that does, and say so in the banner. GitHub catch-up
+  follows the same source.
+- The catch-up is only marked as done once it succeeded, so a collector discovered later
+  by the beacon triggers it again instead of being ignored.
+
+## [1.20.0] - 2026-10-10
+
+### Added
+
+- Startup catch-up from morfCollector: when a collector is available, the log cache is
+  refilled with whatever the collector gathered while SiteWatch was closed (size-based
+  comparison), and the updated sites are re-analysed and republished to morfAnalytics.
+- GitHub traffic is caught up the same way and republished when new days were stored.
+- One banner at startup tells what was recovered (log files per site, GitHub days),
+  plus added/removed sites and any incomplete catch-up.
+- The catch-up is replayed once when the collector beacon is heard after the startup
+  sync (it is emitted every 15 s). Without a collector SiteWatch stays fully standalone.
+
 ## [1.19.11] - 2026-10-10
 
 ### Changed

@@ -501,8 +501,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                 collectorSeen_.insert(curl, label.isEmpty() ? QStringLiteral("morfCollector") : label);
                 if (collectorUrl_.isEmpty())
                     collectorUrl_ = curl;
-                if (collectorJustFound)
+                if (collectorJustFound) {
                     applyGithubServices();
+                    // Le beacon peut arriver après la synchro d'ouverture (émission
+                    // toutes les 15 s) : on rejoue alors le rattrapage, une seule fois.
+                    if (!collectorStartupDone_)
+                        QTimer::singleShot(500, this, [this]{ startupCollectorSync(); });
+                }
             }
         });
     }
@@ -1693,51 +1698,109 @@ void MainWindow::startupCollectorSync() {
     const QStringList all = knownCollectorUrls();
     if (all.isEmpty())
         return;   // aucun collecteur : SiteWatch reste autonome (silencieux)
-    const QString readUrl = ensureCollector(2500);
+    const QString pinnedRead = ensureCollector(2500);
 
     // « Les deux collectent » : on pousse le manifeste (et les secrets) à CHAQUE
     // collecteur vu. La synchro est idempotente ; le diff ajouts/retraits n'est
     // calculé qu'au 1er passage (l'état local est ensuite à jour) : on le capte.
-    collectorsync::SyncResult r;   // résultat retenu = celui de la source de lecture
+    // Source de LECTURE : le collecteur épinglé s'il répond, sinon le premier qui
+    // répond. Une IP épinglée devenue morte (DHCP) ne doit pas bloquer le rattrapage
+    // alors qu'un collecteur vivant est connu par le beacon.
+    collectorsync::SyncResult r;
     QStringList added, removed;
+    QString readUrl;
     bool haveRead = false;
     for (const QString& u : all) {
         const collectorsync::SyncResult sr =
             collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/false);
         if (!sr.addedLabels.isEmpty())   added   = sr.addedLabels;
         if (!sr.removedLabels.isEmpty()) removed = sr.removedLabels;
-        if (u == readUrl || !haveRead) { r = sr; haveRead = true; }
+        if (!haveRead || (sr.ok && (!r.ok || u == pinnedRead))) {
+            r = sr; haveRead = true;
+            if (sr.ok) readUrl = u;
+        }
     }
+    const bool readFallback = r.ok && !pinnedRead.isEmpty() && readUrl != pinnedRead;
     r.addedLabels   = added;
     r.removedLabels = removed;
     if (!r.ok) {
         showBanner(BannerLevel::Warning,
             "morfCollector détecté mais synchronisation impossible : " + r.error.toHtmlEscaped());
-        return;
+        return;   // pas marqué « fait » : un autre collecteur découvert plus tard relance
+    }
+    collectorStartupDone_ = true;
+
+    // Rattrapage : SiteWatch reste la source de vérité, mais le collecteur a pu
+    // récolter pendant son absence. On ne recopie que ce qui manque ou a grossi
+    // (fillCache compare les tailles), puis on ré-analyse les seuls sites touchés
+    // pour que l'affichage ET morfAnalytics repartent à jour. Sans collecteur on
+    // n'arrive jamais ici : SiteWatch fonctionne seul.
+    QStringList recovered, problems, updatedSites;
+    if (!readUrl.isEmpty()) {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        for (const SiteConfig& s : config_.sites) {
+            statusBar()->showMessage("Rattrapage morfCollector : " + QString::fromStdString(s.name) + " …");
+            QApplication::processEvents();
+            const collectorsync::FillResult f = collectorsync::fillCache(readUrl, s, config_.cacheRoot);
+            if (f.downloaded > 0) {
+                updatedSites << QString::fromStdString(s.name);
+                recovered << QString("%1 (%2 fichier(s))")
+                                 .arg(QString::fromStdString(s.name).toHtmlEscaped()).arg(f.downloaded);
+            }
+            if (!f.ok) problems << QString::fromStdString(s.name);
+        }
+        QApplication::restoreOverrideCursor();
     }
 
-    // Alerte prioritaire : les retraits. Les copies restent conservées sur le Pi.
-    if (!r.removedLabels.isEmpty()) {
-        showBanner(BannerLevel::Warning,
-            QString("<b>%1 site(s) retiré(s)</b> de la configuration : %2.<br>"
-                    "La collecte s'arrête, mais <b>les copies déjà conservées sur le Pi "
-                    "(morfCollector) ne sont pas effacées</b>. Passez par « Copies locales » "
-                    "pour les supprimer définitivement si vous le souhaitez.")
-                .arg(r.removedLabels.size())
-                .arg(r.removedLabels.join(", ").toHtmlEscaped()));
-        return;
-    }
-    if (!r.addedLabels.isEmpty()) {
-        showBanner(BannerLevel::Info,
-            QString("<b>morfCollector</b> : %1 nouveau(x) site(s) confié(s) à la collecte (%2).")
-                .arg(r.addedLabels.size()).arg(r.addedLabels.join(", ").toHtmlEscaped()));
-        return;
-    }
-    if (r.pushed)
-        statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(r.revision));
+    // GitHub : même principe, le magasin local absorbe les jours qui lui manquent.
+    int githubDays = 0;
     if (githubPage_) {
         applyGithubServices();
-        githubPage_->reconcileFromCollector();
+        if (readFallback)
+            githubPage_->setCollectorUrl(readUrl);   // l'épinglé ne répond pas
+        githubDays = githubPage_->reconcileFromCollector();
+    }
+
+    if (!updatedSites.isEmpty()) {
+        const int keep = siteSelector_->currentIndex();
+        for (const QString& name : updatedSites) {
+            const int idx = siteSelector_->findText(name);
+            if (idx < 0) continue;
+            siteSelector_->setCurrentIndex(idx);
+            onAnalyze();   // met à jour l'affichage et publie vers morfAnalytics
+        }
+        if (keep >= 0 && keep < siteSelector_->count())
+            siteSelector_->setCurrentIndex(keep);
+        refreshSitesOverview();
+    }
+
+    // Un seul bandeau qui dit tout ce qui s'est passé à l'ouverture.
+    QStringList lines;
+    if (!r.removedLabels.isEmpty())
+        lines << QString("<b>%1 site(s) retiré(s)</b> de la configuration : %2. La collecte "
+                         "s'arrête, mais les copies déjà conservées sur le Pi ne sont pas "
+                         "effacées (« Copies locales » pour les supprimer).")
+                     .arg(r.removedLabels.size()).arg(r.removedLabels.join(", ").toHtmlEscaped());
+    if (!r.addedLabels.isEmpty())
+        lines << QString("<b>%1 nouveau(x) site(s)</b> confié(s) à la collecte : %2.")
+                     .arg(r.addedLabels.size()).arg(r.addedLabels.join(", ").toHtmlEscaped());
+    if (readFallback)
+        lines << QString("Le collecteur épinglé (%1) ne répond pas : lecture depuis %2. "
+                         "Mettez à jour l'adresse épinglée dans la configuration.")
+                     .arg(pinnedRead.toHtmlEscaped(), readUrl.toHtmlEscaped());
+    if (!recovered.isEmpty())
+        lines << "<b>Logs mis à jour depuis morfCollector</b> : " + recovered.join(", ") + ".";
+    if (githubDays > 0)
+        lines << QString("<b>GitHub mis à jour depuis morfCollector</b> : %1 jour(s) de trafic récupéré(s).")
+                     .arg(githubDays);
+    if (!problems.isEmpty())
+        lines << "Rattrapage incomplet pour : " + problems.join(", ").toHtmlEscaped() + ".";
+
+    if (!lines.isEmpty()) {
+        const bool warn = !r.removedLabels.isEmpty() || !problems.isEmpty() || readFallback;
+        showBanner(warn ? BannerLevel::Warning : BannerLevel::Info, lines.join("<br>"));
+    } else if (r.pushed) {
+        statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(r.revision));
     }
 }
 

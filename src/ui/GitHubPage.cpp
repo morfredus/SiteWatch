@@ -394,13 +394,17 @@ void GitHubPage::collectNow() {
     refresh();
 }
 
-void GitHubPage::reconcileFromCollector() {
+int GitHubPage::reconcileFromCollector() {
     if (!config_.github.enabled || collectorUrl_.isEmpty())
-        return;
+        return 0;
     if (!ensureStore())
-        return;
-    catchUpFromCollector();
+        return 0;
+    const int newDays = catchUpFromCollector();
     refresh();
+    // Les données locales ont avancé : morfAnalytics (s'il est là) doit suivre.
+    if (newDays > 0)
+        publishAuthority();
+    return newDays;
 }
 
 // Bouton dedie : rapatrie ce que morfCollector a deja archive (sur le Pi ou tout
@@ -429,10 +433,10 @@ void GitHubPage::pullFromCollector() {
     refresh();
 
     const QString head = got > 0
-        ? QStringLiteral("Rapatriement : %1 instantané(s) lus depuis le collecteur, "
+        ? QStringLiteral("Rapatriement : %1 jour(s) nouveau(x) lus depuis le collecteur, "
                          "vérité consolidée mise à jour.").arg(got)
-        : QStringLiteral("Rapatriement : aucun instantané disponible sur le collecteur "
-                         "pour l'instant (morfCollector collecte une fois par jour).");
+        : QStringLiteral("Rapatriement : rien de nouveau sur le collecteur "
+                         "(morfCollector collecte une fois par jour).");
     next_->setText(pub.isEmpty() ? head : head + QLatin1Char(' ') + pub);
 }
 
@@ -458,8 +462,7 @@ int GitHubPage::catchUpFromCollector() {
             const QJsonObject snap = QJsonDocument::fromJson(raw).object();
             if (snap.value(QStringLiteral("contract")).toString() != QLatin1String("github-traffic/1"))
                 continue;
-            store_->ingestSnapshot(snap, QStringLiteral("morfcollector"));
-            ++ingested;
+            ingested += store_->ingestSnapshot(snap, QStringLiteral("morfcollector"));
         }
     }
     return ingested;

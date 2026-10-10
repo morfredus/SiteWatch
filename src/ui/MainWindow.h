@@ -156,6 +156,7 @@ private:
     QString collectorUrl_;   // morfCollector de LECTURE découvert (1er vu ; vide si absent)
     QMap<QString, QString> collectorSeen_;  // baseUrl -> "app (hote)" : TOUS les collecteurs vus
     QMap<QString, QString> analyticsSeen_;  // baseUrl -> "app (hote)" : morfAnalytics vus
+    bool collectorStartupDone_ = false;   // rattrapage d'ouverture déjà joué
     QString analyticsUrl_;   // dernier vu (repli si pas d'épingle ni même hôte)
     QPushButton* analyticsButton_ = nullptr;
     QStackedWidget* domainStack_ = nullptr;
