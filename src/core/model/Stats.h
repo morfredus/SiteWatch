@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <array>
 #include <string>
 #include <map>
 
@@ -57,5 +58,19 @@ struct Stats {
     std::map<std::string, long> dailyAI;      // robots IA (Claude, OpenAI, Perplexity)
     std::map<std::string, long> dailySEO;     // robots SEO (Semrush, Ahrefs, MJ12, DotBot)
     std::map<std::string, long> daily404;     // erreurs 404
+    std::map<std::string, long> daily403;     // acces refuses 403
+    std::map<std::string, long> daily500;     // erreurs serveur 500
     std::map<std::string, long> dailyAttacks; // tentatives d'attaque
+
+    // --- Analyses approfondies (publiees vers morfAnalytics) ---
+    // Liens casses : URL en 404 qui ne sont PAS des scans (un scan est compte a part).
+    std::map<std::string, long> topBroken;
+    // Profil horaire (heure 0-23) sur toute la periode.
+    std::array<long, 24> hourHumans{};
+    std::array<long, 24> hourBots{};
+    std::array<long, 24> hourAttacks{};
+    // Pages vues par jour (humains, succes) et robots par jour : permettent de comparer
+    // la derniere semaine a la precedente (pages en hausse ou en baisse, nouveaux robots).
+    std::map<std::string, std::map<std::string, long>> dailyPages;
+    std::map<std::string, std::map<std::string, long>> dailyBotEngines;
 };

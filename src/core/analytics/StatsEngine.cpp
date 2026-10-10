@@ -127,8 +127,8 @@ void StatsEngine::ingest(const LogEntry& entry) {
     // --- Codes HTTP + compteurs d'erreurs ---
     ++stats_.statusCounts[entry.status];
     if (entry.status == 404) { ++stats_.errors404; ++stats_.daily404[entry.date]; }
-    else if (entry.status == 403) ++stats_.errors403;
-    else if (entry.status == 500) ++stats_.errors500;
+    else if (entry.status == 403) { ++stats_.errors403; ++stats_.daily403[entry.date]; }
+    else if (entry.status == 500) { ++stats_.errors500; ++stats_.daily500[entry.date]; }
 
     // --- Robot ou humain ? ---
     BotResult bot = BotDetector::detect(entry.userAgent);
@@ -136,14 +136,19 @@ void StatsEngine::ingest(const LogEntry& entry) {
         ++stats_.bots;
         ++stats_.botCounts[bot.engine];
         ++stats_.dailyBots[entry.date];
+        ++stats_.dailyBotEngines[entry.date][bot.engine];
+        if (entry.hour >= 0 && entry.hour < 24) ++stats_.hourBots[entry.hour];
         if (isAiEngine(bot.engine))  ++stats_.dailyAI[entry.date];
         if (isSeoEngine(bot.engine)) ++stats_.dailySEO[entry.date];
     } else {
         ++stats_.humans;
         ++stats_.dailyHumans[entry.date];
         // Top pages : vues humaines reussies, hors ressources techniques.
-        if (entry.method == "GET" && entry.status == 200 && !isStaticAsset(entry.url))
+        if (entry.hour >= 0 && entry.hour < 24) ++stats_.hourHumans[entry.hour];
+        if (entry.method == "GET" && entry.status == 200 && !isStaticAsset(entry.url)) {
             ++stats_.topPages[entry.url];
+            ++stats_.dailyPages[entry.date][entry.url];
+        }
         ++stats_.referers[classifyReferer(entry.referer)];
     }
 
@@ -156,5 +161,8 @@ void StatsEngine::ingest(const LogEntry& entry) {
         ++stats_.attackActivity[act.label];
         ++stats_.topAttacked[entry.url];   // URL attaquees = vrais scans uniquement
         ++stats_.dailyAttacks[entry.date];
+        if (entry.hour >= 0 && entry.hour < 24) ++stats_.hourAttacks[entry.hour];
+    } else if (entry.status == 404) {
+        ++stats_.topBroken[entry.url];     // 404 hors scan : probablement un lien casse
     }
 }

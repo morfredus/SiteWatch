@@ -2,6 +2,127 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.26.0] - 2026-10-11
+
+### Changed
+
+- The SFTP download ("Télécharger les logs") no longer freezes the window: connection, remote
+  listing and file copy run in a worker thread, with the current step and a byte-based progress
+  bar in the status bar. Banners, analysis and the sites table are updated in the UI thread when
+  it ends. Each file is written to a temporary name then renamed.
+- "Tout synchroniser" runs in the background too. Via morfCollector: same background work as the
+  startup catch-up (config pushed to every collector with all secrets, then copies re-fetched).
+  Direct (SFTP): one site after the other, each in the background, the window stays usable in
+  between.
+- One synchronization at a time (startup catch-up, SFTP, "Tout synchroniser"): they share the
+  collector state and the cache. Starting another one says so in the status bar.
+- Closing the window while a worker is stuck in a network call (silent server) ends the process
+  after 8 s instead of leaving it alive without a window.
+
+### Notes
+
+- The SFTP path was compiled and reviewed but NOT run against a real server in this release
+  (no local SFTP server available); the collector paths were measured on real data.
+
+## [1.25.0] - 2026-10-11
+
+### Changed
+
+- The window no longer looks frozen. Heavy work now runs in a worker thread and the UI keeps
+  repainting: the startup catch-up (collector sync, log copy, GitHub snapshots), the analysis
+  of the sites whose logs changed, the sites summary table, and the manual analysis. A spinning
+  "travail en cours" indicator and the current step show in the status bar. Measured on real
+  data with a forced heavy start (two big logs re-copied, two sites re-analysed): 349 window
+  responsiveness probes, none over 1 s, 12 ms at worst.
+- SQLite connections stay in the UI thread (a Qt connection cannot be shared between threads):
+  the worker only reads and computes, the UI thread writes the stores and publishes.
+- Log files copied from the collector are written to a temporary file then renamed, so an
+  analysis never reads a half-written .gz.
+- Closing the window interrupts the workers between two steps and waits for them (8 s at most),
+  so no background work keeps the process alive.
+
+### Fixed
+
+- A report that could not be published (morfAnalytics not seen yet, or unreachable) is kept and
+  sent again as soon as morfAnalytics is discovered or answers, instead of being lost.
+
+## [1.24.1] - 2026-10-11
+
+### Added
+
+- Settings, morfCollector tab: the collector choice is always offered ("Automatic (first
+  detected)" or one of the detected collectors), like in the GitHub tab. It used to appear
+  only when at least two collectors had been detected.
+
+### Fixed
+
+- A pinned address missing from the detected list (service off, IP gone) is now shown as
+  "Pinned (not detected)" instead of "Automatic", in both the morfCollector and GitHub tabs.
+- Typing an address by hand updates the selector; the two selectors stay in sync.
+- "Advanced analyses" and the publication to morfAnalytics fall back on a morfAnalytics
+  discovered by the beacon when the pinned address does not answer (short /healthz probe,
+  cached for a minute), and say so in the status bar.
+
+## [1.24.0] - 2026-10-11
+
+### Added
+
+- Report for morfAnalytics enriched with likely broken links (404 URLs that are not scans),
+  an hourly profile (humans, bots, attacks), and pages and bots over the last 7 days against
+  the 7 days before (rising and falling pages, new bots).
+- `Stats` carries the matching accumulators (`topBroken`, `hourHumans`/`hourBots`/`hourAttacks`,
+  `dailyPages`, `dailyBotEngines`).
+
+## [1.23.0] - 2026-10-10
+
+### Added
+
+- Richer report for morfAnalytics: daily series for 403 and 500 errors, plus referers,
+  attack and WordPress activity breakdowns and HTTP status families (2xx to 5xx).
+- The web authority store carries a series version: the cached logs are re-read once to
+  fill the new series, then nothing is redone until a log changes.
+
+## [1.22.0] - 2026-10-10
+
+### Added
+
+- `sitewatch-publish`: headless tool that does without the GUI what SiteWatch does at
+  startup: sync with morfCollector and refill the log cache, consolidate the web authority
+  store, publish every site to morfAnalytics, then catch up and publish GitHub. Same code
+  and same stores as the GUI; schedulable (see docs/fr/PUBLICATION_HEADLESS.md).
+
+### Changed
+
+- Analysis, report building and GitHub catch-up/publication moved out of the UI into
+  shared modules (`publish/SiteAnalysis`, `github/GitHubSync`) used by both the GUI and
+  the tool. No behaviour change in the GUI.
+
+## [1.21.1] - 2026-10-10
+
+### Added
+
+- Startup fill of the web authority store: 4 s after opening, sites whose cached logs are
+  new or changed since the last consolidation are analysed (and republished to morfAnalytics
+  when it is known). Works without any collector. A second start does nothing when nothing
+  changed.
+
+## [1.21.0] - 2026-10-10
+
+### Added
+
+- Web authority store (`web/web.sqlite` under the cache root): daily series of each site
+  over the whole cached log history, not just the displayed period. It is fed during the
+  analysis itself, in the same read of the logs, and only when a log file is new or has a
+  different size (a monthly .gz grows, so size is the signal; a smaller file counts too).
+- The report published to morfAnalytics now carries the consolidated daily series (no
+  more 90-day cap) and freshness fields `source_up_to` and `consolidated_at`.
+- Self-test `sitewatch-webstore-selftest`.
+
+### Notes
+
+- SiteWatch stays standalone: the store depends on neither morfCollector nor morfAnalytics.
+- The store is filled when a site is analysed (manually or by the startup catch-up).
+
 ## [1.20.1] - 2026-10-10
 
 ### Fixed

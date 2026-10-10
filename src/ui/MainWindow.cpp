@@ -5,6 +5,7 @@
  */
 
 #include "ui/MainWindow.h"
+#include "publish/SiteAnalysis.h"
 
 #include <morfbeacon/PresenceService.h>
 #include <morfbeacon/IMetricsProvider.h>
@@ -35,6 +36,12 @@
 #include <QLocale>
 #include <QEventLoop>
 #include <QTimer>
+#include <QThreadPool>
+#include <QRunnable>
+#include <atomic>
+#include <cstdlib>
+#include <memory>
+#include "github/GitHubSync.h"
 #include <QUrl>
 #include <QUrlQuery>
 #include <QJsonDocument>
@@ -487,6 +494,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                         analyticsButton_->setToolTip("Ouvrir les analyses avancées dans morfAnalytics");
                     }
                     if (analyticsJustFound) {
+                        analyticsCheckedAt_ = 0;   // un morfAnalytics vivant est connu : on recontrole l'epingle
+                        flushPendingReports();     // et on renvoie les syntheses restees en attente
                         applyGithubServices();
                         if (lastStats_.totalRequests > 0)
                             publishAnalytics();
@@ -519,9 +528,23 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // config, alerte sur les sites ajoutés / retirés. Différée pour ne pas
     // retarder l'affichage.
     QTimer::singleShot(2500, this, [this]{ startupCollectorSync(); });
+
+    // Remplissage de la verite web : apres le rattrapage collecteur (qui analyse deja
+    // les sites qu'il a mis a jour), on consolide ceux dont le cache a change depuis la
+    // derniere fois (ex. logs telecharges en SFTP lors d'une session precedente).
+    // Marche sans collecteur ni analytics : SiteWatch reste autonome.
+    QTimer::singleShot(4000, this, [this]{ consolidateStaleSites(); });
 }
 
 MainWindow::~MainWindow() {
+    // Les fils de travail s'interrompent entre deux etapes (drapeau) ; on les attend pour qu'aucun
+    // ne touche a la fenetre detruite, ni ne retienne le processus apres la fermeture.
+    cancel_ = true;
+    // Un fil bloque dans une connexion reseau (serveur muet) ne peut pas etre interrompu : apres 8 s on
+    // termine le processus plutot que de le laisser vivre sans fenetre (et de laisser le fil toucher
+    // une fenetre detruite). Les fichiers sont ecrits de facon atomique (temporaire puis renommage).
+    if (!QThreadPool::globalInstance()->waitForDone(8000))
+        std::_Exit(0);
     // Arrête heartbeat + serveur AVANT la destruction de presenceMetrics_.
     delete presence_;
 }
@@ -1099,6 +1122,21 @@ void MainWindow::buildUi() {
     progressBar_->setTextVisible(true);
     progressBar_->setVisible(false);
     statusBar()->addPermanentWidget(progressBar_);
+
+    // Indicateur d'activite des travaux d'arriere-plan : un symbole qui tourne reste visible
+    // quel que soit le theme (une barre « indeterminee » ne se dessine pas avec la feuille de
+    // style de l'application).
+    busyLabel_ = new QLabel;
+    busyLabel_->setVisible(false);
+    busyLabel_->setProperty("muted", true);
+    statusBar()->addPermanentWidget(busyLabel_);
+    busyTimer_ = new QTimer(this);
+    busyTimer_->setInterval(140);
+    connect(busyTimer_, &QTimer::timeout, this, [this] {
+        static const QStringList frames{QStringLiteral("◐"), QStringLiteral("◓"), QStringLiteral("◑"), QStringLiteral("◒")};
+        busyFrame_ = (busyFrame_ + 1) % frames.size();
+        busyLabel_->setText(frames[busyFrame_] + QStringLiteral(" travail en cours"));
+    });
     statusRight_ = new QLabel;
     statusBar()->addPermanentWidget(statusRight_);
 
@@ -1386,196 +1424,317 @@ bool MainWindow::whitelistSsh(const SiteConfig& site, QString& error) {
     return true;
 }
 
-void MainWindow::onSync() {
-    hideBanner();   // repartir d'un état propre à chaque tentative
+// ---- Synchronisations lancees a la main : en arriere-plan ---------------------------------
+// Le telechargement SFTP (connexion, liste, copie) et « Tout synchroniser » ne bloquent plus la
+// fenetre : le fil de travail fait le reseau et les fichiers, l'interface affiche l'etape, une
+// progression et les bannieres de resultat. Une seule synchronisation a la fois (syncBusy_) :
+// elles partagent l'etat du collecteur et le cache.
 
-    if (!configError_.isEmpty() || config_.sites.empty()) {
-        showBanner(BannerLevel::Error,
-            "Aucune configuration valide. Ouvrez <b>Fichier → Configuration…</b> "
-            "pour renseigner au moins un site.");
+// Resultat d'un telechargement SFTP calcule en arriere-plan (aucun widget n'y est touche).
+struct SftpOutcome {
+    enum class Kind { Done, ConnectFailed, ListFailed, NoFiles, NoneMatch } kind = Kind::Done;
+    QString detail;                       // erreur technique
+    int downloaded = 0, skipped = 0, ignored = 0, failed = 0;
+    int totalGz = 0;                      // NoneMatch : fichiers presents mais filtres
+    bool suggestionValid = false;
+    QString suggestionFilter;
+    int suggestionMatch = 0;
+};
+
+void MainWindow::postProgress(int percent) {
+    QMetaObject::invokeMethod(this, [this, percent] {
+        progressBar_->setRange(0, 100);
+        progressBar_->setValue(percent);
+        progressBar_->setVisible(true);
+    }, Qt::QueuedConnection);
+}
+
+void MainWindow::sftpWork(SftpOutcome& out, const SiteConfig& site, const std::string& cacheRoot) {
+    postStatus("Connexion SFTP à " + QString::fromStdString(site.host) + " …");
+    SftpClient client;
+    std::string err;
+    if (!client.connect(site, err)) {
+        out.kind = SftpOutcome::Kind::ConnectFailed;
+        out.detail = QString::fromStdString(err);
+        return;
+    }
+    auto remote = client.listLogs(site.remoteLogDir, err);
+    if (remote.empty() && !err.empty()) {
+        client.disconnect();
+        out.kind = SftpOutcome::Kind::ListFailed;
+        out.detail = QString::fromStdString(err);
         return;
     }
 
-    const SiteConfig* site = currentSite();
-    if (!site) return;
-    const QString siteLabel = QString::fromStdString(site->name).toHtmlEscaped();
+    // Diagnostic : le dossier contient-il des logs, et correspondent-ils au site (filtre/domaine) ?
+    // On distingue « rien » de « presents mais filtres ».
+    std::vector<std::string> remoteNames;
+    remoteNames.reserve(remote.size());
+    for (const auto& rf : remote) remoteNames.push_back(rf.name);
+    const logdiscovery::Report diag = logdiscovery::analyze(remoteNames, site);
+    if (diag.outcome == logdiscovery::Outcome::NoFilesInDir) {
+        client.disconnect();
+        out.kind = SftpOutcome::Kind::NoFiles;
+        return;
+    }
+    if (diag.outcome == logdiscovery::Outcome::NoneMatch) {
+        client.disconnect();
+        out.kind = SftpOutcome::Kind::NoneMatch;
+        out.totalGz = diag.totalGz;
+        out.suggestionValid = diag.suggestion.valid;
+        out.suggestionFilter = QString::fromStdString(diag.suggestion.filter);
+        out.suggestionMatch = diag.suggestion.wouldMatch;
+        return;
+    }
 
-    QApplication::setOverrideCursor(Qt::WaitCursor);
+    // 1er passage : ne retenir que les logs de CE site (filtre domaine) et non deja presents en
+    // cache avec la meme taille.
+    CacheManager cache(cacheRoot);
+    const std::string dir = cache.siteDir(site.name);
+    std::vector<SftpClient::RemoteFile> toDownload;
+    unsigned long long grandTotal = 0;
+    for (const auto& rf : remote) {
+        if (!fileBelongsToSite(rf.name, site.name, site.logMatch)) { ++out.ignored; continue; }
+        std::error_code ec;
+        const std::string local = dir + "/" + rf.name;
+        if (fs::exists(local, ec) && fs::file_size(local, ec) == rf.size) { ++out.skipped; continue; }
+        toDownload.push_back(rf);
+        grandTotal += rf.size;
+    }
 
-    // Étape préalable : autoriser l'IP courante sur le pare-feu o2switch.
-    if (!site->cpanelToken.empty()) {
-        statusBar()->showMessage("Autorisation du pare-feu o2switch (API cPanel) …");
-        QApplication::processEvents();
+    // 2e passage : telechargement avec progression globale (en octets). Chaque fichier est ecrit
+    // sous un nom temporaire puis renomme : une analyse ne lit jamais un .gz a moitie ecrit.
+    unsigned long long doneBase = 0;
+    int lastPercent = -1;
+    for (const auto& rf : toDownload) {
+        if (cancel_) break;
+        postStatus(QString("Téléchargement de %1 …").arg(QString::fromStdString(rf.name)));
+        const std::string local = dir + "/" + rf.name;
+        const std::string tmp = local + ".part";
+        const std::string remotePath = site.remoteLogDir + "/" + rf.name;
+        const bool ok = client.download(remotePath, tmp, err, rf.size,
+            [&](uint64_t received, uint64_t) {
+                const unsigned long long overall = doneBase + received;
+                const int p = grandTotal ? static_cast<int>(overall * 100ULL / grandTotal) : 100;
+                if (p != lastPercent) { lastPercent = p; postProgress(p); }
+            });
+        std::error_code ec;
+        if (ok) fs::rename(tmp, local, ec);
+        if (ok && !ec) ++out.downloaded;
+        else { ++out.failed; fs::remove(tmp, ec); }
+        doneBase += rf.size;
+    }
+    client.disconnect();
+}
+
+void MainWindow::startSftpSync(const SiteConfig& siteIn, bool analyzeAfter, std::function<void()> done) {
+    hideBanner();   // repartir d'un etat propre a chaque tentative
+    if (syncBusy_) {
+        statusBar()->showMessage("Une synchronisation est déjà en cours.", 5000);
+        return;
+    }
+    syncBusy_ = true;
+    const SiteConfig site = siteIn;   // copie : le fil de travail ne lit jamais config_
+    const QString siteLabel = QString::fromStdString(site.name).toHtmlEscaped();
+
+    // Etape prealable : autoriser l'IP courante sur le pare-feu o2switch. Reseau en boucle locale
+    // (la fenetre reste vivante) ; le drapeau syncBusy_ interdit toute relance pendant ce temps.
+    if (!site.cpanelToken.empty()) {
+        beginBusy("Autorisation du pare-feu o2switch (API cPanel) …");
         QString wlErr;
-        if (!whitelistSsh(*site, wlErr)) {
-            QApplication::restoreOverrideCursor();
+        const bool ok = whitelistSsh(site, wlErr);
+        endBusy();
+        if (!ok) {
+            syncBusy_ = false;
             statusBar()->showMessage("Échec de l'autorisation pare-feu.");
             showBanner(BannerLevel::Error,
                 "<b>Pare-feu o2switch : autorisation refusée.</b><br>"
                 "Vérifiez le <b>jeton d'API cPanel</b> dans la configuration du site. "
                 "Détail : " + wlErr.toHtmlEscaped());
+            if (done) done();
             return;
         }
     }
 
-    statusBar()->showMessage("Connexion SFTP à " + QString::fromStdString(site->host) + " …");
-    QApplication::processEvents();
+    auto out = std::make_shared<SftpOutcome>();
+    const std::string cacheRoot = config_.cacheRoot;
+    beginBusy("Connexion SFTP à " + QString::fromStdString(site.host) + " …");
 
-    SftpClient client;
-    std::string err;
-    if (!client.connect(*site, err)) {
-        QApplication::restoreOverrideCursor();
-        statusBar()->showMessage("Échec de la connexion SFTP.");
-        showBanner(BannerLevel::Error,
-            "<b>Connexion SFTP impossible</b> à " +
-            QString::fromStdString(site->host).toHtmlEscaped() + ".<br>"
-            "Vérifiez l'hôte, l'utilisateur et le mot de passe (ou la clé SSH). "
-            "Détail : " + QString::fromStdString(err).toHtmlEscaped());
-        return;
-    }
-
-    auto remote = client.listLogs(site->remoteLogDir, err);
-    if (remote.empty() && !err.empty()) {
-        QApplication::restoreOverrideCursor();
-        client.disconnect();
-        statusBar()->showMessage("Dossier distant illisible.");
-        showBanner(BannerLevel::Error,
-            "<b>Dossier distant illisible :</b> " +
-            QString::fromStdString(site->remoteLogDir).toHtmlEscaped() + ".<br>"
-            "Vérifiez le chemin « Dossier distant des logs » dans la configuration. "
-            "Détail : " + QString::fromStdString(err).toHtmlEscaped());
-        return;
-    }
-
-    // Diagnostic : le dossier contient-il des logs, et correspondent-ils au
-    // site (filtre/domaine) ? On distingue « rien » de « présents mais filtrés ».
-    std::vector<std::string> remoteNames;
-    remoteNames.reserve(remote.size());
-    for (const auto& rf : remote) remoteNames.push_back(rf.name);
-    const logdiscovery::Report diag = logdiscovery::analyze(remoteNames, *site);
-
-    if (diag.outcome == logdiscovery::Outcome::NoFilesInDir) {
-        QApplication::restoreOverrideCursor();
-        client.disconnect();
-        statusBar()->showMessage("Aucun log sur le serveur.");
-        showBanner(BannerLevel::Warning,
-            "<b>Aucun log (.gz) dans le dossier distant</b> " +
-            QString::fromStdString(site->remoteLogDir).toHtmlEscaped() + ".<br>"
-            "Vérifiez le dossier des logs, ou attendez la rotation des logs de "
-            "votre hébergeur (les fichiers compressés apparaissent souvent le lendemain).");
-        return;
-    }
-
-    if (diag.outcome == logdiscovery::Outcome::NoneMatch) {
-        QApplication::restoreOverrideCursor();
-        client.disconnect();
-        statusBar()->showMessage("Aucun fichier ne correspond au filtre.");
-        const QString current = site->logMatch.empty()
-            ? QStringLiteral("détection automatique")
-            : QStringLiteral("« %1 »").arg(
-                  QString::fromStdString(site->logMatch).toHtmlEscaped());
-        QString msg =
-            QString("<b>%1 fichier(s) présent(s) sur le serveur, mais aucun ne "
-                    "correspond au filtre actuel (%2).</b>")
-                .arg(diag.totalGz).arg(current);
-        if (diag.suggestion.valid) {
-            const QString filter =
-                QString::fromStdString(diag.suggestion.filter);
-            msg += QString("<br>SiteWatch a détecté un préfixe commun : <b>%1</b> "
-                           "(%2 fichier(s)).")
-                       .arg(filter.toHtmlEscaped()).arg(diag.suggestion.wouldMatch);
-            showBanner(BannerLevel::Warning, msg,
-                       "Utiliser ce filtre : " + filter,
-                       [this, filter] { applySuggestedFilter(filter); });
-        } else {
-            msg += "<br>Renseignez le champ <b>Filtre des logs (avancé)</b> dans "
-                   "la configuration du site pour cibler les bons fichiers.";
-            showBanner(BannerLevel::Warning, msg);
-        }
-        return;
-    }
-
-    // Outcome::Matched : des fichiers correspondent → téléchargement.
-    // 1er passage : ne retenir que les logs de CE site (filtre domaine) et
-    //               non déjà présents en cache avec la même taille.
-    CacheManager cache(config_.cacheRoot);
-    const std::string dir = cache.siteDir(site->name);
-    std::vector<SftpClient::RemoteFile> toDownload;
-    int skipped = 0, ignored = 0;
-    unsigned long long grandTotal = 0;
-    for (const auto& rf : remote) {
-        if (!fileBelongsToSite(rf.name, site->name, site->logMatch)) {
-            ++ignored;                       // autre domaine ou sous-domaine
-            continue;
-        }
-        std::error_code ec;
-        const std::string local = dir + "/" + rf.name;
-        if (fs::exists(local, ec) && fs::file_size(local, ec) == rf.size) {
-            ++skipped;                       // déjà en cache, inchangé : pas de re-téléchargement
-            continue;
-        }
-        toDownload.push_back(rf);
-        grandTotal += rf.size;
-    }
-
-    // 2e passage : téléchargement avec barre de progression globale (en octets).
-    int downloaded = 0, failed = 0;
-    if (!toDownload.empty()) {
-        progressBar_->setRange(0, 100);
-        progressBar_->setValue(0);
-        progressBar_->setVisible(true);
-        unsigned long long doneBase = 0;
-        for (const auto& rf : toDownload) {
-            statusBar()->showMessage(
-                QString("Téléchargement de %1 …").arg(QString::fromStdString(rf.name)));
-            QApplication::processEvents();
-            const std::string local = dir + "/" + rf.name;
-            const std::string remotePath = site->remoteLogDir + "/" + rf.name;
-            const bool ok = client.download(
-                remotePath, local, err, rf.size,
-                [&](uint64_t received, uint64_t) {
-                    const unsigned long long overall = doneBase + received;
-                    const int p = grandTotal
-                        ? static_cast<int>(overall * 100ULL / grandTotal) : 100;
-                    progressBar_->setValue(p);
-                    QApplication::processEvents();
-                });
-            doneBase += rf.size;
-            if (ok) ++downloaded; else ++failed;
-        }
-        progressBar_->setValue(100);
+    runInBackground([this, out, site, cacheRoot] { sftpWork(*out, site, cacheRoot); },
+                    [this, out, site, siteLabel, analyzeAfter, done] {
+        endBusy();
         progressBar_->setVisible(false);
-    }
+        syncBusy_ = false;
+        const SftpOutcome& o = *out;
+        using K = SftpOutcome::Kind;
+        bool analyse = false;
 
-    client.disconnect();
-    QApplication::restoreOverrideCursor();
+        if (o.kind == K::ConnectFailed) {
+            statusBar()->showMessage("Échec de la connexion SFTP.");
+            showBanner(BannerLevel::Error,
+                "<b>Connexion SFTP impossible</b> à " + QString::fromStdString(site.host).toHtmlEscaped() + ".<br>"
+                "Vérifiez l'hôte, l'utilisateur et le mot de passe (ou la clé SSH). "
+                "Détail : " + o.detail.toHtmlEscaped());
+        } else if (o.kind == K::ListFailed) {
+            statusBar()->showMessage("Dossier distant illisible.");
+            showBanner(BannerLevel::Error,
+                "<b>Dossier distant illisible :</b> " + QString::fromStdString(site.remoteLogDir).toHtmlEscaped() + ".<br>"
+                "Vérifiez le chemin « Dossier distant des logs » dans la configuration. "
+                "Détail : " + o.detail.toHtmlEscaped());
+        } else if (o.kind == K::NoFiles) {
+            statusBar()->showMessage("Aucun log sur le serveur.");
+            showBanner(BannerLevel::Warning,
+                "<b>Aucun log (.gz) dans le dossier distant</b> " +
+                QString::fromStdString(site.remoteLogDir).toHtmlEscaped() + ".<br>"
+                "Vérifiez le dossier des logs, ou attendez la rotation des logs de "
+                "votre hébergeur (les fichiers compressés apparaissent souvent le lendemain).");
+        } else if (o.kind == K::NoneMatch) {
+            statusBar()->showMessage("Aucun fichier ne correspond au filtre.");
+            const QString current = site.logMatch.empty()
+                ? QStringLiteral("détection automatique")
+                : QStringLiteral("« %1 »").arg(QString::fromStdString(site.logMatch).toHtmlEscaped());
+            QString msg = QString("<b>%1 fichier(s) présent(s) sur le serveur, mais aucun ne "
+                                  "correspond au filtre actuel (%2).</b>").arg(o.totalGz).arg(current);
+            if (o.suggestionValid) {
+                const QString filter = o.suggestionFilter;
+                msg += QString("<br>SiteWatch a détecté un préfixe commun : <b>%1</b> (%2 fichier(s)).")
+                           .arg(filter.toHtmlEscaped()).arg(o.suggestionMatch);
+                showBanner(BannerLevel::Warning, msg, "Utiliser ce filtre : " + filter,
+                           [this, filter] { applySuggestedFilter(filter); });
+            } else {
+                msg += "<br>Renseignez le champ <b>Filtre des logs (avancé)</b> dans "
+                       "la configuration du site pour cibler les bons fichiers.";
+                showBanner(BannerLevel::Warning, msg);
+            }
+        } else {
+            statusBar()->showMessage(
+                QString("SFTP : %1 téléchargé(s), %2 en cache, %3 autre(s) domaine(s) ignoré(s)%4.")
+                    .arg(o.downloaded).arg(o.skipped).arg(o.ignored)
+                    .arg(o.failed ? QString(", %1 échec(s)").arg(o.failed) : QString()));
+            if (o.failed > 0 && o.downloaded == 0) {
+                showBanner(BannerLevel::Error,
+                    QString("<b>Échec du téléchargement</b> pour %1. Réessayez ou vérifiez la connexion.").arg(siteLabel));
+            } else if (o.downloaded > 0) {
+                QString msg = QString("<b>%1 : %2 fichier(s) de logs téléchargé(s).</b>").arg(siteLabel).arg(o.downloaded);
+                if (o.skipped) msg += QString(" %1 déjà à jour.").arg(o.skipped);
+                if (o.failed)  msg += QString(" %1 échec(s).").arg(o.failed);
+                showBanner(BannerLevel::Success, msg);
+            } else {
+                showBanner(BannerLevel::Success,
+                    QString("<b>%1 : déjà à jour.</b> Aucun nouveau fichier à télécharger (%2 en cache).")
+                        .arg(siteLabel).arg(o.skipped));
+            }
+            analyse = true;
+        }
 
-    statusBar()->showMessage(
-        QString("SFTP : %1 téléchargé(s), %2 en cache, %3 autre(s) domaine(s) ignoré(s)%4.")
-            .arg(downloaded).arg(skipped).arg(ignored)
-            .arg(failed ? QString(", %1 échec(s)").arg(failed) : QString()));
-
-    // Bannière de synthèse (non bloquante).
-    if (failed > 0 && downloaded == 0) {
-        showBanner(BannerLevel::Error,
-            QString("<b>Échec du téléchargement</b> pour %1. "
-                    "Réessayez ou vérifiez la connexion.").arg(siteLabel));
-    } else if (downloaded > 0) {
-        QString msg = QString("<b>%1 : %2 fichier(s) de logs téléchargé(s).</b>")
-                          .arg(siteLabel).arg(downloaded);
-        if (skipped) msg += QString(" %1 déjà à jour.").arg(skipped);
-        if (failed)  msg += QString(" %1 échec(s).").arg(failed);
-        showBanner(BannerLevel::Success, msg);
-    } else {
-        showBanner(BannerLevel::Success,
-            QString("<b>%1 : déjà à jour.</b> Aucun nouveau fichier à télécharger "
-                    "(%2 en cache).").arg(siteLabel).arg(skipped));
-    }
-
-    onAnalyze();   // analyse immédiate des logs mis à jour
-    refreshSitesOverview();
-    tabs_->setCurrentWidget(sitesTab_);
+        if (analyse && analyzeAfter) {
+            // L'analyse porte sur le site selectionne : on selectionne celui qui vient d'etre synchronise.
+            const int idx = siteSelector_->findText(QString::fromStdString(site.name));
+            if (idx >= 0) siteSelector_->setCurrentIndex(idx);
+            onAnalyze();   // analyse immediate des logs mis a jour (calcul en arriere-plan)
+        }
+        refreshSitesOverview();
+        if (analyse) tabs_->setCurrentWidget(sitesTab_);
+        if (done) done();
+    });
 }
+
+void MainWindow::onSync() {
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        hideBanner();
+        showBanner(BannerLevel::Error,
+            "Aucune configuration valide. Ouvrez <b>Fichier → Configuration…</b> "
+            "pour renseigner au moins un site.");
+        return;
+    }
+    const SiteConfig* site = currentSite();
+    if (!site) return;
+    startSftpSync(*site, /*analyzeAfter=*/true, {});
+}
+
+// « Tout synchroniser » via le collecteur : memes etapes que le rattrapage d'ouverture (config
+// poussee a chaque collecteur, copies recopiees), en arriere-plan, avec remise de tous les secrets.
+void MainWindow::syncAllViaCollector() {
+    hideBanner();
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+        return;
+    }
+    if (syncBusy_) {
+        statusBar()->showMessage("Une synchronisation est déjà en cours.", 5000);
+        return;
+    }
+    const QStringList all = knownCollectorUrls();
+    const QString url = ensureCollector(3000);   // source de LECTURE (fillCache)
+    if (all.isEmpty() || url.isEmpty()) {
+        showBanner(BannerLevel::Warning,
+            "<b>Aucun morfCollector détecté</b> sur le réseau.<br>"
+            "Utilisez « Tout synchroniser → En direct (SFTP) » pour télécharger "
+            "directement depuis l'hébergeur.");
+        return;
+    }
+    syncBusy_ = true;
+
+    auto w = std::make_shared<CollectorWork>();
+    w->cfg = config_;
+    w->cfgPath = configFilePath();
+    w->all = all;
+    w->pinnedRead = url;
+    w->force = true;
+    w->withGithub = false;
+    runCollectorWork(w, "Synchronisation avec morfCollector…", [this, w] {
+        syncBusy_ = false;
+        if (!w->r.ok) {
+            showBanner(BannerLevel::Error, "Synchronisation refusée : " + w->r.error.toHtmlEscaped());
+            return;
+        }
+        QString msg = QString("<b>morfCollector : %1 fichier(s) copié(s) dans le cache</b> "
+                              "(%2 déjà à jour).").arg(w->totalDl).arg(w->totalSkip);
+        if (!w->r.removedLabels.isEmpty())
+            msg += QString("<br>%1 site(s) retiré(s) : copies conservées sur le Pi, non effacées.")
+                       .arg(w->r.removedLabels.size());
+        if (!w->problems.isEmpty())
+            msg += "<br>Problème pour : " + w->problems.join(", ").toHtmlEscaped();
+        showBanner(w->problems.isEmpty() ? BannerLevel::Success : BannerLevel::Warning, msg);
+        onAnalyze();
+        refreshSitesOverview();
+    });
+}
+
+// « Tout synchroniser » en direct : un site apres l'autre, chacun en arriere-plan. Chaque
+// synchronisation rappelle la suivante a sa fin ; la fenetre reste utilisable entre-temps.
+void MainWindow::syncAllLocal() {
+    hideBanner();
+    if (!configError_.isEmpty() || config_.sites.empty()) {
+        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+        return;
+    }
+    if (syncBusy_) {
+        statusBar()->showMessage("Une synchronisation est déjà en cours.", 5000);
+        return;
+    }
+    const int n = siteSelector_->count();
+    const int keep = siteSelector_->currentIndex();
+    // La fonction ne garde qu'un pointeur faible sur elle-meme : les rappels de fin tiennent la
+    // reference forte (pas de cycle, pas de fuite).
+    auto step = std::make_shared<std::function<void(int)>>();
+    *step = [this, weak = std::weak_ptr<std::function<void(int)>>(step), n, keep](int i) {
+        auto self = weak.lock();
+        if (!self) return;
+        if (i >= n) {
+            if (keep >= 0 && keep < n) siteSelector_->setCurrentIndex(keep);
+            showBanner(BannerLevel::Success,
+                QString("<b>Tout synchroniser (SFTP) terminé</b> : %1 site(s) traité(s).").arg(n));
+            return;
+        }
+        siteSelector_->setCurrentIndex(i);
+        const SiteConfig* s = currentSite();
+        if (!s) { (*self)(i + 1); return; }
+        startSftpSync(*s, /*analyzeAfter=*/true, [self, i] { (*self)(i + 1); });
+    };
+    (*step)(0);
+}
+
 
 // --- Intégration morfCollector ----------------------------------------------
 
@@ -1590,9 +1749,49 @@ QString MainWindow::ensureCollector(int /*discoverTimeoutMs*/) {
     return collectorUrl_;
 }
 
-QString MainWindow::ensureAnalytics() const {
-    if (!config_.analyticsUrl.empty())
-        return QString::fromStdString(config_.analyticsUrl);
+// Vrai si un morfAnalytics repond a `base` (sonde breve : /healthz, 1,2 s au plus).
+static bool analyticsAnswers(const QString& base) {
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.get(QNetworkRequest(QUrl(base + QStringLiteral("/healthz"))));
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    timeout.start(1200);
+    loop.exec();
+    const bool ok = reply->isFinished() && reply->error() == QNetworkReply::NoError
+                    && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
+    if (!reply->isFinished()) reply->abort();
+    reply->deleteLater();
+    return ok;
+}
+
+QString MainWindow::ensureAnalytics() {
+    const QString pinned = QString::fromStdString(config_.analyticsUrl);
+    if (!pinned.isEmpty()) {
+        // Adresse epinglee : on la garde si elle repond. Une IP epinglee peut devenir morte
+        // (DHCP, ancien Pi) alors qu'un morfAnalytics vivant est connu par le beacon : on
+        // se rabat dessus plutot que d'ouvrir une page injoignable.
+        const qint64 now = QDateTime::currentSecsSinceEpoch();
+        if (analyticsCheckedFor_ == pinned && now - analyticsCheckedAt_ < 60)
+            return analyticsLive_;
+        QString chosen = pinned;
+        bool answered = analyticsAnswers(pinned);
+        if (!answered) {
+            for (auto it = analyticsSeen_.constBegin(); it != analyticsSeen_.constEnd(); ++it) {
+                if (it.key() != pinned && analyticsAnswers(it.key())) { chosen = it.key(); answered = true; break; }
+            }
+            if (answered)
+                statusBar()->showMessage(QString("L'adresse morfAnalytics épinglée (%1) ne répond pas : "
+                    "utilisation de %2. Mettre à jour l'adresse épinglée dans la configuration.").arg(pinned, chosen), 15000);
+        }
+        analyticsLive_ = chosen;
+        analyticsCheckedFor_ = pinned;
+        // Rien ne repond : on recontrole bientot (15 s) au lieu de figer l'echec une minute.
+        analyticsCheckedAt_ = answered ? now : now - 45;
+        return chosen;
+    }
     const QString col = !config_.collectorUrl.empty()
         ? QString::fromStdString(config_.collectorUrl) : collectorUrl_;
     const QString colHost = QUrl(col).host();
@@ -1690,6 +1889,114 @@ QStringList MainWindow::knownCollectorUrls() const {
     return urls;
 }
 
+// ---- Travail en arriere-plan -------------------------------------------------------------
+// Tout calcul long (lecture des .gz, reseau, ecriture de fichiers) quitte le fil de l'interface :
+// la fenetre continue de se redessiner et l'utilisateur voit un indicateur d'activite plutot
+// qu'une application qui semble figee. Les bases SQLite restent dans le fil de l'interface
+// (une connexion Qt ne se partage pas entre fils) : le fil de travail ne fait que CALCULER.
+
+void MainWindow::runInBackground(std::function<void()> work, std::function<void()> done) {
+    QThreadPool::globalInstance()->start(QRunnable::create(
+        [this, work = std::move(work), done = std::move(done)]() mutable {
+            work();
+            // Retour dans le fil de l'interface. Si la fenetre a ete detruite entre-temps,
+            // l'evenement est abandonne par Qt.
+            QMetaObject::invokeMethod(this, [done = std::move(done)]() mutable { if (done) done(); },
+                                      Qt::QueuedConnection);
+        }));
+}
+
+// Variante qui conserve la semantique « la fonction rend la main quand c'est fini » (les
+// enchainements sequentiels en dependent) tout en laissant la fenetre se redessiner : on
+// attend dans une boucle d'evenements qui ignore les clics et frappes (pas de reentrance).
+void MainWindow::runPumped(const QString& text, const std::function<void()>& work) {
+    beginBusy(text);
+    QEventLoop loop;
+    QThreadPool::globalInstance()->start(QRunnable::create([&loop, &work] {
+        work();
+        QMetaObject::invokeMethod(&loop, [&loop] { loop.quit(); }, Qt::QueuedConnection);
+    }));
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+    endBusy();
+}
+
+void MainWindow::postStatus(const QString& text) {
+    QMetaObject::invokeMethod(this, [this, text] { statusBar()->showMessage(text); }, Qt::QueuedConnection);
+}
+
+void MainWindow::beginBusy(const QString& text) {
+    ++busyCount_;
+    if (busyLabel_ && busyTimer_) {
+        busyLabel_->setText(QStringLiteral("◐ travail en cours"));
+        busyLabel_->setVisible(true);
+        busyTimer_->start();
+    }
+    statusBar()->showMessage(text);
+}
+
+void MainWindow::endBusy() {
+    if (busyCount_ > 0) --busyCount_;
+    if (busyCount_ == 0 && busyLabel_ && busyTimer_) {
+        busyTimer_->stop();
+        busyLabel_->setVisible(false);
+    }
+}
+
+// Travail commun au rattrapage d'ouverture et a « Tout synchroniser » via le collecteur :
+// config poussee a chaque collecteur, puis copies recopiees depuis la source de lecture
+// (et, a l'ouverture, instantanes GitHub). Tout se passe dans un fil de travail ; `done` est
+// rappele dans le fil de l'interface.
+void MainWindow::runCollectorWork(std::shared_ptr<CollectorWork> w, const QString& text,
+                                  std::function<void()> done) {
+    beginBusy(text);
+    runInBackground([this, w] {
+        // « Les deux collectent » : on pousse le manifeste (et les secrets) a CHAQUE collecteur
+        // vu. La synchro est idempotente ; le diff ajouts/retraits n'est calcule qu'au 1er
+        // passage (l'etat local est ensuite a jour) : on le capte. Source de LECTURE : le
+        // collecteur epingle s'il repond, sinon le premier qui repond (une IP epinglee peut
+        // etre morte alors qu'un collecteur vivant est connu par le beacon).
+        bool haveRead = false;
+        for (const QString& u : w->all) {
+            if (cancel_) return;
+            const collectorsync::SyncResult sr =
+                collectorsync::synchronize(u, w->cfg, w->cfgPath, w->force);
+            if (!sr.addedLabels.isEmpty())   w->added   = sr.addedLabels;
+            if (!sr.removedLabels.isEmpty()) w->removed = sr.removedLabels;
+            if (!haveRead || (sr.ok && (!w->r.ok || u == w->pinnedRead))) {
+                w->r = sr;
+                haveRead = true;
+                if (sr.ok) w->readUrl = u;
+            }
+        }
+        if (!w->r.ok)
+            return;
+        w->readFallback = !w->pinnedRead.isEmpty() && w->readUrl != w->pinnedRead;
+
+        // Rattrapage : recopie de ce que le collecteur a recolte (comparaison des tailles).
+        for (const SiteConfig& s : w->cfg.sites) {
+            if (cancel_) return;
+            postStatus(QStringLiteral("Rattrapage morfCollector : %1 …").arg(QString::fromStdString(s.name)));
+            const collectorsync::FillResult f = collectorsync::fillCache(w->readUrl, s, w->cfg.cacheRoot, &cancel_);
+            w->totalDl += f.downloaded;
+            w->totalSkip += f.skipped;
+            if (f.downloaded > 0)
+                w->recovered << QString("%1 (%2 fichier(s))")
+                                    .arg(QString::fromStdString(s.name).toHtmlEscaped()).arg(f.downloaded);
+            if (!f.ok) w->problems << QString::fromStdString(s.name);
+        }
+
+        // GitHub : on LIT les instantanes (reseau) ici ; l'ecriture en base se fait dans le fil
+        // de l'interface (la connexion SQLite lui appartient).
+        if (w->withGithub && w->cfg.github.enabled) {
+            postStatus(QStringLiteral("Rattrapage GitHub depuis morfCollector…"));
+            w->githubSnapshots = githubsync::fetchSnapshots(w->cfg, w->readUrl, &cancel_);
+        }
+    }, [this, done = std::move(done)] {
+        endBusy();
+        done();
+    });
+}
+
 void MainWindow::startupCollectorSync() {
     if (!configError_.isEmpty())
         return;
@@ -1698,190 +2005,133 @@ void MainWindow::startupCollectorSync() {
     const QStringList all = knownCollectorUrls();
     if (all.isEmpty())
         return;   // aucun collecteur : SiteWatch reste autonome (silencieux)
-    const QString pinnedRead = ensureCollector(2500);
-
-    // « Les deux collectent » : on pousse le manifeste (et les secrets) à CHAQUE
-    // collecteur vu. La synchro est idempotente ; le diff ajouts/retraits n'est
-    // calculé qu'au 1er passage (l'état local est ensuite à jour) : on le capte.
-    // Source de LECTURE : le collecteur épinglé s'il répond, sinon le premier qui
-    // répond. Une IP épinglée devenue morte (DHCP) ne doit pas bloquer le rattrapage
-    // alors qu'un collecteur vivant est connu par le beacon.
-    collectorsync::SyncResult r;
-    QStringList added, removed;
-    QString readUrl;
-    bool haveRead = false;
-    for (const QString& u : all) {
-        const collectorsync::SyncResult sr =
-            collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/false);
-        if (!sr.addedLabels.isEmpty())   added   = sr.addedLabels;
-        if (!sr.removedLabels.isEmpty()) removed = sr.removedLabels;
-        if (!haveRead || (sr.ok && (!r.ok || u == pinnedRead))) {
-            r = sr; haveRead = true;
-            if (sr.ok) readUrl = u;
-        }
+    if (syncBusy_) {   // une synchronisation est deja en cours : on rejouera a sa fin
+        startupRerun_ = true;
+        return;
     }
-    const bool readFallback = r.ok && !pinnedRead.isEmpty() && readUrl != pinnedRead;
-    r.addedLabels   = added;
-    r.removedLabels = removed;
-    if (!r.ok) {
-        showBanner(BannerLevel::Warning,
-            "morfCollector détecté mais synchronisation impossible : " + r.error.toHtmlEscaped());
-        return;   // pas marqué « fait » : un autre collecteur découvert plus tard relance
-    }
-    collectorStartupDone_ = true;
+    syncBusy_ = true;
 
-    // Rattrapage : SiteWatch reste la source de vérité, mais le collecteur a pu
-    // récolter pendant son absence. On ne recopie que ce qui manque ou a grossi
-    // (fillCache compare les tailles), puis on ré-analyse les seuls sites touchés
-    // pour que l'affichage ET morfAnalytics repartent à jour. Sans collecteur on
-    // n'arrive jamais ici : SiteWatch fonctionne seul.
-    QStringList recovered, problems, updatedSites;
-    if (!readUrl.isEmpty()) {
-        QApplication::setOverrideCursor(Qt::WaitCursor);
-        for (const SiteConfig& s : config_.sites) {
-            statusBar()->showMessage("Rattrapage morfCollector : " + QString::fromStdString(s.name) + " …");
-            QApplication::processEvents();
-            const collectorsync::FillResult f = collectorsync::fillCache(readUrl, s, config_.cacheRoot);
-            if (f.downloaded > 0) {
-                updatedSites << QString::fromStdString(s.name);
-                recovered << QString("%1 (%2 fichier(s))")
-                                 .arg(QString::fromStdString(s.name).toHtmlEscaped()).arg(f.downloaded);
+    auto w = std::make_shared<CollectorWork>();
+    w->cfg = config_;
+    w->cfgPath = configFilePath();
+    w->all = all;
+    w->pinnedRead = ensureCollector(2500);
+    w->force = false;
+    w->withGithub = true;
+
+    runCollectorWork(w, QStringLiteral("Synchronisation avec morfCollector…"), [this, w] {
+        syncBusy_ = false;
+        if (!w->r.ok) {
+            showBanner(BannerLevel::Warning,
+                "morfCollector détecté mais synchronisation impossible : " + w->r.error.toHtmlEscaped());
+            statusBar()->clearMessage();
+        } else {
+            collectorStartupDone_ = true;   // pas marque « fait » en cas d'echec : un collecteur decouvert plus tard relance
+            int githubDays = 0;
+            if (githubPage_) {
+                applyGithubServices();
+                if (w->readFallback)
+                    githubPage_->setCollectorUrl(w->readUrl);   // l'epingle ne repond pas
+                githubDays = githubPage_->applyCatchUp(w->githubSnapshots);
             }
-            if (!f.ok) problems << QString::fromStdString(s.name);
+
+            // Un seul bandeau qui dit tout ce qui s'est passe a l'ouverture.
+            QStringList lines;
+            if (!w->removed.isEmpty())
+                lines << QString("<b>%1 site(s) retiré(s)</b> de la configuration : %2. La collecte "
+                                 "s'arrête, mais les copies déjà conservées sur le Pi ne sont pas "
+                                 "effacées (« Copies locales » pour les supprimer).")
+                             .arg(w->removed.size()).arg(w->removed.join(", ").toHtmlEscaped());
+            if (!w->added.isEmpty())
+                lines << QString("<b>%1 nouveau(x) site(s)</b> confié(s) à la collecte : %2.")
+                             .arg(w->added.size()).arg(w->added.join(", ").toHtmlEscaped());
+            if (w->readFallback)
+                lines << QString("Le collecteur épinglé (%1) ne répond pas : lecture depuis %2. "
+                                 "Mettez à jour l'adresse épinglée dans la configuration.")
+                             .arg(w->pinnedRead.toHtmlEscaped(), w->readUrl.toHtmlEscaped());
+            if (!w->recovered.isEmpty())
+                lines << "<b>Logs mis à jour depuis morfCollector</b> : " + w->recovered.join(", ") + ".";
+            if (githubDays > 0)
+                lines << QString("<b>GitHub mis à jour depuis morfCollector</b> : %1 jour(s) de trafic récupéré(s).")
+                             .arg(githubDays);
+            if (!w->problems.isEmpty())
+                lines << "Rattrapage incomplet pour : " + w->problems.join(", ").toHtmlEscaped() + ".";
+            if (!lines.isEmpty()) {
+                const bool warn = !w->removed.isEmpty() || !w->problems.isEmpty() || w->readFallback;
+                showBanner(warn ? BannerLevel::Warning : BannerLevel::Info, lines.join("<br>"));
+            } else if (w->r.pushed) {
+                statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(w->r.revision));
+            }
+            consolidateStaleSites();   // les logs recopies sont maintenant a analyser
         }
-        QApplication::restoreOverrideCursor();
-    }
-
-    // GitHub : même principe, le magasin local absorbe les jours qui lui manquent.
-    int githubDays = 0;
-    if (githubPage_) {
-        applyGithubServices();
-        if (readFallback)
-            githubPage_->setCollectorUrl(readUrl);   // l'épinglé ne répond pas
-        githubDays = githubPage_->reconcileFromCollector();
-    }
-
-    if (!updatedSites.isEmpty()) {
-        const int keep = siteSelector_->currentIndex();
-        for (const QString& name : updatedSites) {
-            const int idx = siteSelector_->findText(name);
-            if (idx < 0) continue;
-            siteSelector_->setCurrentIndex(idx);
-            onAnalyze();   // met à jour l'affichage et publie vers morfAnalytics
+        if (startupRerun_) {
+            startupRerun_ = false;
+            QTimer::singleShot(0, this, [this] { startupCollectorSync(); });
         }
-        if (keep >= 0 && keep < siteSelector_->count())
-            siteSelector_->setCurrentIndex(keep);
-        refreshSitesOverview();
-    }
-
-    // Un seul bandeau qui dit tout ce qui s'est passé à l'ouverture.
-    QStringList lines;
-    if (!r.removedLabels.isEmpty())
-        lines << QString("<b>%1 site(s) retiré(s)</b> de la configuration : %2. La collecte "
-                         "s'arrête, mais les copies déjà conservées sur le Pi ne sont pas "
-                         "effacées (« Copies locales » pour les supprimer).")
-                     .arg(r.removedLabels.size()).arg(r.removedLabels.join(", ").toHtmlEscaped());
-    if (!r.addedLabels.isEmpty())
-        lines << QString("<b>%1 nouveau(x) site(s)</b> confié(s) à la collecte : %2.")
-                     .arg(r.addedLabels.size()).arg(r.addedLabels.join(", ").toHtmlEscaped());
-    if (readFallback)
-        lines << QString("Le collecteur épinglé (%1) ne répond pas : lecture depuis %2. "
-                         "Mettez à jour l'adresse épinglée dans la configuration.")
-                     .arg(pinnedRead.toHtmlEscaped(), readUrl.toHtmlEscaped());
-    if (!recovered.isEmpty())
-        lines << "<b>Logs mis à jour depuis morfCollector</b> : " + recovered.join(", ") + ".";
-    if (githubDays > 0)
-        lines << QString("<b>GitHub mis à jour depuis morfCollector</b> : %1 jour(s) de trafic récupéré(s).")
-                     .arg(githubDays);
-    if (!problems.isEmpty())
-        lines << "Rattrapage incomplet pour : " + problems.join(", ").toHtmlEscaped() + ".";
-
-    if (!lines.isEmpty()) {
-        const bool warn = !r.removedLabels.isEmpty() || !problems.isEmpty() || readFallback;
-        showBanner(warn ? BannerLevel::Warning : BannerLevel::Info, lines.join("<br>"));
-    } else if (r.pushed) {
-        statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(r.revision));
-    }
+    });
 }
 
-void MainWindow::syncAllViaCollector() {
-    hideBanner();
-    if (!configError_.isEmpty() || config_.sites.empty()) {
-        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+// Remplit la verite web des sites dont le cache a change depuis la derniere consolidation
+// (logs recopies du collecteur, ou telecharges en SFTP lors d'une session precedente), puis
+// republie vers morfAnalytics. Le calcul (lecture des .gz) est fait en arriere-plan ; seule
+// l'ecriture en base et la publication reviennent dans le fil de l'interface.
+void MainWindow::consolidateStaleSites() {
+    if (!configError_.isEmpty() || config_.sites.empty())
         return;
-    }
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    const QStringList all = knownCollectorUrls();
-    const QString url = ensureCollector(3000);   // source de LECTURE (fillCache)
-    if (all.isEmpty() || url.isEmpty()) {
-        QApplication::restoreOverrideCursor();
-        showBanner(BannerLevel::Warning,
-            "<b>Aucun morfCollector détecté</b> sur le réseau.<br>"
-            "Utilisez « Tout synchroniser → En direct (SFTP) » pour télécharger "
-            "directement depuis l'hébergeur.");
+    if (syncBusy_)
+        return;   // le rattrapage en cours rappellera cette fonction a sa fin
+    WebAuthorityStore* web = webStore();
+    if (!web)
         return;
-    }
 
-    // 1. Aligner la configuration sur CHAQUE collecteur (manifeste + secrets).
-    //    « Les deux collectent » : tous reçoivent le manifeste (redondance).
-    collectorsync::SyncResult sr;   // retenu = celui de la source de lecture
-    bool haveRead = false;
-    for (const QString& u : all) {
-        const collectorsync::SyncResult one =
-            collectorsync::synchronize(u, config_, configFilePath(), /*forceCredentials=*/true);
-        if (u == url || !haveRead) { sr = one; haveRead = true; }
-    }
-    if (!sr.ok) {
-        QApplication::restoreOverrideCursor();
-        showBanner(BannerLevel::Error, "Synchronisation refusée : " + sr.error.toHtmlEscaped());
-        return;
-    }
-
-    // 2. Remplir le cache local depuis la source de LECTURE choisie (tous les
-    //    sites). On ne lit qu'UN collecteur pour éviter tout doublon de données.
-    int totalDl = 0, totalSkip = 0;
-    QStringList problems;
+    struct Job { SiteConfig site; };
+    auto jobs = std::make_shared<std::vector<Job>>();
     for (const SiteConfig& s : config_.sites) {
-        statusBar()->showMessage("Copies locales : " + QString::fromStdString(s.name) + " …");
-        QApplication::processEvents();
-        const collectorsync::FillResult f = collectorsync::fillCache(url, s, config_.cacheRoot);
-        totalDl += f.downloaded;
-        totalSkip += f.skipped;
-        if (!f.ok) problems << QString::fromStdString(s.name);
+        const QMap<QString, qint64> sizes = siteanalysis::siteLogSizes(config_.cacheRoot, s);
+        if (!sizes.isEmpty() && web->needsConsolidation(QString::fromStdString(s.id), sizes))
+            jobs->push_back({s});
     }
-    QApplication::restoreOverrideCursor();
-
-    QString msg = QString("<b>morfCollector : %1 fichier(s) copié(s) dans le cache</b> "
-                          "(%2 déjà à jour).").arg(totalDl).arg(totalSkip);
-    if (!sr.removedLabels.isEmpty())
-        msg += QString("<br>%1 site(s) retiré(s) : copies conservées sur le Pi, non effacées.")
-                   .arg(sr.removedLabels.size());
-    if (!problems.isEmpty())
-        msg += "<br>Problème pour : " + problems.join(", ").toHtmlEscaped();
-    showBanner(problems.isEmpty() ? BannerLevel::Success : BannerLevel::Warning, msg);
-
-    onAnalyze();
-    refreshSitesOverview();
-}
-
-void MainWindow::syncAllLocal() {
-    hideBanner();
-    if (!configError_.isEmpty() || config_.sites.empty()) {
-        showBanner(BannerLevel::Error, "Aucune configuration valide.");
+    if (jobs->empty())
         return;
-    }
-    // Réutilise le téléchargement SFTP éprouvé, site par site, en une passe.
-    const int n = siteSelector_->count();
-    const int keep = siteSelector_->currentIndex();
-    for (int i = 0; i < n; ++i) {
-        siteSelector_->setCurrentIndex(i);
-        QApplication::processEvents();
-        onSync();   // télécharge (SFTP) + analyse le site i
-    }
-    if (keep >= 0 && keep < n)
-        siteSelector_->setCurrentIndex(keep);
-    showBanner(BannerLevel::Success,
-        QString("<b>Tout synchroniser (SFTP) terminé</b> : %1 site(s) traité(s).").arg(n));
+    syncBusy_ = true;
+
+    const std::string cacheRoot = config_.cacheRoot;
+    const std::string fromStr = fromDate_->date().toString("yyyy-MM-dd").toStdString();
+    const std::string toStr   = toDate_->date().toString("yyyy-MM-dd").toStdString();
+    auto results = std::make_shared<std::vector<siteanalysis::Result>>(jobs->size());
+    beginBusy(QString("Historique web : analyse de %1 site(s)…").arg(jobs->size()));
+
+    runInBackground([this, jobs, results, cacheRoot, fromStr, toStr] {
+        for (size_t i = 0; i < jobs->size(); ++i) {
+            if (cancel_) return;
+            postStatus(QString("Historique web : analyse de %1 …").arg(QString::fromStdString((*jobs)[i].site.name)));
+            (*results)[i] = siteanalysis::computeSite(cacheRoot, (*jobs)[i].site, fromStr, toStr, /*wantFull=*/true);
+        }
+    }, [this, jobs, results] {
+        endBusy();
+        syncBusy_ = false;
+        WebAuthorityStore* store = webStore();
+        QStringList names;
+        for (size_t i = 0; i < jobs->size(); ++i) {
+            const siteanalysis::Result& r = (*results)[i];
+            if (r.sizes.isEmpty() || !store) continue;   // analyse interrompue
+            const SiteConfig& site = (*jobs)[i].site;
+            store->consolidate(QString::fromStdString(site.id), r.full, r.sizes);
+            postReport(siteanalysis::buildReport(site, r.stats, store));
+            names << QString::fromStdString(site.name);
+        }
+        if (!names.isEmpty()) {
+            refreshSitesOverview();
+            statusBar()->showMessage(QString("Historique web consolidé pour %1 site(s) : %2.")
+                                         .arg(names.size()).arg(names.join(", ")), 10000);
+        } else {
+            statusBar()->clearMessage();
+        }
+        if (startupRerun_) {
+            startupRerun_ = false;
+            QTimer::singleShot(0, this, [this] { startupCollectorSync(); });
+        }
+    });
 }
 
 // --- Onglet « Copies locales » ----------------------------------------------
@@ -2178,22 +2428,29 @@ void MainWindow::onAnalyze() {
     }
 
     // --- Pipeline coeur : lecture -> parsing -> filtre de date -> stats ---
-    StatsEngine engine;
-    entries_.clear();
-    unsigned long long totalBytes = 0;
-    for (const std::string& file : logs) {
-        std::error_code ec;
-        totalBytes += fs::file_size(file, ec);
-        GzReader::readLines(file, [&](const std::string& line) {
-            LogEntry e = ApacheLogParser::parseLine(line);
-            if (e.valid && e.date >= fromStr && e.date <= toStr) {
-                engine.ingest(e);
-                entries_.push_back(e);   // conservé pour le détail au double-clic
-            }
+    // Module partage avec l'outil headless : une seule lecture des logs alimente la
+    // periode affichee ET, si un fichier a change, la verite web (tout l'historique).
+    const SiteConfig* analysed = currentSite();
+    if (!analysed)
+        return;
+    WebAuthorityStore* web = webStore();
+    const QString siteId = QString::fromStdString(analysed->id);
+    const QMap<QString, qint64> sizes = siteanalysis::siteLogSizes(config_.cacheRoot, *analysed);
+    const bool consolidate = web && !siteId.isEmpty() && !sizes.isEmpty() && web->needsConsolidation(siteId, sizes);
+    siteanalysis::Result res;
+    {
+        // Lecture et analyse des .gz dans un fil de travail : la fenetre reste vivante.
+        const SiteConfig siteCopy = *analysed;
+        const std::string cacheRoot = config_.cacheRoot;
+        runPumped(QString("Analyse de %1…").arg(QString::fromStdString(siteName)), [&] {
+            res = siteanalysis::computeSite(cacheRoot, siteCopy, fromStr, toStr, consolidate, /*keepEntries=*/true);
         });
     }
-
-    lastStats_ = engine.result();
+    if (consolidate)
+        web->consolidate(siteId, res.full, res.sizes);
+    entries_ = std::move(res.entries);
+    const unsigned long long totalBytes = res.totalBytes;
+    lastStats_ = std::move(res.stats);
     displayStats(lastStats_);
     publishAnalytics();
 
@@ -2212,59 +2469,60 @@ void MainWindow::onAnalyze() {
     refreshSitesOverview();
 }
 
+WebAuthorityStore* MainWindow::webStore() {
+    if (!webStore_) {
+        const QString path = QDir::cleanPath(QString::fromStdString(config_.cacheRoot)
+                                             + QStringLiteral("/web/web.sqlite"));
+        auto store = std::make_unique<WebAuthorityStore>(path);
+        if (!store->open())
+            return nullptr;   // pas de magasin : SiteWatch retombe sur l'analyse en memoire
+        webStore_ = std::move(store);
+    }
+    return webStore_.get();
+}
+
 void MainWindow::publishAnalytics() {
     const SiteConfig* site = currentSite();
+    if (!site) return;
+    postReport(siteanalysis::buildReport(*site, lastStats_, webStore()));
+}
+
+// POST asynchrone de la synthese d'un site vers morfAnalytics (sans attente).
+//
+// Une synthese qui n'a pas pu partir (morfAnalytics pas encore vu sur le reseau, injoignable)
+// n'est pas perdue : la derniere par site est gardee et renvoyee des qu'il est joignable.
+void MainWindow::postReport(const QJsonObject& body) {
+    const QString siteId = body.value(QStringLiteral("site_id")).toString();
     const QString analytics = ensureAnalytics();
-    if (!site || analytics.isEmpty()) return;
-    // Le rapport est destiné à une synthèse Web, non à une copie exhaustive des
-    // journaux. Envoyer toutes les URL d'un gros site peut dépasser la taille
-    // maximale d'une requête HTTP et empêcher complètement sa publication.
-    auto rankedMapJson = [](const std::map<std::string, long>& values) {
-        std::vector<std::pair<std::string, long>> ranked(values.begin(), values.end());
-        std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
-            return a.second != b.second ? a.second > b.second : a.first < b.first;
-        });
-        QJsonObject out;
-        constexpr size_t kMaximumItems = 20;
-        constexpr int kMaximumLabelLength = 180;
-        for (size_t i = 0; i < ranked.size() && i < kMaximumItems; ++i) {
-            QString label = QString::fromStdString(ranked[i].first);
-            if (label.size() > kMaximumLabelLength)
-                label = label.left(kMaximumLabelLength - 1) + QChar(0x2026);
-            out[label] = static_cast<double>(ranked[i].second);
-        }
-        return out;
-    };
-    auto dailyMapJson = [](const std::map<std::string, long>& values) {
-        QJsonObject out;
-        constexpr size_t kMaximumDays = 90;
-        const size_t skip = values.size() > kMaximumDays ? values.size() - kMaximumDays : 0;
-        size_t index = 0;
-        for (const auto& [day, count] : values) {
-            if (index++ >= skip) out[QString::fromStdString(day)] = static_cast<double>(count);
-        }
-        return out;
-    };
-    QJsonObject stats{{"requests", static_cast<double>(lastStats_.totalRequests)},
-        {"bots", static_cast<double>(lastStats_.bots)}, {"attacks", static_cast<double>(sumAttacks(lastStats_))},
-        {"errors_404", static_cast<double>(lastStats_.errors404)}, {"errors_403", static_cast<double>(lastStats_.errors403)},
-        {"errors_500", static_cast<double>(lastStats_.errors500)},
-        {"top_pages", rankedMapJson(lastStats_.topPages)}, {"top_attacked", rankedMapJson(lastStats_.topAttacked)},
-        {"bot_counts", rankedMapJson(lastStats_.botCounts)}, {"daily_humans", dailyMapJson(lastStats_.dailyHumans)},
-        {"daily_bots", dailyMapJson(lastStats_.dailyBots)}, {"daily_ai", dailyMapJson(lastStats_.dailyAI)},
-        {"daily_seo", dailyMapJson(lastStats_.dailySEO)}, {"daily_404", dailyMapJson(lastStats_.daily404)},
-        {"daily_attacks", dailyMapJson(lastStats_.dailyAttacks)}, {"daily_normal", dailyMapJson(lastStats_.dailyNormal)}};
-    QJsonObject body{{"site_id", QString::fromStdString(site->id)}, {"site_label", QString::fromStdString(site->name)},
-        {"from", QString::fromStdString(lastStats_.firstDate)}, {"to", QString::fromStdString(lastStats_.lastDate)}, {"stats", stats}};
+    if (analytics.isEmpty()) {
+        pendingReports_.insert(siteId, body);
+        return;
+    }
     auto* nam = new QNetworkAccessManager(this);
     QNetworkRequest request(QUrl(analytics + "/sitewatch/ingest"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     auto* reply = nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, reply, [this, reply, nam] {
-        if (reply->error() != QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200)
-            statusBar()->showMessage("Publication morfAnalytics échouée : " + reply->errorString(), 8000);
+    connect(reply, &QNetworkReply::finished, reply, [this, reply, nam, body, siteId] {
+        const bool ok = reply->error() == QNetworkReply::NoError
+                        && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
+        if (ok) {
+            pendingReports_.remove(siteId);
+            if (!pendingReports_.isEmpty())
+                flushPendingReports();   // morfAnalytics repond : on rattrape les autres sites
+        } else {
+            pendingReports_.insert(siteId, body);
+            statusBar()->showMessage("Publication morfAnalytics échouée (renvoi dès qu'il est joignable) : "
+                                     + reply->errorString(), 8000);
+        }
         reply->deleteLater(); nam->deleteLater();
     });
+}
+
+void MainWindow::flushPendingReports() {
+    const QMap<QString, QJsonObject> pending = pendingReports_;
+    pendingReports_.clear();   // un echec les remet en attente, sans boucle
+    for (const QJsonObject& report : pending)
+        postReport(report);
 }
 
 void MainWindow::displayStats(const Stats& s) {
@@ -2311,116 +2569,133 @@ void MainWindow::displayStats(const Stats& s) {
     rebuildChart();
 }
 
+namespace {
+// Une ligne du tableau de synthese des sites (calculee en arriere-plan).
+struct OverviewRow {
+    QString name;
+    Stats stats;
+    int level = 0;
+    QDateTime lastSync;
+};
+} // namespace
+
+// Le tableau est calcule en arriere-plan (lecture des .gz de TOUS les sites sur la periode) puis
+// presente dans le fil de l'interface. Un compteur de generation ecarte un resultat devenu
+// perime si une nouvelle demande est arrivee entre-temps.
 void MainWindow::refreshSitesOverview() {
     if (!sitesTable_ || !sitesSummary_) return;
-    sitesTable_->setSortingEnabled(false);
-    sitesTable_->setRowCount(0);
 
     if (configError_.size() > 0 || config_.sites.empty()) {
+        sitesTable_->setSortingEnabled(false);
+        sitesTable_->setRowCount(0);
         sitesSummary_->setText("Aucun site configuré.");
         return;
     }
 
+    const int gen = ++overviewGen_;
+    sitesSummary_->setText("Calcul de la synthèse des sites…");
     const std::string fromStr = fromDate_->date().toString("yyyy-MM-dd").toStdString();
     const std::string toStr = toDate_->date().toString("yyyy-MM-dd").toStdString();
-    CacheManager cache(config_.cacheRoot);
+    const Config cfg = config_;   // copie : le fil de travail ne lit jamais config_
+    auto result = std::make_shared<std::vector<OverviewRow>>();
+    result->reserve(cfg.sites.size());
 
-    struct Row {
-        QString name;
-        Stats stats;
-        int level = 0;
-        QDateTime lastSync;
-    };
-    std::vector<Row> rows;
-    rows.reserve(config_.sites.size());
-
-    for (const auto& site : config_.sites) {
-        Row row;
-        row.name = QString::fromStdString(site.name);
-        row.stats = analyzeSiteStats(config_.cacheRoot, site, fromStr, toStr);
-        row.level = healthLevel(row.stats);
-
-        for (const std::string& file : cache.localLogs(site.name)) {
-            if (!fileBelongsToSite(fs::path(file).filename().string(), site.name, site.logMatch))
-                continue;
-            const QDateTime modified = QFileInfo(QString::fromStdString(file)).lastModified();
-            if (modified.isValid() && (!row.lastSync.isValid() || modified > row.lastSync))
-                row.lastSync = modified;
+    runInBackground([this, cfg, fromStr, toStr, result] {
+        CacheManager cache(cfg.cacheRoot);
+        for (const auto& site : cfg.sites) {
+            if (cancel_) return;
+            OverviewRow row;
+            row.name = QString::fromStdString(site.name);
+            row.stats = analyzeSiteStats(cfg.cacheRoot, site, fromStr, toStr);
+            row.level = healthLevel(row.stats);
+            for (const std::string& file : cache.localLogs(site.name)) {
+                if (!fileBelongsToSite(fs::path(file).filename().string(), site.name, site.logMatch))
+                    continue;
+                const QDateTime modified = QFileInfo(QString::fromStdString(file)).lastModified();
+                if (modified.isValid() && (!row.lastSync.isValid() || modified > row.lastSync))
+                    row.lastSync = modified;
+            }
+            result->push_back(std::move(row));
         }
-        rows.push_back(row);
-    }
+    }, [this, gen, result] {
+        if (gen != overviewGen_ || !sitesTable_ || !sitesSummary_)
+            return;   // une demande plus recente est en cours
+        std::vector<OverviewRow>& rows = *result;
+        sitesTable_->setSortingEnabled(false);
+        sitesTable_->setRowCount(0);
 
-    std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
-        if (a.level != b.level) return a.level > b.level;
-        return a.name.toLower() < b.name.toLower();
-    });
+        std::sort(rows.begin(), rows.end(), [](const OverviewRow& a, const OverviewRow& b) {
+            if (a.level != b.level) return a.level > b.level;
+            return a.name.toLower() < b.name.toLower();
+        });
 
-    sitesTable_->setRowCount(static_cast<int>(rows.size()));
-    int r = 0;
-    for (const Row& row : rows) {
-        const Stats& s = row.stats;
-        const long attacks = sumAttacks(s);
-        const long ai = aiBots(s);
-        const long google = botOf(s, "Google");
-        const long wp = normalActivityTotal(s);
+        sitesTable_->setRowCount(static_cast<int>(rows.size()));
+        int r = 0;
+        for (const OverviewRow& row : rows) {
+            const Stats& s = row.stats;
+            const long attacks = sumAttacks(s);
+            const long ai = aiBots(s);
+            const long google = botOf(s, "Google");
+            const long wp = normalActivityTotal(s);
 
-        auto* name = textItem(row.name, row.name.toLower());
-        name->setData(Qt::UserRole + 1, row.name);
-        sitesTable_->setItem(r, 0, name);
-        auto* stateItem = textItem(healthLabel(row.level), row.level);
-        stateItem->setIcon(icons::icon(icons::Glyph::Dot, stateColor(row.level)));
-        sitesTable_->setItem(r, 1, stateItem);
-        sitesTable_->setItem(r, 2, numberItem(s.humans));
-        sitesTable_->setItem(r, 3, numberItem(s.bots));
-        sitesTable_->setItem(r, 4, numberItem(ai));
-        sitesTable_->setItem(r, 5, numberItem(google));
-        sitesTable_->setItem(r, 6, numberItem(s.errors404));
-        sitesTable_->setItem(r, 7, numberItem(s.errors500));
-        sitesTable_->setItem(r, 8, numberItem(attacks));
-        sitesTable_->setItem(r, 9, numberItem(wp));
-        sitesTable_->setItem(r, 10, textItem(
-            row.lastSync.isValid() ? row.lastSync.toString("dd/MM/yyyy HH:mm") : "Jamais",
-            row.lastSync.isValid() ? row.lastSync.toSecsSinceEpoch() : 0));
-        sitesTable_->setItem(r, 11, textItem(attentionSummary(s)));
-        sitesTable_->setItem(r, 12, textItem(recommendedAction(s)));
-        ++r;
-    }
-    sitesTable_->setSortingEnabled(true);
-
-    auto maxBy = [&](auto getter) -> QString {
-        const Row* best = nullptr;
-        long bestValue = -1;
-        for (const Row& row : rows) {
-            const long value = getter(row.stats);
-            if (value > bestValue) { bestValue = value; best = &row; }
+            auto* name = textItem(row.name, row.name.toLower());
+            name->setData(Qt::UserRole + 1, row.name);
+            sitesTable_->setItem(r, 0, name);
+            auto* stateItem = textItem(healthLabel(row.level), row.level);
+            stateItem->setIcon(icons::icon(icons::Glyph::Dot, stateColor(row.level)));
+            sitesTable_->setItem(r, 1, stateItem);
+            sitesTable_->setItem(r, 2, numberItem(s.humans));
+            sitesTable_->setItem(r, 3, numberItem(s.bots));
+            sitesTable_->setItem(r, 4, numberItem(ai));
+            sitesTable_->setItem(r, 5, numberItem(google));
+            sitesTable_->setItem(r, 6, numberItem(s.errors404));
+            sitesTable_->setItem(r, 7, numberItem(s.errors500));
+            sitesTable_->setItem(r, 8, numberItem(attacks));
+            sitesTable_->setItem(r, 9, numberItem(wp));
+            sitesTable_->setItem(r, 10, textItem(
+                row.lastSync.isValid() ? row.lastSync.toString("dd/MM/yyyy HH:mm") : "Jamais",
+                row.lastSync.isValid() ? row.lastSync.toSecsSinceEpoch() : 0));
+            sitesTable_->setItem(r, 11, textItem(attentionSummary(s)));
+            sitesTable_->setItem(r, 12, textItem(recommendedAction(s)));
+            ++r;
         }
-        return best && bestValue > 0 ? QString("%1 (%2)").arg(best->name, num(bestValue)) : "Aucun";
-    };
-    const auto bestHealth = std::min_element(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
-        if (a.level != b.level) return a.level < b.level;
-        return a.name.toLower() < b.name.toLower();
-    });
+        sitesTable_->setSortingEnabled(true);
 
-    Theme& th = Theme::instance();
-    const int ip = 13;
-    auto item = [&](icons::Glyph g, const QString& colorTok, const QString& label,
-                    const QString& value) {
-        return icons::span(g, th.color(colorTok), ip) + " " + label + " : " + value;
-    };
-    sitesSummary_->setText(QStringList{
-        item(icons::Glyph::Trophy,  "accent",    "Site le plus visité",
-             maxBy([](const Stats& s) { return s.humans; })),
-        item(icons::Glyph::Shield,  "danger",    "Site le plus attaqué",
-             maxBy([](const Stats& s) { return sumAttacks(s); })),
-        item(icons::Glyph::Robot,   "textMuted", "Robots IA",
-             maxBy([](const Stats& s) { return aiBots(s); })),
-        item(icons::Glyph::CrossCircle, "kpi404", "Erreurs 404",
-             maxBy([](const Stats& s) { return s.errors404; })),
-        item(icons::Glyph::TrendUp, "accent",    "Activité Google",
-             maxBy([](const Stats& s) { return botOf(s, "Google"); })),
-        item(icons::Glyph::Heart,   "ok",        "Meilleur état",
-             bestHealth != rows.end() ? bestHealth->name : QString("Aucun")),
-    }.join("   ·   "));
+        auto maxBy = [&](auto getter) -> QString {
+            const OverviewRow* best = nullptr;
+            long bestValue = -1;
+            for (const OverviewRow& row : rows) {
+                const long value = getter(row.stats);
+                if (value > bestValue) { bestValue = value; best = &row; }
+            }
+            return best && bestValue > 0 ? QString("%1 (%2)").arg(best->name, num(bestValue)) : "Aucun";
+        };
+        const auto bestHealth = std::min_element(rows.begin(), rows.end(), [](const OverviewRow& a, const OverviewRow& b) {
+            if (a.level != b.level) return a.level < b.level;
+            return a.name.toLower() < b.name.toLower();
+        });
+
+        Theme& th = Theme::instance();
+        const int ip = 13;
+        auto item = [&](icons::Glyph g, const QString& colorTok, const QString& label,
+                        const QString& value) {
+            return icons::span(g, th.color(colorTok), ip) + " " + label + " : " + value;
+        };
+        sitesSummary_->setText(QStringList{
+            item(icons::Glyph::Trophy,  "accent",    "Site le plus visité",
+                 maxBy([](const Stats& s) { return s.humans; })),
+            item(icons::Glyph::Shield,  "danger",    "Site le plus attaqué",
+                 maxBy([](const Stats& s) { return sumAttacks(s); })),
+            item(icons::Glyph::Robot,   "textMuted", "Robots IA",
+                 maxBy([](const Stats& s) { return aiBots(s); })),
+            item(icons::Glyph::CrossCircle, "kpi404", "Erreurs 404",
+                 maxBy([](const Stats& s) { return s.errors404; })),
+            item(icons::Glyph::TrendUp, "accent",    "Activité Google",
+                 maxBy([](const Stats& s) { return botOf(s, "Google"); })),
+            item(icons::Glyph::Heart,   "ok",        "Meilleur état",
+                 bestHealth != rows.end() ? bestHealth->name : QString("Aucun")),
+        }.join("   ·   "));
+    });
 }
 
 void MainWindow::fillUrls() {

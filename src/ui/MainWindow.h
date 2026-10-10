@@ -9,10 +9,19 @@
 #include <QMap>
 #include <QStringList>
 #include <functional>
+#include <atomic>
+#include <QJsonObject>
+#include <QStringList>
+#include <QVector>
+#include "collector/CollectorSync.h"
+#include "config/Config.h"
+#include <functional>
 #include <memory>
 #include <vector>
 #include "config/Config.h"
 #include "core/model/Stats.h"
+#include "webstore/WebAuthorityStore.h"
+#include <memory>
 #include "core/model/LogEntry.h"
 #include "ui/UrlReport.h"
 #include "ui/Icons.h"
@@ -45,6 +54,24 @@ namespace morfbeacon { class PresenceService; class IMetricsProvider; }
 // Elle orchestre le coeur (Config -> CacheManager -> GzReader -> Parser ->
 // StatsEngine) et affiche le resultat dans une interface facon Windows 11.
 // -----------------------------------------------------------------------------
+// Travail de synchronisation avec les collecteurs, calcule dans un fil de travail : le fil de travail
+// n'a acces qu'a des COPIES (jamais a config_ ni aux widgets).
+struct CollectorWork {
+    Config cfg;
+    QString cfgPath;
+    QStringList all;                 // collecteurs a qui pousser
+    QString pinnedRead;              // source de lecture souhaitee
+    bool force = false;              // remettre TOUS les secrets (« Tout synchroniser »)
+    bool withGithub = false;         // lire aussi les instantanes GitHub (rattrapage d'ouverture)
+    collectorsync::SyncResult r;
+    QStringList added, removed, recovered, problems;
+    QString readUrl;
+    bool readFallback = false;
+    int totalDl = 0, totalSkip = 0;
+    QVector<QJsonObject> githubSnapshots;
+};
+struct SftpOutcome;                  // resultat d'un telechargement SFTP (defini dans le .cpp)
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -103,7 +130,7 @@ private:
     // Localise morfCollector (découverte morfBeacon), en mémorisant l'URL. "" si
     // aucun collecteur n'est présent (SiteWatch reste autonome).
     QString ensureCollector(int discoverTimeoutMs);
-    QString ensureAnalytics() const;
+    QString ensureAnalytics();
     QStringList knownCollectorUrls() const;   // tous les collecteurs a qui pousser
     void applyGithubServices();
     void pinCollectorUrl(const QString& url);
@@ -112,6 +139,27 @@ private:
     // Au démarrage : pousse la config au collecteur si présent, et ALERTE sur les
     // sites ajoutés / retirés (un retrait n'efface JAMAIS les copies du Pi).
     void startupCollectorSync();
+    void consolidateStaleSites();   // remplit le magasin web des sites au cache modifie (arriere-plan)
+
+    // --- Travail en arriere-plan : l'interface ne doit jamais sembler figee ---
+    // `work` tourne dans un fil du pool (il ne touche NI aux widgets NI aux bases SQLite) ;
+    // `done` est rappele dans le fil de l'interface avec le resultat.
+    void runInBackground(std::function<void()> work, std::function<void()> done);
+    // Synchronisation avec les collecteurs (rattrapage d'ouverture, « Tout synchroniser »).
+    void runCollectorWork(std::shared_ptr<CollectorWork> w, const QString& text, std::function<void()> done);
+    // Telechargement SFTP d'un site : connexion, liste et copie dans un fil de travail, bannieres et
+    // analyse dans l'interface. `done` est rappele quoi qu'il arrive (enchainement site par site).
+    void startSftpSync(const SiteConfig& site, bool analyzeAfter, std::function<void()> done);
+    void sftpWork(SftpOutcome& out, const SiteConfig& site, const std::string& cacheRoot);
+    void postProgress(int percent);
+    // Meme principe mais la fonction ne rend la main qu'a la fin (enchainements sequentiels) ;
+    // la fenetre se redessine pendant l'attente, sans accepter de clic.
+    void runPumped(const QString& text, const std::function<void()>& work);
+    void postStatus(const QString& text);   // message de barre d'etat depuis un fil de travail
+    void beginBusy(const QString& text);    // indicateur d'activite (barre de progression)
+    void endBusy();
+    void postReport(const QJsonObject& body);   // POST asynchrone de la synthese vers morfAnalytics
+    void flushPendingReports();                 // renvoie les syntheses non publiees (morfAnalytics enfin joignable)
     void publishAnalytics();
     // « Tout synchroniser » : en une passe, tous les sites.
     void syncAllViaCollector();   // récupère les copies locales depuis le collecteur
@@ -157,6 +205,18 @@ private:
     QMap<QString, QString> collectorSeen_;  // baseUrl -> "app (hote)" : TOUS les collecteurs vus
     QMap<QString, QString> analyticsSeen_;  // baseUrl -> "app (hote)" : morfAnalytics vus
     bool collectorStartupDone_ = false;   // rattrapage d'ouverture déjà joué
+    std::atomic<bool> cancel_{false};     // arret demande (fermeture) : les fils de travail s'interrompent
+    bool syncBusy_ = false;            // rattrapage ou consolidation en arriere-plan en cours
+    bool startupRerun_ = false;           // une demande est arrivee pendant ce temps : a rejouer ensuite
+    int  busyCount_ = 0;                  // taches d'arriere-plan actives (indicateur d'activite)
+    QLabel* busyLabel_ = nullptr;         // indicateur tournant de la barre d'etat
+    QTimer* busyTimer_ = nullptr;
+    int  busyFrame_ = 0;
+    QMap<QString, QJsonObject> pendingReports_;   // site_id -> derniere synthese non publiee
+    int  overviewGen_ = 0;                // generation du tableau de synthese (ecarte un resultat perime)
+    QString analyticsLive_;          // morfAnalytics retenu (epingle s'il repond, sinon un autre vu)
+    QString analyticsCheckedFor_;    // adresse epinglee pour laquelle analyticsLive_ a ete calcule
+    qint64  analyticsCheckedAt_ = 0; // epoch du dernier controle (cache court : pas de sonde a chaque appel)
     QString analyticsUrl_;   // dernier vu (repli si pas d'épingle ni même hôte)
     QPushButton* analyticsButton_ = nullptr;
     QStackedWidget* domainStack_ = nullptr;
@@ -164,6 +224,8 @@ private:
     QPushButton* githubDomainBtn_ = nullptr;
     GitHubPage*  githubPage_ = nullptr;
     Stats   lastStats_;
+    std::unique_ptr<WebAuthorityStore> webStore_;   // verite web, ouverte a la demande
+    WebAuthorityStore* webStore();
     std::vector<LogEntry> entries_;   // entrées de la dernière analyse (pour le détail)
 
     // --- En-tete ---

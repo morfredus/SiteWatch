@@ -8,6 +8,7 @@
 #include <QString>
 #include <QStringList>
 #include <QJsonObject>
+#include <atomic>
 #include <string>
 #include "config/Config.h"
 
@@ -59,7 +60,8 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
 // Remplit le cache local d'un site depuis le collecteur : ne recopie que les
 // originaux absents, ou presents mais de taille differente (donnees plus
 // recentes). Meme disposition de cache que le telechargement direct.
+// `cancel` (facultatif) : arret propre entre deux fichiers quand l'application se ferme.
 FillResult fillCache(const QString& baseUrl, const SiteConfig& site,
-                     const std::string& cacheRoot);
+                     const std::string& cacheRoot, const std::atomic<bool>* cancel = nullptr);
 
 } // namespace collectorsync

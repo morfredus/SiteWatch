@@ -107,6 +107,9 @@ set(UI_SOURCES
     src/github/GitHubRepoCatalog.cpp
     src/github/GitHubTrafficClient.cpp
     src/github/GitHubAuthorityStore.cpp
+    src/webstore/WebAuthorityStore.cpp
+    src/publish/SiteAnalysis.cpp
+    src/github/GitHubSync.cpp
 )
 
 set(UI_HEADERS
@@ -122,6 +125,9 @@ set(UI_HEADERS
     src/github/GitHubRepoCatalog.h
     src/github/GitHubTrafficClient.h
     src/github/GitHubAuthorityStore.h
+    src/webstore/WebAuthorityStore.h
+    src/publish/SiteAnalysis.h
+    src/github/GitHubSync.h
 )
 
 # Integration morfCollector (cote fournisseur). Qt Network ; appele par l'UI.
@@ -230,6 +236,46 @@ if(MSVC)
     target_compile_options(sitewatch-collector-sync PRIVATE /utf-8)
 endif()
 
+# --- Outil headless : consolidation et publication vers morfAnalytics ------
+# Fait sans interface ce que la GUI fait a l'ouverture (rattrapage collecteur, verite
+# web, publication web + GitHub), avec le MEME code et les MEMES magasins. A planifier
+# (tache planifiee Windows, timer systemd) pour que morfAnalytics reste a jour meme si
+# la GUI n'est pas lancee pendant des jours.
+add_executable(sitewatch-publish
+    src/publish/publish_main.cpp
+    src/publish/SiteAnalysis.cpp
+    src/publish/SiteAnalysis.h
+    src/webstore/WebAuthorityStore.cpp
+    src/webstore/WebAuthorityStore.h
+    src/github/GitHubSync.cpp
+    src/github/GitHubSync.h
+    src/github/GitHubAuthorityStore.cpp
+    src/github/GitHubAuthorityStore.h
+    src/collector/CollectorClient.cpp
+    src/collector/CollectorClient.h
+    src/collector/CollectorSync.cpp
+    src/collector/CollectorSync.h
+    src/config/Config.cpp
+    src/config/Config.h
+    src/core/io/GzReader.cpp
+    src/core/parser/ApacheLogParser.cpp
+    src/core/analytics/BotDetector.cpp
+    src/core/analytics/StatsEngine.cpp
+    src/core/cache/CacheManager.cpp
+    src/core/net/LogDiscovery.cpp
+)
+target_include_directories(sitewatch-publish PRIVATE src)
+target_link_libraries(sitewatch-publish PRIVATE
+    Qt6::Core
+    Qt6::Network
+    Qt6::Sql
+    ZLIB::ZLIB
+    nlohmann_json::nlohmann_json
+)
+if(MSVC)
+    target_compile_options(sitewatch-publish PRIVATE /utf-8)
+endif()
+
 # --- Auto-test du moteur de coherence (chantier B1) -----------------------
 # Console PURE (aucune E/S, aucune dependance Qt) : verifie que chaque scenario
 # des trois vues (source / collecteur / cache) produit l'etat attendu. Sert de
@@ -243,6 +289,15 @@ target_include_directories(sitewatch-coherence-selftest PRIVATE src)
 if(MSVC)
     target_compile_options(sitewatch-coherence-selftest PRIVATE /utf-8)
 endif()
+
+# Auto-test du magasin d'autorite web (SQLite, sans reseau ni interface).
+add_executable(sitewatch-webstore-selftest
+    src/webstore/webstore_selftest.cpp
+    src/webstore/WebAuthorityStore.cpp
+    src/webstore/WebAuthorityStore.h
+)
+target_include_directories(sitewatch-webstore-selftest PRIVATE src)
+target_link_libraries(sitewatch-webstore-selftest PRIVATE Qt6::Core Qt6::Sql)
 
 # --- CLI headless : contrôle de cohérence end-to-end ----------------------
 # Construit les trois vues REELLES (SFTP o2switch, collecteur, cache) et affiche

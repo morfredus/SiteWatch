@@ -29,6 +29,7 @@ SSH). Choisissez le document adapté à votre besoin.
 |---|---|
 | [Architecture et philosophie](ARCHITECTURE.md) | Organisation en couches, dépendances, et parti pris de conception. |
 | [Supervision réseau et mises à jour](SUPERVISION_ET_MAJ.md) | Modules communs « morf » : présence/métriques réseau (morfBeacon) et vérification des mises à jour (morfUpdate). |
+| [Publication sans interface](PUBLICATION_HEADLESS.md) | `sitewatch-publish` : consolider les logs et publier vers morfAnalytics sans lancer la fenêtre, à planifier. |
 
 ## À la racine du projet
 

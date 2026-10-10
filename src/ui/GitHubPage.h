@@ -5,6 +5,8 @@
  */
 
 #pragma once
+#include <QJsonObject>
+#include <QVector>
 #include <QMap>
 #include <QWidget>
 #include <memory>
@@ -32,6 +34,9 @@ public:
     void publishToAnalytics();
     // Rattrape ce que le collecteur a archivé ; retourne le nombre de jours nouveaux.
     int reconcileFromCollector();
+    // Verse des instantanes DEJA LUS (par un fil de travail) dans le magasin, rafraichit et
+    // republie. Retourne le nombre de jours nouveaux.
+    int applyCatchUp(const QVector<QJsonObject>& snapshots);
 
 signals:
     void openAnalyticsRequested();

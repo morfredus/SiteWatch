@@ -327,7 +327,7 @@ SyncResult synchronize(const QString& baseUrl, const Config& cfg,
 }
 
 FillResult fillCache(const QString& baseUrl, const SiteConfig& site,
-                     const std::string& cacheRoot) {
+                     const std::string& cacheRoot, const std::atomic<bool>* cancel) {
     FillResult r;
     CollectorClient::Reply objs = CollectorClient::getObjects(baseUrl, QString::fromStdString(site.id));
     if (!objs.ok()) {
@@ -341,6 +341,8 @@ FillResult fillCache(const QString& baseUrl, const SiteConfig& site,
     fs::create_directories(dir, ec);
 
     for (const QJsonValue& v : objs.json.value(QStringLiteral("objects")).toArray()) {
+        if (cancel && cancel->load())
+            break;
         const QJsonObject o = v.toObject();
         const QString name = o.value(QStringLiteral("original_name")).toString();
         const qint64  size = static_cast<qint64>(o.value(QStringLiteral("size")).toDouble());
@@ -359,9 +361,16 @@ FillResult fillCache(const QString& baseUrl, const SiteConfig& site,
         bool ok = false; QString derr;
         const QByteArray bytes = CollectorClient::download(baseUrl, oid, ok, derr);
         if (!ok) { r.error = derr; continue; }
-        std::ofstream out(local, std::ios::binary | std::ios::trunc);
-        if (!out) { r.error = QStringLiteral("ecriture cache impossible : %1").arg(name); continue; }
-        out.write(bytes.constData(), bytes.size());
+        // Ecriture dans un fichier temporaire puis renommage : une analyse qui lit le cache en
+        // meme temps (fil de travail) ne voit jamais un .gz a moitie ecrit.
+        const std::string tmp = local + ".part";
+        {
+            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+            if (!out) { r.error = QStringLiteral("ecriture cache impossible : %1").arg(name); continue; }
+            out.write(bytes.constData(), bytes.size());
+        }
+        fs::rename(tmp, local, ec);
+        if (ec) { r.error = QStringLiteral("renommage impossible : %1").arg(name); fs::remove(tmp, ec); continue; }
         ++r.downloaded;
     }
 

@@ -181,7 +181,14 @@ void fillUrlCombo(QComboBox* box, const QMap<QString, QString>& seen,
         const QString app = it.value().isEmpty() ? QStringLiteral("service") : it.value();
         box->addItem(QStringLiteral("%1 - %2").arg(app, it.key()), it.key());
     }
-    const int idx = box->findData(current);
+    int idx = box->findData(current);
+    // Adresse epinglee absente de la liste (service non detecte : eteint, autre reseau, IP
+    // devenue morte) : on la montre telle quelle plutot que d'afficher « Automatique », ce
+    // qui laisserait croire qu'aucune adresse n'est epinglee.
+    if (idx < 0 && !current.isEmpty()) {
+        box->addItem(QStringLiteral("Épinglé (non détecté) - %1").arg(current), current);
+        idx = box->count() - 1;
+    }
     box->setCurrentIndex(idx >= 0 ? idx : 0);
 }
 
@@ -841,20 +848,14 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
     // Choix du collecteur quand PLUSIEURS morfCollector sont présents sur le
     // réseau. Tous reçoivent le manifeste (redondance d'archive) ; celui choisi
     // ici devient la source de LECTURE (copies locales) et l'adresse épinglée.
-    // « Automatique » = pas d'épingle : SiteWatch lit le 1er collecteur détecté.
-    if (discoveredCollectors_.size() >= 2) {
-        collectorPick_ = new QComboBox;
-        collectorPick_->addItem("Automatique (1er détecté)", QString());
-        for (auto it = discoveredCollectors_.constBegin();
-             it != discoveredCollectors_.constEnd(); ++it) {
-            const QString app = it.value().isEmpty() ? QStringLiteral("morfCollector") : it.value();
-            collectorPick_->addItem(QStringLiteral("%1 - %2").arg(app, it.key()), it.key());
-        }
-        // Présélectionner l'URL déjà épinglée dans la config, si elle correspond.
-        const int idx = collectorPick_->findData(QString::fromStdString(config_.collectorUrl));
-        collectorPick_->setCurrentIndex(idx >= 0 ? idx : 0);
-        addRow(form, "Collecteur à utiliser :", collectorPick_);
-    }
+    // « Automatique » = pas d'épingle : SiteWatch lit le 1er collecteur détecté. Le choix est
+    // toujours proposé (même avec un seul collecteur, ou aucun encore détecté), comme dans
+    // l'onglet GitHub : l'écouteur peut n'avoir encore rien entendu à l'ouverture.
+    collectorPick_ = new QComboBox;
+    fillUrlCombo(collectorPick_, discoveredCollectors_,
+                 QString::fromStdString(config_.collectorUrl),
+                 QStringLiteral("Automatique (1er détecté)"));
+    addRow(form, "Collecteur à utiliser :", collectorPick_);
 
     collectorEdit_ = new QLineEdit(QString::fromStdString(config_.collectorUrl));
     collectorEdit_->setPlaceholderText("http://pi4fred:8792  (vide = découverte automatique)");
@@ -864,7 +865,29 @@ void SettingsDialog::buildCollectorGroup(QVBoxLayout* root) {
         connect(collectorPick_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                 [this](int) {
             collectorEdit_->setText(collectorPick_->currentData().toString());
+            // Le sélecteur de l'onglet GitHub montre le même choix : on le tient à jour.
+            if (githubCollectorPick_) {
+                const QSignalBlocker block(githubCollectorPick_);
+                const int g = githubCollectorPick_->findData(collectorPick_->currentData());
+                if (g >= 0)
+                    githubCollectorPick_->setCurrentIndex(g);
+            }
             refreshCollector();
+        });
+        // Adresse tapée à la main : le sélecteur la reflète (entrée « Saisie » si inconnue)
+        // au lieu de rester sur « Automatique ».
+        connect(collectorEdit_, &QLineEdit::textEdited, this, [this](const QString& text) {
+            const QString url = text.trimmed();
+            const QSignalBlocker block(collectorPick_);
+            int i = collectorPick_->findData(url);
+            if (i < 0 && !url.isEmpty()) {
+                const int typed = collectorPick_->findData(QStringLiteral("\x01typed"), Qt::UserRole + 1);
+                if (typed >= 0) collectorPick_->removeItem(typed);
+                collectorPick_->addItem(QStringLiteral("Saisie - %1").arg(url), url);
+                collectorPick_->setItemData(collectorPick_->count() - 1, QStringLiteral("\x01typed"), Qt::UserRole + 1);
+                i = collectorPick_->count() - 1;
+            }
+            collectorPick_->setCurrentIndex(i >= 0 ? i : 0);
         });
     }
     auto* connectBtn = new QPushButton("Se connecter");
