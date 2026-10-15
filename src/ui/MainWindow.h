@@ -208,6 +208,8 @@ private:
     std::atomic<bool> cancel_{false};     // arret demande (fermeture) : les fils de travail s'interrompent
     bool syncBusy_ = false;            // rattrapage ou consolidation en arriere-plan en cours
     bool startupRerun_ = false;           // une demande est arrivee pendant ce temps : a rejouer ensuite
+    QString busyText_;                    // libelle du travail en cours (declare en activity/1)
+    qint64  busySince_ = 0;               // debut (epoch s) du travail en cours
     int  busyCount_ = 0;                  // taches d'arriere-plan actives (indicateur d'activite)
     QLabel* busyLabel_ = nullptr;         // indicateur tournant de la barre d'etat
     QTimer* busyTimer_ = nullptr;

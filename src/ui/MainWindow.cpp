@@ -449,6 +449,23 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             if (!lastStats_.lastDate.empty())
                 m["last_analysis_date"] = QString::fromStdString(lastStats_.lastDate);
             return m;
+        },
+        morfbeacon::FunctionMetricsProvider::StateFn{},
+        // Activite en cours (contrat `activity/1`) : tout travail d'arriere-plan
+        // passe par beginBusy/endBusy (synchro morfCollector, SFTP, consolidation),
+        // on declare donc simplement ce libelle. Lu sur le fil de l'interface.
+        [this]() {
+            QJsonObject a;
+            if (busyCount_ <= 0)
+                return a;
+            const QString t = busyText_.toLower();
+            a["type"]       = t.contains(QStringLiteral("synchro")) ? QStringLiteral("synchronisation")
+                            : t.contains(QStringLiteral("analyse")) ? QStringLiteral("analyse")
+                                                                    : QStringLiteral("traitement");
+            a["state"]      = QStringLiteral("running");
+            a["started_at"] = static_cast<double>(busySince_);
+            a["detail"]     = busyText_;
+            return a;
         });
 
     presence_ = new morfbeacon::PresenceService(beaconCfg, presenceMetrics_.get());
@@ -1435,7 +1452,8 @@ struct SftpOutcome {
     enum class Kind { Done, ConnectFailed, ListFailed, NoFiles, NoneMatch } kind = Kind::Done;
     QString detail;                       // erreur technique
     int downloaded = 0, skipped = 0, ignored = 0, failed = 0;
-    int totalGz = 0;                      // NoneMatch : fichiers presents mais filtres
+    int updated = 0;                      // parmi downloaded : fichier deja en cache mais dont la taille a change
+    int totalGz = 0;                     // NoneMatch : fichiers presents mais filtres
     bool suggestionValid = false;
     QString suggestionFilter;
     int suggestionMatch = 0;
@@ -1497,7 +1515,9 @@ void MainWindow::sftpWork(SftpOutcome& out, const SiteConfig& site, const std::s
         if (!fileBelongsToSite(rf.name, site.name, site.logMatch)) { ++out.ignored; continue; }
         std::error_code ec;
         const std::string local = dir + "/" + rf.name;
-        if (fs::exists(local, ec) && fs::file_size(local, ec) == rf.size) { ++out.skipped; continue; }
+        const bool cached = fs::exists(local, ec);
+        if (cached && fs::file_size(local, ec) == rf.size) { ++out.skipped; continue; }
+        if (cached) ++out.updated;   // meme nom, taille differente : l'hebergeur a complete le fichier
         toDownload.push_back(rf);
         grandTotal += rf.size;
     }
@@ -1615,13 +1635,17 @@ void MainWindow::startSftpSync(const SiteConfig& siteIn, bool analyzeAfter, std:
                 showBanner(BannerLevel::Error,
                     QString("<b>Échec du téléchargement</b> pour %1. Réessayez ou vérifiez la connexion.").arg(siteLabel));
             } else if (o.downloaded > 0) {
-                QString msg = QString("<b>%1 : %2 fichier(s) de logs téléchargé(s).</b>").arg(siteLabel).arg(o.downloaded);
-                if (o.skipped) msg += QString(" %1 déjà à jour.").arg(o.skipped);
+                // Un log mensuel qui grossit garde son nom : le dire, sinon « nouveau fichier » est trompeur.
+                const int fresh = o.downloaded - o.updated;
+                QString msg = QString("<b>%1 : données mises à jour.</b> ").arg(siteLabel);
+                if (o.updated) msg += QString("%1 fichier(s) complété(s) (taille modifiée). ").arg(o.updated);
+                if (fresh > 0) msg += QString("%1 nouveau(x) fichier(s). ").arg(fresh);
+                if (o.skipped) msg += QString("%1 inchangé(s).").arg(o.skipped);
                 if (o.failed)  msg += QString(" %1 échec(s).").arg(o.failed);
                 showBanner(BannerLevel::Success, msg);
             } else {
                 showBanner(BannerLevel::Success,
-                    QString("<b>%1 : déjà à jour.</b> Aucun nouveau fichier à télécharger (%2 en cache).")
+                    QString("<b>%1 : rien de nouveau chez l'hébergeur.</b> Aucun fichier ajouté ni agrandi depuis la dernière synchronisation (%2 en cache).")
                         .arg(siteLabel).arg(o.skipped));
             }
             analyse = true;
@@ -1921,11 +1945,16 @@ void MainWindow::runPumped(const QString& text, const std::function<void()>& wor
 }
 
 void MainWindow::postStatus(const QString& text) {
-    QMetaObject::invokeMethod(this, [this, text] { statusBar()->showMessage(text); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this, [this, text] {
+        statusBar()->showMessage(text);
+        if (busyCount_ > 0) busyText_ = text;   // le detail d'activite suit l'etape courante
+    }, Qt::QueuedConnection);
 }
 
 void MainWindow::beginBusy(const QString& text) {
-    ++busyCount_;
+    if (busyCount_++ == 0)
+        busySince_ = QDateTime::currentSecsSinceEpoch();
+    busyText_ = text;
     if (busyLabel_ && busyTimer_) {
         busyLabel_->setText(QStringLiteral("◐ travail en cours"));
         busyLabel_->setVisible(true);

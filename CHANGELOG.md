@@ -2,6 +2,22 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.27.0] - 2026-10-15
+
+### Added
+
+- Running background work (morfCollector sync, SFTP download, web history analysis) is now
+  declared in `/status` as the generic `activity/1` object, so morfMonitor shows it in its
+  "Activités en cours" section. Vendored morfBeacon resynced to 0.8.0.
+
+### Changed
+
+- Log update banners say whether files were completed (size changed) or are really new.
+
+### Changed
+
+- Resync the vendored morfBeacon (0.8.0).
+
 ## [1.26.0] - 2026-10-11
 
 ### Changed
