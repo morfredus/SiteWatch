@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.27.1] - 2026-11-02
+
+### Fixed
+
+- No functional change. The release tag has to land after the repository cleanup (project-level `cmake/toolchains/linux-aarch64.cmake` removed, the vendored morfdeploy toolchain is the only one), otherwise the packaging step refuses the artifacts ("artifact commit does not match source tag"); this is also the first version published with its arm64 package.
+
 ## [1.27.0] - 2026-10-15
 
 ### Added
