@@ -40,6 +40,7 @@
 #include <QRunnable>
 #include <atomic>
 #include <cstdlib>
+#include <future>
 #include <memory>
 #include "github/GitHubSync.h"
 #include <QUrl>
@@ -544,7 +545,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // Synchronisation d'ouverture avec morfCollector (si présent) : pousse la
     // config, alerte sur les sites ajoutés / retirés. Différée pour ne pas
     // retarder l'affichage.
-    QTimer::singleShot(2500, this, [this]{ startupCollectorSync(); });
+    QTimer::singleShot(300, this, [this]{ startupCollectorSync(); });
 
     // Remplissage de la verite web : apres le rattrapage collecteur (qui analyse deja
     // les sites qu'il a mis a jour), on consolide ceux dont le cache a change depuis la
@@ -1969,6 +1970,10 @@ void MainWindow::endBusy() {
         busyTimer_->stop();
         busyLabel_->setVisible(false);
     }
+    // Plus aucun travail : le dernier message d'etape (« Rattrapage… ») ne doit pas rester colle.
+    // Les callbacks de fin affichent ensuite leur propre resultat, apres cet appel.
+    if (busyCount_ == 0)
+        statusBar()->clearMessage();
 }
 
 // Travail commun au rattrapage d'ouverture et a « Tout synchroniser » via le collecteur :
@@ -2001,11 +2006,26 @@ void MainWindow::runCollectorWork(std::shared_ptr<CollectorWork> w, const QStrin
             return;
         w->readFallback = !w->pinnedRead.isEmpty() && w->readUrl != w->pinnedRead;
 
+        // Le reseau domine : GitHub et chaque site sont recuperes EN PARALLELE (chaque appel a son
+        // propre QNetworkAccessManager et son propre cache de site, rien de partage).
+        // GitHub : on LIT les instantanes (reseau) ici ; l'ecriture en base se fait dans le fil
+        // de l'interface (la connexion SQLite lui appartient).
+        std::future<QVector<QJsonObject>> gh;
+        if (w->withGithub && w->cfg.github.enabled)
+            gh = std::async(std::launch::async, [this, w] {
+                return githubsync::fetchSnapshots(w->cfg, w->readUrl, &cancel_);
+            });
+
         // Rattrapage : recopie de ce que le collecteur a recolte (comparaison des tailles).
-        for (const SiteConfig& s : w->cfg.sites) {
-            if (cancel_) return;
-            postStatus(QStringLiteral("Rattrapage morfCollector : %1 …").arg(QString::fromStdString(s.name)));
-            const collectorsync::FillResult f = collectorsync::fillCache(w->readUrl, s, w->cfg.cacheRoot, &cancel_);
+        std::vector<std::future<collectorsync::FillResult>> fills;
+        for (const SiteConfig& s : w->cfg.sites)
+            fills.push_back(std::async(std::launch::async, [this, w, &s] {
+                return collectorsync::fillCache(w->readUrl, s, w->cfg.cacheRoot, &cancel_);
+            }));
+        postStatus(QStringLiteral("Rattrapage morfCollector…"));
+        for (size_t i = 0; i < fills.size(); ++i) {
+            const collectorsync::FillResult f = fills[i].get();
+            const SiteConfig& s = w->cfg.sites[i];
             w->totalDl += f.downloaded;
             w->totalSkip += f.skipped;
             if (f.downloaded > 0)
@@ -2013,13 +2033,8 @@ void MainWindow::runCollectorWork(std::shared_ptr<CollectorWork> w, const QStrin
                                     .arg(QString::fromStdString(s.name).toHtmlEscaped()).arg(f.downloaded);
             if (!f.ok) w->problems << QString::fromStdString(s.name);
         }
-
-        // GitHub : on LIT les instantanes (reseau) ici ; l'ecriture en base se fait dans le fil
-        // de l'interface (la connexion SQLite lui appartient).
-        if (w->withGithub && w->cfg.github.enabled) {
-            postStatus(QStringLiteral("Rattrapage GitHub depuis morfCollector…"));
-            w->githubSnapshots = githubsync::fetchSnapshots(w->cfg, w->readUrl, &cancel_);
-        }
+        if (gh.valid())
+            w->githubSnapshots = gh.get();
     }, [this, done = std::move(done)] {
         endBusy();
         done();
@@ -2089,7 +2104,7 @@ void MainWindow::startupCollectorSync() {
                 const bool warn = !w->removed.isEmpty() || !w->problems.isEmpty() || w->readFallback;
                 showBanner(warn ? BannerLevel::Warning : BannerLevel::Info, lines.join("<br>"));
             } else if (w->r.pushed) {
-                statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(w->r.revision));
+                statusBar()->showMessage(QString("morfCollector à jour (révision %1).").arg(w->r.revision), 8000);
             }
             consolidateStaleSites();   // les logs recopies sont maintenant a analyser
         }

@@ -75,6 +75,8 @@ bool GitHubAuthorityStore::open() {
     }
     // Bases deja ouvertes avant 1.17.0 : la colonne stars n'existait pas.
     q.exec(QStringLiteral("ALTER TABLE github_repo_state ADD COLUMN stars INTEGER"));
+    // Idem pour forks (ajoute apres coup, publie vers morfAnalytics).
+    q.exec(QStringLiteral("ALTER TABLE github_repo_state ADD COLUMN forks INTEGER"));
     open_ = true;
     return true;
 }
@@ -172,16 +174,19 @@ void GitHubAuthorityStore::upsertState(const QJsonObject& snap, const QString& p
     const qint64 stars = static_cast<qint64>(
         data.value(QStringLiteral("repository")).toObject()
             .value(QStringLiteral("stargazers_count")).toDouble());
+    const qint64 forks = static_cast<qint64>(
+        data.value(QStringLiteral("repository")).toObject()
+            .value(QStringLiteral("forks_count")).toDouble());
     QSqlQuery u(db);
     u.prepare(QStringLiteral(
         "INSERT INTO github_repo_state(full_name, provenance, last_collect_ts, last_error, "
-        "views_14, uniques_14, clones, downloads, last_release, stars) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?) "
+        "views_14, uniques_14, clones, downloads, last_release, stars, forks) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(full_name) DO UPDATE SET provenance=excluded.provenance, "
         "last_collect_ts=excluded.last_collect_ts, last_error=excluded.last_error, "
         "views_14=excluded.views_14, uniques_14=excluded.uniques_14, "
         "clones=excluded.clones, downloads=excluded.downloads, "
-        "last_release=excluded.last_release, stars=excluded.stars"));
+        "last_release=excluded.last_release, stars=excluded.stars, forks=excluded.forks"));
     u.addBindValue(full);
     u.addBindValue(provenance);
     u.addBindValue(ts);
@@ -192,6 +197,7 @@ void GitHubAuthorityStore::upsertState(const QJsonObject& snap, const QString& p
     u.addBindValue(downloads);
     u.addBindValue(lastRel);
     u.addBindValue(stars);
+    u.addBindValue(forks);
     u.exec();
 }
 
@@ -334,12 +340,13 @@ QJsonObject GitHubAuthorityStore::exportAuthority() const {
         qint64 downloads = 0;
         QString lastRelease;
         qint64 stars = 0;
+        qint64 forks = 0;
     };
     QVector<RepoOut> list;
     QSqlQuery st(db);
     st.exec(QStringLiteral(
         "SELECT full_name, provenance, last_collect_ts, views_14, uniques_14, clones, "
-        "downloads, last_release, stars FROM github_repo_state"));
+        "downloads, last_release, stars, forks FROM github_repo_state"));
     while (st.next()) {
         RepoOut r;
         r.full = st.value(0).toString();
@@ -351,6 +358,7 @@ QJsonObject GitHubAuthorityStore::exportAuthority() const {
         r.downloads = st.value(6).toLongLong();
         r.lastRelease = st.value(7).toString();
         r.stars = st.value(8).toLongLong();
+        r.forks = st.value(9).toLongLong();
         list.append(r);
     }
     QJsonArray repos;
@@ -365,6 +373,7 @@ QJsonObject GitHubAuthorityStore::exportAuthority() const {
         repo[QStringLiteral("downloads")] = static_cast<double>(r.downloads);
         repo[QStringLiteral("last_release")] = r.lastRelease;
         repo[QStringLiteral("stars")] = static_cast<double>(r.stars);
+        repo[QStringLiteral("forks")] = static_cast<double>(r.forks);
         QJsonArray daily;
         QSqlQuery d(db);
         d.prepare(QStringLiteral(

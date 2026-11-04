@@ -2,6 +2,20 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.28.0] - 2026-11-04
+
+### Added
+
+- The GitHub publication to morfAnalytics now carries the fork count of each repository (new `forks` column, filled at the next collection).
+
+### Changed
+
+- Faster startup catch-up: the collector sync starts after 300 ms (was 2.5 s) and GitHub snapshots and every site are fetched in parallel instead of one after the other.
+
+### Fixed
+
+- The status-bar message ("Rattrapage..." / "morfCollector a jour") no longer stays stuck once the data is retrieved.
+
 ## [1.27.1] - 2026-11-02
 
 ### Fixed
