@@ -102,6 +102,7 @@ private:
     QLineEdit*   hostEdit_   = nullptr;
     QLineEdit*   userEdit_   = nullptr;
     QLineEdit*   keyEdit_    = nullptr;
+    QLineEdit*   hostKeyEdit_ = nullptr;   // empreinte SSH mémorisée (lecture seule)
     QLineEdit*   passEdit_   = nullptr;
     QToolButton* passEye_    = nullptr;
     QLineEdit*   remoteEdit_ = nullptr;

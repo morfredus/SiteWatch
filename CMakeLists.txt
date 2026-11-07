@@ -290,6 +290,18 @@ if(MSVC)
     target_compile_options(sitewatch-coherence-selftest PRIVATE /utf-8)
 endif()
 
+# Auto-test de Config (empreinte SSH, ecriture atomique, droits 0600). Sans Qt.
+add_executable(sitewatch-config-selftest
+    src/config/config_selftest.cpp
+    src/config/Config.cpp
+    src/config/Config.h
+)
+target_include_directories(sitewatch-config-selftest PRIVATE src)
+target_link_libraries(sitewatch-config-selftest PRIVATE nlohmann_json::nlohmann_json)
+if(MSVC)
+    target_compile_options(sitewatch-config-selftest PRIVATE /utf-8)
+endif()
+
 # Auto-test du magasin d'autorite web (SQLite, sans reseau ni interface).
 add_executable(sitewatch-webstore-selftest
     src/webstore/webstore_selftest.cpp
@@ -367,6 +379,12 @@ if(WIN32 AND NOT MSVC)
         message(WARNING "MSYS2 Bash not found; non-Qt MinGW DLL collection is skipped")
     endif()
 endif()
+
+# --- ctest : les auto-tests ci-dessus ----------------------------------------
+enable_testing()
+add_test(NAME coherence-selftest COMMAND sitewatch-coherence-selftest)
+add_test(NAME config-selftest COMMAND sitewatch-config-selftest)
+add_test(NAME webstore-selftest COMMAND sitewatch-webstore-selftest)
 
 # Signale la duree de compile a morfAnalytics apres le lien de l'executable.
 morf_record_target_build(SiteWatch "SiteWatch")

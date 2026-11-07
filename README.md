@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.28.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.29.0-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -138,6 +138,18 @@ traffic, bots, AI bots, Google, HTTP errors, WordPress activity).
 - LAN presence broadcast and live metrics endpoint (`/status`) for central monitoring
 - GitHub presence: collector and morfAnalytics can be chosen automatically (same host) or pinned
 - Update check against GitHub Releases (silent at startup, on demand from the Help menu)
+
+---
+
+## Security notes
+
+- **SSH host key (TOFU)**: the SHA-256 fingerprint of the server key is stored in the site settings
+  on the first SFTP connection, then compared on every connection, before any password is sent.
+  A different key refuses the connection with an explicit message. After a legitimate server
+  reinstall, use the "Forget" button next to "Server fingerprint" in the site settings.
+- **Secrets in `config.json`**: SFTP password, cPanel token and GitHub token are stored in clear
+  text (no system keyring, on purpose). The file is written atomically and, on Unix, with `0600`
+  permissions. On Windows, rely on the user profile permissions. Prefer an SSH key when possible.
 
 ---
 

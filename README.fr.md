@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.28.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.29.0-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -143,6 +143,20 @@ horaire et quotidienne, avec copie et export CSV partout.
 - Diffusion de présence sur le réseau local + endpoint de métriques (`/status`) pour une supervision centralisée
 - Présence GitHub : collecteur et morfAnalytics au choix, automatique (même hôte) ou épinglé
 - Vérification des mises à jour via les *releases* GitHub (silencieuse au démarrage, à la demande depuis le menu Aide)
+
+---
+
+## Notes de sécurité
+
+- **Clé d'hôte SSH (TOFU)** : l'empreinte SHA-256 de la clé du serveur est mémorisée dans les
+  réglages du site à la première connexion SFTP, puis comparée à chaque connexion, avant l'envoi
+  de tout mot de passe. Une clé différente refuse la connexion avec un message explicite. Après
+  une réinstallation légitime du serveur, utiliser le bouton « Oublier » à côté de « Empreinte du
+  serveur » dans les réglages du site.
+- **Secrets dans `config.json`** : mot de passe SFTP, jeton cPanel et jeton GitHub sont stockés en
+  clair (pas de trousseau système, par choix). Le fichier est écrit de façon atomique et, sous
+  Unix, avec les droits `0600`. Sous Windows, s'appuyer sur les droits du profil utilisateur.
+  Préférer une clé SSH quand c'est possible.
 
 ---
 

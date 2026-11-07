@@ -23,6 +23,7 @@ struct SiteConfig {
     std::string remoteLogDir;  // dossier des logs sur le serveur
     std::string cpanelToken;   // jeton d'API cPanel (o2switch : autorisation pare-feu SSH)
     std::string domain;        // domaine complet avec TLD (ex. "morfredus.fr") ; filtre le domaine principal, exclut les sous-domaines
+    std::string hostKeySha256; // empreinte SHA-256 de la cle d'hote SSH ("sha256:<hex>"), memorisee a la 1re connexion (TOFU) ; vide = pas encore vue
     std::string logMatch;      // filtre AVANCE (optionnel) : si renseigne, un fichier est retenu si son nom contient ce motif ; sinon detection auto o2switch
 };
 

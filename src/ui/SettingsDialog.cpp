@@ -54,6 +54,7 @@
 #include <cctype>
 
 #include "core/net/SftpClient.h"
+#include "ui/NetPump.h"
 #include "collector/CollectorClient.h"
 #include "github/GitHubRepoCatalog.h"
 
@@ -139,14 +140,7 @@ bool firewallWhitelist(const SiteConfig& site, QString& error) {
     if (site.cpanelToken.empty()) return true;
     QNetworkAccessManager nam;
     auto syncGet = [&nam](const QNetworkRequest& req, QByteArray& body) {
-        QNetworkReply* r = nam.get(req);
-        QEventLoop loop;
-        QObject::connect(r, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-        loop.exec();
-        body = r->readAll();
-        auto err = r->error();
-        r->deleteLater();
-        return err;
+        return netpump::boundedGet(nam, req, body);
     };
     QByteArray ipBody;
     if (syncGet(QNetworkRequest(QUrl("https://api.ipify.org")), ipBody) != QNetworkReply::NoError) {
@@ -170,7 +164,7 @@ bool firewallWhitelist(const SiteConfig& site, QString& error) {
         error = QString::fromUtf8(body).left(160);
         return false;
     }
-    QEventLoop wait; QTimer::singleShot(4000, &wait, &QEventLoop::quit); wait.exec();
+    netpump::pause(4000);
     return true;
 }
 
@@ -320,6 +314,20 @@ void SettingsDialog::buildUi() {
     passEdit_->setEchoMode(QLineEdit::Password);
     passEye_ = makeEye(passEdit_);
     addRow(authForm, "Mot de passe :", fieldWith(passEdit_, passEye_));
+    // Empreinte de la clé d'hôte SSH (TOFU) : mémorisée à la 1re connexion, comparée ensuite.
+    // « Oublier » est l'action utilisateur explicite pour accepter une nouvelle clé.
+    hostKeyEdit_ = new QLineEdit;
+    hostKeyEdit_->setReadOnly(true);
+    hostKeyEdit_->setPlaceholderText("mémorisée à la première connexion");
+    auto* forgetKey = new QPushButton("Oublier");
+    forgetKey->setToolTip("Accepter une nouvelle clé d'hôte à la prochaine connexion "
+                          "(à n'utiliser que si le serveur a été réinstallé).");
+    addRow(authForm, "Empreinte du serveur :", fieldWith(hostKeyEdit_, forgetKey));
+    connect(forgetKey, &QPushButton::clicked, this, [this] {
+        if (current_ < 0 || current_ >= static_cast<int>(config_.sites.size())) return;
+        config_.sites[current_].hostKeySha256.clear();
+        hostKeyEdit_->clear();
+    });
     rightCol->addWidget(authBox);
 
     auto* botForm = new QFormLayout;
@@ -459,6 +467,7 @@ void SettingsDialog::loadSiteToForm(int i) {
     remoteEdit_->setText(QString::fromStdString(s.remoteLogDir));
     tokenEdit_->setText(QString::fromStdString(s.cpanelToken));
     logMatchEdit_->setText(QString::fromStdString(s.logMatch));
+    hostKeyEdit_->setText(QString::fromStdString(s.hostKeySha256));
     testResult_->setText(lastReport_[i]);
     applyResultStyle(siteState_[i]);
     loading_ = false;
@@ -468,8 +477,11 @@ void SettingsDialog::commitFormToSite(int i) {
     if (i < 0 || i >= static_cast<int>(config_.sites.size())) return;
     SiteConfig& s = config_.sites[i];
     s.name         = nameEdit_->text().trimmed().toStdString();
-    s.host         = hostEdit_->text().trimmed().toStdString();
-    s.user         = userEdit_->text().trimmed().toStdString();
+    const std::string newHost = hostEdit_->text().trimmed().toStdString();
+    // Autre serveur : l'ancienne empreinte ne le concerne plus.
+    if (newHost != s.host) { s.hostKeySha256.clear(); hostKeyEdit_->clear(); }
+    s.host         = newHost;
+    s.user        = userEdit_->text().trimmed().toStdString();
     s.keyFile      = keyEdit_->text().trimmed().toStdString();
     s.password     = passEdit_->text().toStdString();
     s.remoteLogDir = remoteEdit_->text().trimmed().toStdString();
@@ -563,7 +575,6 @@ void SettingsDialog::onTestConnection() {
     QApplication::setOverrideCursor(Qt::WaitCursor);
     testResult_->setText("Test en cours…");
     applyResultStyle(0);
-    QApplication::processEvents();
 
     QString err;
     if (!firewallWhitelist(s, err)) {
@@ -572,16 +583,30 @@ void SettingsDialog::onTestConnection() {
         return;
     }
 
-    SftpClient client;
-    std::string cerr;
-    if (!client.connect(s, cerr)) {
+    // Connexion + listage hors du fil de l'interface (delais reseau de plusieurs secondes) :
+    // la fenetre reste vivante mais n'accepte aucune saisie pendant le test.
+    std::string cerr, learnedKey;
+    bool connected = false;
+    std::vector<SftpClient::RemoteFile> files;
+    netpump::runPumped([&] {
+        SftpClient client;
+        connected = client.connect(s, cerr);
+        learnedKey = client.observedHostKey();
+        if (connected) {
+            files = client.listLogs(s.remoteLogDir, cerr);
+            client.disconnect();
+        }
+    });
+    // 1re connexion reussie : memoriser l'empreinte (TOFU), enregistree avec la config.
+    if (connected && s.hostKeySha256.empty() && !learnedKey.empty()) {
+        config_.sites[current_].hostKeySha256 = learnedKey;
+        hostKeyEdit_->setText(QString::fromStdString(learnedKey));
+    }
+    if (!connected) {
         QApplication::restoreOverrideCursor();
         showTestResult(2, "✓ Pare-feu cPanel\n✗ Connexion SSH - " + QString::fromStdString(cerr));
         return;
     }
-
-    auto files = client.listLogs(s.remoteLogDir, cerr);
-    client.disconnect();
 
     const QString prefix = sitePrefix(s.name);
     int match = 0;

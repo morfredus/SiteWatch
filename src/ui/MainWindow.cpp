@@ -82,6 +82,7 @@
 #include "core/analytics/StatsEngine.h"
 #include "core/analytics/BotDetector.h"
 #include "core/net/SftpClient.h"
+#include "ui/NetPump.h"
 #include "collector/CollectorSync.h"
 #include "collector/CollectorClient.h"
 #include <QToolButton>
@@ -1390,16 +1391,9 @@ bool MainWindow::whitelistSsh(const SiteConfig& site, QString& error) {
 
     QNetworkAccessManager nam;
 
-    // Petit utilitaire : requête GET synchrone (via boucle d'événements locale).
-    auto syncGet = [&nam](const QNetworkRequest& req, QByteArray& body) -> QNetworkReply::NetworkError {
-        QNetworkReply* r = nam.get(req);
-        QEventLoop loop;
-        connect(r, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-        loop.exec();
-        body = r->readAll();
-        auto err = r->error();
-        r->deleteLater();
-        return err;
+    // Requête GET synchrone bornée (délai 15 s, saisie ignorée pendant l'attente).
+    auto syncGet = [&nam](const QNetworkRequest& req, QByteArray& body) {
+        return netpump::boundedGet(nam, req, body);
     };
 
     // 1. IP publique courante.
@@ -1436,9 +1430,7 @@ bool MainWindow::whitelistSsh(const SiteConfig& site, QString& error) {
     }
 
     // Laisse le temps à la règle de se propager (o2switch : jusqu'à ~35 s).
-    QEventLoop wait;
-    QTimer::singleShot(4000, &wait, &QEventLoop::quit);
-    wait.exec();
+    netpump::pause(4000);
     return true;
 }
 
@@ -1476,6 +1468,20 @@ void MainWindow::sftpWork(SftpOutcome& out, const SiteConfig& site, const std::s
         out.kind = SftpOutcome::Kind::ConnectFailed;
         out.detail = QString::fromStdString(err);
         return;
+    }
+    // 1re connexion a ce serveur : memoriser l'empreinte de sa cle d'hote (TOFU). L'ecriture
+    // de config_ se fait dans le fil de l'interface, jamais depuis ce fil de travail.
+    if (site.hostKeySha256.empty() && !client.observedHostKey().empty()) {
+        const std::string siteId = site.id;
+        const std::string fp = client.observedHostKey();
+        QMetaObject::invokeMethod(this, [this, siteId, fp] {
+            for (SiteConfig& s : config_.sites) {
+                if (s.id != siteId || !s.hostKeySha256.empty()) continue;
+                s.hostKeySha256 = fp;
+                std::string saveErr;
+                Config::save(configFilePath().toStdString(), config_, saveErr);
+            }
+        }, Qt::QueuedConnection);
     }
     auto remote = client.listLogs(site.remoteLogDir, err);
     if (remote.empty() && !err.empty()) {
@@ -1784,7 +1790,7 @@ static bool analyticsAnswers(const QString& base) {
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     timeout.start(1200);
-    loop.exec();
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
     const bool ok = reply->isFinished() && reply->error() == QNetworkReply::NoError
                     && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
     if (!reply->isFinished()) reply->abort();

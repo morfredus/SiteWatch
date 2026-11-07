@@ -39,7 +39,7 @@ CollectorClient::Reply httpRequest(const QString& urlStr, const QByteArray& verb
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     timer.start(8000);
-    loop.exec();
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
 
     if (!timer.isActive() && reply->isRunning()) {
         reply->abort();
@@ -83,7 +83,7 @@ bool CollectorClient::discover(int timeoutMs, Discovered& out, QString& error) {
             QObject::connect(&t, &QTimer::timeout, &loop, &QEventLoop::quit);
             QObject::connect(&sock, &QUdpSocket::readyRead, &loop, &QEventLoop::quit);
             t.start(static_cast<int>(timeoutMs - clock.elapsed()));
-            loop.exec();
+            loop.exec(QEventLoop::ExcludeUserInputEvents);
         }
         while (sock.hasPendingDatagrams()) {
             QByteArray buf(int(sock.pendingDatagramSize()), '\0');
@@ -171,7 +171,7 @@ QByteArray CollectorClient::download(const QString& baseUrl, const QString& obje
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     timer.start(30000);   // un original peut etre volumineux
-    loop.exec();
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
 
     if (!timer.isActive() && reply->isRunning()) { reply->abort(); error = QStringLiteral("delai depasse"); }
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();

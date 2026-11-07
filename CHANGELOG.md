@@ -2,6 +2,29 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.29.0] - 2026-11-07
+
+### Security
+
+- SFTP: the SSH host key is now verified (trust on first use). Its SHA-256 fingerprint is stored in the site settings on the first connection and compared before the password is sent; a changed key refuses the connection. A "Forget" button in the site settings renews it.
+- `config.json` (SFTP password, cPanel and GitHub tokens) is now written atomically and with `0600` permissions on Unix.
+
+### Fixed
+
+- SFTP: TCP connection timeout (15 s per address) and libssh2 session timeout (30 s) instead of waiting for the OS defaults.
+- The settings connection test and the coherence direct download no longer freeze the window: the SFTP work runs in the thread pool while input is ignored.
+- Blocking HTTP waits (cPanel firewall opening, collector client, analytics probe) ignore user input while waiting and the cPanel requests have a 15 s timeout.
+
+### Added
+
+- `ctest` now runs the self-tests, including a new one for the configuration file.
+
+## [1.28.1] - 2026-11-07
+
+### Changed
+
+- Resync the vendored morfUpdate core to 0.9.0: loopback health URL parsed with `QUrl`, `Host` and `Origin` checks on the local API, downgrade refused unless explicitly allowed, subprocess timeouts and a minimal environment, archives with links refused. Update checks are unchanged.
+
 ## [1.28.0] - 2026-11-04
 
 ### Added

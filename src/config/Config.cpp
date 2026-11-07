@@ -7,6 +7,8 @@
 #include "config/Config.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <filesystem>
+#include <system_error>
 #include <random>
 #include <cstdio>
 
@@ -78,6 +80,7 @@ bool Config::load(const std::string& path, Config& out, std::string& error) {
             site.cpanelToken  = getStr(s, "cpanelToken");
             site.domain       = getStr(s, "domain");
             site.logMatch     = getStr(s, "logMatch");
+            site.hostKeySha256 = getStr(s, "hostKeySha256");
             // Migration : l'ancien champ "domain" (ex. morfredus.fr) devient le
             // "nom du site". Le préfixe de filtrage en est déduit automatiquement.
             if (!site.domain.empty()) site.name = site.domain;
@@ -137,6 +140,7 @@ bool Config::save(const std::string& path, const Config& config, std::string& er
         o["remoteLogDir"] = s.remoteLogDir;
         o["cpanelToken"]  = s.cpanelToken;
         if (!s.logMatch.empty()) o["logMatch"] = s.logMatch;
+        if (!s.hostKeySha256.empty()) o["hostKeySha256"] = s.hostKeySha256;
         sites.push_back(o);
     }
     j["sites"] = sites;
@@ -160,14 +164,37 @@ bool Config::save(const std::string& path, const Config& config, std::string& er
     github["repositories"] = repos;
     j["github"] = github;
 
-    std::ofstream out(path);
-    if (!out) {
-        error = "Écriture impossible : " + path;
-        return false;
+    // Le fichier contient des secrets en clair (mot de passe SFTP, jeton cPanel, jeton GitHub) :
+    // - ecriture ATOMIQUE (fichier temporaire voisin puis renommage) : un crash ou un disque
+    //   plein en cours d'ecriture ne laisse jamais une config tronquee a la place de l'ancienne ;
+    // - droits 0600 poses AVANT d'y ecrire les secrets (Unix) : jamais lisible par un autre
+    //   utilisateur, meme brievement. Sous Windows, les ACL du profil utilisateur font foi.
+    // Pas de trousseau systeme : choix assume (dependance et portabilite), voir le README.
+    namespace fs = std::filesystem;
+    const std::string tmpPath = path + ".tmp";
+    std::error_code ec;
+    {
+        std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            error = "Écriture impossible : " + tmpPath;
+            return false;
+        }
+        // Droits poses sur le fichier vide, avant d'y ecrire quoi que ce soit.
+        fs::permissions(tmpPath, fs::perms::owner_read | fs::perms::owner_write,
+                        fs::perm_options::replace, ec);
+        out << j.dump(2) << '\n';
+        out.flush();
+        if (!out.good()) {
+            out.close();
+            fs::remove(tmpPath, ec);
+            error = "Erreur lors de l'écriture de " + path;
+            return false;
+        }
     }
-    out << j.dump(2) << std::endl;
-    if (!out.good()) {
-        error = "Erreur lors de l'écriture de " + path;
+    fs::rename(tmpPath, path, ec);
+    if (ec) {
+        fs::remove(tmpPath, ec);
+        error = "Remplacement de " + path + " impossible.";
         return false;
     }
     return true;

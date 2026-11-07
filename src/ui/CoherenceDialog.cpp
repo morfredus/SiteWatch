@@ -9,6 +9,7 @@
 #include "coherence/CoherenceEngine.h"
 #include "collector/CollectorClient.h"
 #include "core/net/SftpClient.h"
+#include "ui/NetPump.h"
 #include "core/cache/CacheManager.h"
 
 #include <QVBoxLayout>
@@ -255,20 +256,27 @@ void CoherenceDialog::downloadDirect(const std::string& site, const std::string&
     const SiteConfig* s = siteByName(site);
     if (!s) return;
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    SftpClient client;
+    // Connexion + telechargement hors du fil de l'interface (un .gz peut peser plusieurs Mo) :
+    // la fenetre se redessine mais n'accepte aucune saisie pendant l'attente.
+    CacheManager cache(config_.cacheRoot);
+    const std::string local = cache.siteDir(site) + "/" + file;
+    const std::string remote = s->remoteLogDir + "/" + file;
+    const SiteConfig siteCfg = *s;
     std::string err;
-    if (!client.connect(*s, err)) {
-        QApplication::restoreOverrideCursor();
+    bool connected = false, ok = false;
+    netpump::runPumped([&] {
+        SftpClient client;
+        connected = client.connect(siteCfg, err);
+        if (!connected) return;
+        ok = client.download(remote, local, err);
+        client.disconnect();
+    });
+    QApplication::restoreOverrideCursor();
+    if (!connected) {
         QMessageBox::warning(this, "Téléchargement direct",
             "Connexion SFTP impossible : " + QString::fromStdString(err).toHtmlEscaped());
         return;
     }
-    CacheManager cache(config_.cacheRoot);
-    const std::string local = cache.siteDir(site) + "/" + file;
-    const std::string remote = s->remoteLogDir + "/" + file;
-    const bool ok = client.download(remote, local, err);
-    client.disconnect();
-    QApplication::restoreOverrideCursor();
     if (!ok) {
         QMessageBox::warning(this, "Téléchargement direct",
             "Échec : " + QString::fromStdString(err).toHtmlEscaped());

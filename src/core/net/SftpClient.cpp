@@ -14,13 +14,24 @@
   using socket_t = SOCKET;
   static constexpr socket_t kInvalidSocket = INVALID_SOCKET;
   static inline void closeSocket(socket_t s) { closesocket(s); }
+  static inline void setBlocking(socket_t s, bool on) {
+      u_long mode = on ? 0 : 1;
+      ioctlsocket(s, FIONBIO, &mode);
+  }
 #else
   #include <sys/socket.h>
+  #include <sys/select.h>
   #include <netdb.h>
   #include <unistd.h>
+  #include <fcntl.h>
+  #include <cerrno>
   using socket_t = int;
   static constexpr socket_t kInvalidSocket = -1;
   static inline void closeSocket(socket_t s) { ::close(s); }
+  static inline void setBlocking(socket_t s, bool on) {
+      const int flags = fcntl(s, F_GETFL, 0);
+      fcntl(s, F_SETFL, on ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK));
+  }
 #endif
 
 #include <libssh2.h>
@@ -32,6 +43,57 @@
 // Raccourcis de transtypage vers les types opaques stockes en void*.
 #define SESSION (static_cast<LIBSSH2_SESSION*>(session_))
 #define SFTP    (static_cast<LIBSSH2_SFTP*>(sftp_))
+
+namespace {
+
+// Delais reseau : sans eux, un serveur muet ou un pare-feu qui jette les paquets fige
+// l'appelant pendant la valeur par defaut de l'OS (plusieurs minutes).
+constexpr int  kConnectTimeoutSec = 15;      // etablissement TCP
+constexpr long kSessionTimeoutMs  = 30000;   // handshake, auth, operations libssh2
+
+// Connexion TCP avec delai : mode non bloquant + select, puis retour en mode bloquant
+// (libssh2 est pilote en bloquant, borne par libssh2_session_set_timeout).
+bool connectWithTimeout(socket_t s, const sockaddr* addr, socklen_t len) {
+    setBlocking(s, false);
+    if (::connect(s, addr, len) != 0) {
+#ifdef _WIN32
+        const bool inProgress = WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+        const bool inProgress = errno == EINPROGRESS;
+#endif
+        if (!inProgress) return false;
+        fd_set wfds, efds;
+        FD_ZERO(&wfds);
+        FD_ZERO(&efds);
+        FD_SET(s, &wfds);
+        FD_SET(s, &efds);
+        timeval tv{kConnectTimeoutSec, 0};
+        // Le 1er argument de select est ignore sous Windows, requis ailleurs.
+        if (select(static_cast<int>(s) + 1, nullptr, &wfds, &efds, &tv) <= 0) return false;
+        int soErr = 0;
+        socklen_t sl = sizeof(soErr);
+        if (getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&soErr), &sl) != 0
+            || soErr != 0) return false;
+    }
+    setBlocking(s, true);
+    return true;
+}
+
+// Empreinte SHA-256 de la cle d'hote en hexadecimal minuscule, prefixee "sha256:".
+std::string hostKeyFingerprint(LIBSSH2_SESSION* session) {
+    const char* raw = libssh2_hostkey_hash(session, LIBSSH2_HOSTKEY_HASH_SHA256);
+    if (!raw) return {};
+    static const char* hex = "0123456789abcdef";
+    std::string out = "sha256:";
+    for (int i = 0; i < 32; ++i) {
+        const unsigned char b = static_cast<unsigned char>(raw[i]);
+        out += hex[b >> 4];
+        out += hex[b & 0x0F];
+    }
+    return out;
+}
+
+} // namespace
 
 SftpClient::SftpClient() {
     libssh2_init(0);
@@ -65,29 +127,55 @@ bool SftpClient::connect(const SiteConfig& site, std::string& error) {
         return false;
     }
 
-    socket_t s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (s == kInvalidSocket) {
-        freeaddrinfo(res);
-        error = "Création du socket impossible.";
-        return false;
-    }
-    if (::connect(s, res->ai_addr, static_cast<socklen_t>(res->ai_addrlen)) != 0) {
-        freeaddrinfo(res);
+    // Essaie chaque adresse resolue (IPv6 puis IPv4, par exemple) : une famille injoignable
+    // ne doit pas condamner la connexion si l'autre repond.
+    socket_t s = kInvalidSocket;
+    for (struct addrinfo* ai = res; ai; ai = ai->ai_next) {
+        s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (s == kInvalidSocket) continue;
+        if (connectWithTimeout(s, ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen))) break;
         closeSocket(s);
-        error = "Connexion TCP impossible vers " + site.host + ":22.";
-        return false;
+        s = kInvalidSocket;
     }
     freeaddrinfo(res);
+    if (s == kInvalidSocket) {
+        error = "Connexion TCP impossible vers " + site.host + ":22 (délai de "
+              + std::to_string(kConnectTimeoutSec) + " s par adresse).";
+        return false;
+    }
     sock_ = static_cast<uintptr_t>(s);
 
     // --- Handshake SSH ---
     session_ = libssh2_session_init();
     if (!session_) { error = "Initialisation de la session SSH impossible."; return false; }
     libssh2_session_set_blocking(SESSION, 1);
+    libssh2_session_set_timeout(SESSION, kSessionTimeoutMs);
     if (libssh2_session_handshake(SESSION, s) != 0) {
         error = "Handshake SSH échoué (le serveur autorise-t-il SSH ?).";
         return false;
     }
+
+    // --- Verification de la cle d'hote (TOFU) AVANT toute authentification ---
+    // Le mot de passe ne doit jamais partir vers un serveur dont l'identite n'est pas
+    // reconnue. 1re connexion : l'empreinte est memorisee par l'appelant (observedHostKey).
+    // Ensuite : toute difference est refusee ; l'utilisateur doit l'oublier explicitement
+    // (reglages du site) pour accepter une nouvelle cle.
+    observedHostKey_.clear();
+    hostKeyMismatch_ = false;
+    const std::string fp = hostKeyFingerprint(SESSION);
+    if (fp.empty()) {
+        error = "Empreinte de la clé d'hôte SSH illisible : connexion refusée.";
+        return false;
+    }
+    if (!site.hostKeySha256.empty() && site.hostKeySha256 != fp) {
+        hostKeyMismatch_ = true;
+        error = "La clé d'hôte SSH de " + site.host + " a CHANGÉ (mémorisée : "
+              + site.hostKeySha256 + ", reçue : " + fp + "). Connexion refusée par sécurité. "
+              "Si le changement est légitime (réinstallation du serveur), oubliez l'empreinte "
+              "dans les réglages du site puis reconnectez-vous.";
+        return false;
+    }
+    observedHostKey_ = fp;
 
     // --- Authentification (clé SSH prioritaire, repli sur le mot de passe) ---
     int  rc = -1;

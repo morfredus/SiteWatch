@@ -55,7 +55,17 @@ public:
 
     void disconnect();
 
+    // Empreinte de la clé d'hôte vue lors du dernier connect() ("sha256:<hex>"), vide si le
+    // handshake n'a pas abouti. L'appelant la mémorise dans SiteConfig::hostKeySha256 quand
+    // celle-ci était vide (1re connexion).
+    const std::string& observedHostKey() const { return observedHostKey_; }
+
+    // Vrai si le dernier connect() a été refusé car la clé d'hôte diffère de celle mémorisée.
+    bool hostKeyMismatch() const { return hostKeyMismatch_; }
+
 private:
+    std::string observedHostKey_;
+    bool        hostKeyMismatch_ = false;
     void*     session_ = nullptr;              // LIBSSH2_SESSION*
     void*     sftp_    = nullptr;              // LIBSSH2_SFTP*
     uintptr_t sock_    = ~static_cast<uintptr_t>(0); // SOCKET (INVALID_SOCKET)
