@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.31.0] - 2026-11-10
+
+### Changed
+
+- **Referrers tab**: unknown referrers are no longer lumped into "Autres". Each one now appears under its own domain (port and `www.` stripped), so a suspicious referrer can be spotted. Double-clicking a row opens the detail with the distinct IPs, user-agents and URLs behind it, which allows checking whether a referrer comes from a bot hiding its identity. Known engines and networks (Google, Bing, Facebook...) and "Direct" are unchanged.
+
 ## [1.30.0] - 2026-11-10
 
 ### Added

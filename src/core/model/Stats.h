@@ -45,7 +45,8 @@ struct Stats {
     // Pages les plus consultees (url -> nombre de vues humaines).
     std::map<std::string, long> topPages;
 
-    // Provenance du trafic (Google, Bing, DuckDuckGo, Facebook, Direct...).
+    // Provenance du trafic : moteurs/reseaux connus (Google, Bing...), "Direct",
+    // sinon le nom de domaine du referent (ex. "exemple.com").
     std::map<std::string, long> referers;
 
     // URL les plus attaquees (tentatives d'attaque + 404).

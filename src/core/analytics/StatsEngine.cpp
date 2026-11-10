@@ -110,7 +110,11 @@ std::string StatsEngine::classifyReferer(const std::string& referer) {
     if (contains(h, "bsky") || contains(h, "bluesky")) return "Bluesky";
     if (contains(h, "mastodon"))   return "Mastodon";
     if (h.empty()) return "Direct";
-    return "Autres";
+    // Referent inconnu : garder le nom de domaine (sans port ni "www.") plutot qu'un seau
+    // "Autres", pour pouvoir reperer un referent suspect et voir les IP qui en viennent.
+    std::string domain = h.substr(0, h.find(':'));
+    if (domain.rfind("www.", 0) == 0) domain.erase(0, 4);
+    return domain.empty() ? "Direct" : domain;
 }
 
 void StatsEngine::ingest(const LogEntry& entry) {
