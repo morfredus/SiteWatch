@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.29.1] - 2026-11-10
+
+### Changed
+
+- Vendored morfUpdate resynchronised to 0.9.1: the update dialog and its messages now have English source texts and go through the `morfupdate` translation context. Until a catalog provides that context, they appear in English instead of French.
+
 ## [1.29.0] - 2026-11-07
 
 ### Security
