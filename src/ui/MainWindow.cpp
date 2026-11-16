@@ -70,6 +70,7 @@
 #include <QtCharts/QPieSlice>
 #include <QtCharts/QValueAxis>
 
+#include <QMap>
 #include <algorithm>
 #include <vector>
 #include <set>
@@ -983,6 +984,11 @@ void MainWindow::buildUi() {
     activityTable_ = makeTable3("Activité WordPress légitime", "Requêtes", "%");
     pagesTable_    = makeTable("Page", "Vues");
     referersTable_ = makeTable("Provenance", "Requêtes");
+    // Colonnes ajoutees : part de ressources (images, CSS...) et type de provenance.
+    referersTable_->setColumnCount(4);
+    referersTable_->setHorizontalHeaderLabels({"Provenance", "Requêtes", "Dont ressources", "Type"});
+    referersTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    referersTable_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
     attackedTable_ = makeTable("URL attaquée / 404", "Occurrences");
 
     tabs_->addTab(securityTable_, "Sécurité");
@@ -2613,7 +2619,40 @@ void MainWindow::displayStats(const Stats& s) {
     }
     setRows3(activityTable_, sortedByValue(s.normalActivity), t);
     setRows(pagesTable_,    sortedByValue(s.topPages, 50));
-    setRows(referersTable_, sortedByValue(s.referers));
+    {
+        const auto rows = sortedByValue(s.referers);
+        setRows(referersTable_, rows);
+        for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
+            const std::string label = rows[i].first.toStdString();
+            const auto a = s.referersAssets.find(label);
+            const long assets = a == s.referersAssets.end() ? 0 : a->second;
+            QString assetText = assets ? num(assets) : QString();
+            const auto ak = s.referersAssetKinds.find(label);
+            if (assets && ak != s.referersAssetKinds.end() && !ak->second.empty()) {
+                const auto top = std::max_element(ak->second.begin(), ak->second.end(),
+                    [](const auto& x, const auto& y) { return x.second < y.second; });
+                static const QMap<QString, QString> kindNames{
+                    {"image", "images"}, {"style_script", "styles/scripts"}, {"font", "polices"},
+                    {"icon", "icônes"}, {"media", "médias"}, {"other", "autres"}};
+                assetText += " (" + kindNames.value(QString::fromStdString(top->first), "autres") + ")";
+            }
+            auto* av = new QTableWidgetItem(assetText);
+            av->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            referersTable_->setItem(i, 2, av);
+            const std::string kind = StatsEngine::refererKind(label);
+            QString name = QStringLiteral("Autre site");
+            if (kind == "direct") name = QStringLiteral("Direct");
+            else if (kind == "search") name = QStringLiteral("Moteur de recherche");
+            else if (kind == "social") name = QStringLiteral("Réseau social");
+            else if (kind == "mail") name = QStringLiteral("Messagerie / webmail");
+            // Un référent qui n'a servi que des ressources n'est pas une visite.
+            if (assets > 0 && assets == rows[i].second) name += QStringLiteral(" (ressources seules)");
+            const std::string conf = StatsEngine::mailConfidence(s, label);
+            if (conf == "high") name += QStringLiteral(" · indice fort de mail");
+            else if (conf == "medium") name += QStringLiteral(" · indice de mail");
+            referersTable_->setItem(i, 3, new QTableWidgetItem(name));
+        }
+    }
     fillUrls();
 
     rebuildChart();

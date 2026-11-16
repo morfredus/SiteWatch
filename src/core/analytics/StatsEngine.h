@@ -46,6 +46,24 @@ public:
     // Extrait le moteur de provenance depuis un referer.
     static std::string classifyReferer(const std::string& referer);
 
+    // Type de provenance d'un libelle de classifyReferer : "direct", "search" (moteur de
+    // recherche), "social" (reseau social), "mail" (webmail / messagerie) ou "site" (autre site).
+    static std::string refererKind(const std::string& label);
+
+    // Nature d'une ressource technique : "image", "style_script", "font", "icon", "media"
+    // ou "other" ; chaine vide si l'URL n'est pas une ressource.
+    static std::string assetKind(const std::string& url);
+
+    // Famille du client de messagerie d'apres le User-Agent ("Gmail (proxy d'images)",
+    // "Outlook", "Thunderbird"...) ; chaine vide si ce n'en est pas un.
+    static std::string mailAgent(const std::string& userAgent);
+
+    // Confiance que ce referent vient d'un message : "high" (referent de messagerie ET
+    // User-Agent de client de messagerie), "medium" (l'un des deux), "" (aucun indice).
+    // Jamais une preuve d'ouverture : un referent est declare par le client, un proxy peut
+    // precharger une image.
+    static std::string mailConfidence(const Stats& stats, const std::string& label);
+
 private:
     // Regroupe les moteurs IA / SEO pour les series quotidiennes.
     static bool isAiEngine(const std::string& engine);

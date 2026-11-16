@@ -48,6 +48,19 @@ struct Stats {
     // Provenance du trafic : moteurs/reseaux connus (Google, Bing...), "Direct",
     // sinon le nom de domaine du referent (ex. "exemple.com").
     std::map<std::string, long> referers;
+    // Part de ces requetes qui ne sont que des ressources (image, CSS, JS...) et non des
+    // pages : une signature d'e-mail chargee par un webmail y apparait, pas dans les visites.
+    std::map<std::string, long> referersAssets;
+    // Nature des ressources par referent : referent -> (image, style_script, font, icon,
+    // media, other) -> nombre.
+    std::map<std::string, std::map<std::string, long>> referersAssetKinds;
+    // Requetes dont le User-Agent est celui d'un client ou d'un proxy de messagerie
+    // (GoogleImageProxy, Outlook, Thunderbird...), par referent. Un indice, pas une preuve
+    // d'ouverture de mail : un proxy peut prechager l'image sans que le message soit lu.
+    std::map<std::string, long> referersMailHints;
+    // Requetes de ressources faites par un client de messagerie, quel que soit le referent
+    // (ils n'en envoient souvent aucun) : famille du client -> nombre.
+    std::map<std::string, long> mailAgentAssets;
 
     // URL les plus attaquees (tentatives d'attaque + 404).
     std::map<std::string, long> topAttacked;

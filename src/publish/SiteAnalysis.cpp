@@ -68,6 +68,61 @@ QJsonObject rankedMapJson(const std::map<std::string, long>& values, size_t maxI
     return out;
 }
 
+// Type de provenance (direct, search, social, mail, site) des referents publies par
+// rankedMapJson : memes libelles, memes limites, pour que morfAnalytics les rapproche.
+QJsonObject refererKindsJson(const Stats& s, size_t maxItems = 20) {
+    std::vector<std::pair<std::string, long>> ranked(s.referers.begin(), s.referers.end());
+    std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+    QJsonObject out;
+    for (size_t i = 0; i < ranked.size() && i < maxItems; ++i) {
+        QString label = QString::fromStdString(ranked[i].first);
+        if (label.size() > 180) label = label.left(179) + QChar(0x2026);
+        out[label] = QString::fromStdString(StatsEngine::refererKind(ranked[i].first));
+    }
+    return out;
+}
+
+// Meme selection de referents que rankedMapJson (20 premiers, memes libelles).
+std::vector<std::string> topReferers(const Stats& s, size_t maxItems = 20) {
+    std::vector<std::pair<std::string, long>> ranked(s.referers.begin(), s.referers.end());
+    std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+    std::vector<std::string> out;
+    for (size_t i = 0; i < ranked.size() && i < maxItems; ++i) out.push_back(ranked[i].first);
+    return out;
+}
+
+QString publishedLabel(const std::string& raw) {
+    QString label = QString::fromStdString(raw);
+    return label.size() > 180 ? label.left(179) + QChar(0x2026) : label;
+}
+
+// referent -> {image: n, style_script: n, ...} : la nature des ressources servies.
+QJsonObject refererAssetKindsJson(const Stats& s) {
+    QJsonObject out;
+    for (const std::string& ref : topReferers(s)) {
+        const auto it = s.referersAssetKinds.find(ref);
+        if (it == s.referersAssetKinds.end()) continue;
+        QJsonObject kinds;
+        for (const auto& [kind, n] : it->second) kinds[QString::fromStdString(kind)] = static_cast<double>(n);
+        out[publishedLabel(ref)] = kinds;
+    }
+    return out;
+}
+
+// referent -> "high" | "medium" (voir StatsEngine::mailConfidence) ; absent sans indice.
+QJsonObject refererConfidenceJson(const Stats& s) {
+    QJsonObject out;
+    for (const std::string& ref : topReferers(s)) {
+        const std::string c = StatsEngine::mailConfidence(s, ref);
+        if (!c.empty()) out[publishedLabel(ref)] = QString::fromStdString(c);
+    }
+    return out;
+}
+
 // Cumule les pages (ou les robots) vues sur les jours [from, to] (chaines "AAAA-MM-JJ").
 std::map<std::string, long> sumDays(const std::map<std::string, std::map<std::string, long>>& perDay,
                                     const QDate& from, const QDate& to) {
@@ -175,6 +230,11 @@ QJsonObject buildReport(const SiteConfig& site, const Stats& s, WebAuthorityStor
         {"daily_seo", dailyMapJson(s.dailySEO)}, {"daily_404", dailyMapJson(s.daily404)},
         {"daily_403", dailyMapJson(s.daily403)}, {"daily_500", dailyMapJson(s.daily500)},
         {"referers", rankedMapJson(s.referers)},
+        {"referer_assets", rankedMapJson(s.referersAssets, 50)},
+        {"referer_kinds", refererKindsJson(s)},
+        {"referer_asset_kinds", refererAssetKindsJson(s)},
+        {"referer_mail_confidence", refererConfidenceJson(s)},
+        {"mail_agents", rankedMapJson(s.mailAgentAssets, 10)},
         {"attack_activity", rankedMapJson(s.attackActivity)},
         {"normal_activity", rankedMapJson(s.normalActivity)},
         {"status_classes", statusClassesJson(s)},

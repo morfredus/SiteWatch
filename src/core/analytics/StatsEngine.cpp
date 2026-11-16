@@ -100,6 +100,11 @@ StatsEngine::ActivityInfo StatsEngine::classifyActivity(const LogEntry& entry) {
 std::string StatsEngine::classifyReferer(const std::string& referer) {
     if (referer.empty() || referer == "-") return "Direct";
     const std::string h = toLower(hostOf(referer));
+    // Webmails avant les moteurs : mail.google.com ne doit pas gonfler « Google ».
+    if (contains(h, "mail.google") || contains(h, "mail-attachment.googleusercontent")) return "Gmail";
+    if (contains(h, "outlook.") || contains(h, "office.com") || contains(h, "live.com")) return "Outlook";
+    if (contains(h, "mail.yahoo"))  return "Yahoo Mail";
+    if (contains(h, "proton."))     return "Proton Mail";
     if (contains(h, "google"))     return "Google";
     if (contains(h, "bing"))       return "Bing";
     if (contains(h, "duckduckgo")) return "DuckDuckGo";
@@ -115,6 +120,57 @@ std::string StatsEngine::classifyReferer(const std::string& referer) {
     std::string domain = h.substr(0, h.find(':'));
     if (domain.rfind("www.", 0) == 0) domain.erase(0, 4);
     return domain.empty() ? "Direct" : domain;
+}
+
+std::string StatsEngine::assetKind(const std::string& url) {
+    if (!isStaticAsset(url)) return "";
+    const std::string u = toLower(url.substr(0, url.find('?')));
+    auto ends = [&](const char* e) {
+        const size_t n = std::strlen(e);
+        return u.size() >= n && u.compare(u.size() - n, n, e) == 0;
+    };
+    if (contains(u, "/favicon") || ends(".ico")) return "icon";
+    if (ends(".css") || ends(".js") || ends(".map")) return "style_script";
+    if (ends(".woff") || ends(".woff2") || ends(".ttf") || ends(".eot")) return "font";
+    if (ends(".mp4") || ends(".webm")) return "media";
+    if (ends(".jpg") || ends(".jpeg") || ends(".png") || ends(".gif") || ends(".svg")
+        || ends(".webp") || contains(u, "/wp-content/uploads/")) return "image";
+    return "other";
+}
+
+std::string StatsEngine::mailAgent(const std::string& userAgent) {
+    const std::string ua = toLower(userAgent);
+    if (contains(ua, "googleimageproxy")) return "Gmail (proxy d'images)";
+    if (contains(ua, "yahoomailproxy") || contains(ua, "ymail")) return "Yahoo Mail (proxy)";
+    if (contains(ua, "microsoft outlook") || contains(ua, "ms-office") || contains(ua, "outlook-"))
+        return "Outlook";
+    if (contains(ua, "thunderbird")) return "Thunderbird";
+    if (contains(ua, "applemail") || contains(ua, "apple mail")) return "Apple Mail";
+    return "";
+}
+
+std::string StatsEngine::mailConfidence(const Stats& stats, const std::string& label) {
+    const bool byReferer = refererKind(label) == "mail";
+    const auto h = stats.referersMailHints.find(label);
+    const bool byAgent = h != stats.referersMailHints.end() && h->second > 0;
+    if (byReferer && byAgent) return "high";
+    return (byReferer || byAgent) ? "medium" : "";
+}
+
+std::string StatsEngine::refererKind(const std::string& label) {
+    if (label == "Direct") return "direct";
+    if (label == "Google" || label == "Bing" || label == "DuckDuckGo") return "search";
+    if (label == "Gmail" || label == "Outlook" || label == "Yahoo Mail" || label == "Proton Mail") return "mail";
+    if (label == "Facebook" || label == "Pinterest" || label == "Reddit" || label == "LinkedIn"
+        || label == "Bluesky" || label == "Mastodon") return "social";
+    // Webmail : le referent d'une image d'e-mail (signature, pixel) est la page du webmail.
+    // Motifs sur le nom d'hote ; a completer quand un nouveau webmail apparait.
+    const std::string h = toLower(label);
+    static const char* mail[] = {"mail.", "webmail", "mercure.", "outlook.", "roundcube",
+                                 "mailbox", "zimbra", "horde", "proton.me", "owa."};
+    for (const char* m : mail)
+        if (contains(h, m)) return "mail";
+    return "site";
 }
 
 void StatsEngine::ingest(const LogEntry& entry) {
@@ -153,7 +209,16 @@ void StatsEngine::ingest(const LogEntry& entry) {
             ++stats_.topPages[entry.url];
             ++stats_.dailyPages[entry.date][entry.url];
         }
-        ++stats_.referers[classifyReferer(entry.referer)];
+        const std::string refLabel = classifyReferer(entry.referer);
+        ++stats_.referers[refLabel];
+        const std::string kind = assetKind(entry.url);
+        const std::string agent = mailAgent(entry.userAgent);
+        if (!kind.empty()) {
+            ++stats_.referersAssets[refLabel];
+            ++stats_.referersAssetKinds[refLabel][kind];
+            if (!agent.empty()) ++stats_.mailAgentAssets[agent];
+        }
+        if (!agent.empty()) ++stats_.referersMailHints[refLabel];
     }
 
     // --- Activite : normale ou attaque ---

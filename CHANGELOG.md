@@ -2,6 +2,17 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.32.0] - 2026-11-16
+
+### Added
+
+- **Referrers: type and resources.** Each referrer now has a type (direct, search engine, social network, webmail, other site). The Referrers tab and the published report also say how many of its requests were only resources (images, styles and scripts, fonts, icons, media) and which kind dominates. A referrer that served nothing but resources, such as a webmail showing an e-mail signature image, is no longer mistaken for a visit.
+- **Mail hints.** A referrer from a webmail, or a request made by a mail client or image proxy (GoogleImageProxy, Outlook, Thunderbird, Apple Mail, Yahoo Mail proxy), is flagged with a confidence: strong when both agree, medium when only one does. It is a hint and never a proof that a message was opened (a proxy can preload an image). The report lists the images loaded per mail client.
+
+### Changed
+
+- Gmail, Outlook, Yahoo Mail and Proton Mail referrers have their own label instead of being counted as "Google" or as a raw domain.
+
 ## [1.31.0] - 2026-11-10
 
 ### Changed
