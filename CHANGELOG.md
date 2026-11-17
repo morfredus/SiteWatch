@@ -2,6 +2,14 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.32.2] - 2026-11-17
+
+### Changed
+
+- Vendored morfDeploy resynchronised to 0.22.0: on Windows, the build libraries are recognised under MSYS2 (UCRT64) and verified with pacman instead of reported as "no package for this platform".
+- Vendored morfUpdate resynchronised to 0.9.3 (no behaviour change).
+- Windows build: MSYS2 `UCRT64` instead of the deprecated `MINGW64`. `vscode-mingw.ps1` defaults to `UCRT64` and resets a `build-mingw` folder configured with another MSYS2 environment; `deploy-mingw.sh` copies the DLLs from `/ucrt64/bin` (`/mingw64/bin` is still accepted).
+
 ## [1.32.1] - 2026-11-17
 
 ### Fixed
