@@ -50,19 +50,21 @@ Sur Windows, il est aussi possible d'utiliser :
 winget install MSYS2.MSYS2
 ```
 
-Une fois MSYS2 installé, ouvrir le raccourci **MSYS2 MINGW64** dans le menu
-Démarrer. Il est important de choisir **MINGW64**, pas seulement "MSYS2".
+Une fois MSYS2 installé, ouvrir le raccourci **MSYS2 UCRT64** dans le menu
+Démarrer. Il est important de choisir **UCRT64**, ni "MSYS2" seul ni **MINGW64**
+(déprécié : mélanger les deux environnements dans un même dossier de build produit un
+exécutable qui ne démarre pas).
 
 ## 2. Installer les dépendances
 
-Dans la fenêtre **MSYS2 MINGW64**, commencer par mettre MSYS2 à jour :
+Dans la fenêtre **MSYS2 UCRT64**, commencer par mettre MSYS2 à jour :
 
 ```bash
 pacman -Syu
 ```
 
 Si MSYS2 demande de fermer la fenêtre, fermer la fenêtre, rouvrir
-**MSYS2 MINGW64**, puis relancer :
+**MSYS2 UCRT64**, puis relancer :
 
 ```bash
 pacman -Syu
@@ -71,9 +73,9 @@ pacman -Syu
 Installer ensuite tout ce dont SiteWatch a besoin :
 
 ```bash
-pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-charts \
-  mingw-w64-x86_64-libssh2 mingw-w64-x86_64-zlib mingw-w64-x86_64-nlohmann-json
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+  mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-charts \
+  mingw-w64-ucrt-x86_64-libssh2 mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-nlohmann-json
 ```
 
 Quand MSYS2 demande confirmation, répondre `Y`.
@@ -184,7 +186,7 @@ cache CMake pointe vers un ancien dossier du projet.
 Dans la sortie CMake, vérifier la présence de :
 
 ```text
-C:\msys64\mingw64\bin\cmake.exe
+C:\msys64\ucrt64\bin\cmake.exe
 ```
 
 Si la sortie affiche plutôt :
@@ -200,13 +202,27 @@ configuration CMake.
 
 Cela veut dire que Qt est lancé sans les DLL MSYS2 dans le `PATH`.
 
-Le preset `mingw` de `CMakePresets.json` place déjà `C:/msys64/mingw64/bin` en
-tête du `PATH`. Vérifier que le preset sélectionné est bien
-**SiteWatch (Windows, MSYS2/MinGW)**, recharger VS Code, puis relancer :
+Le preset `mingw` de `CMakePresets.json` lit le compilateur sur le `PATH` et Qt dans
+la variable `QT_ROOT`. Mettre `C:\msys64\ucrt64\bin` en tête du `PATH`, définir
+`QT_ROOT` à `C:\msys64\ucrt64`, vérifier que le preset sélectionné est bien
+**SiteWatch (Windows, MinGW)**, recharger VS Code, puis relancer :
 
 ```text
 CMake: Configure
 ```
+
+### `rcc` plante (`0xc0000409`) ou "point d'entrée introuvable" au démarrage
+
+C'est presque toujours un mélange d'environnements : un compilateur UCRT64 avec le Qt
+officiel de `C:\Qt` (compilé avec un autre MinGW), ou un dossier `build-mingw` compilé
+d'abord avec MINGW64 puis avec UCRT64. Vérifier :
+
+- le terminal est bien **MSYS2 UCRT64** (`echo $MSYSTEM` affiche `UCRT64`) ;
+- aucun dossier `C:\Qt\...` ni `mingw64\bin` n'est dans le `PATH`, et `CMAKE_PREFIX_PATH`
+  n'est pas défini globalement ;
+- en cas de doute, supprimer le dossier `build-mingw` et reconfigurer.
+
+Le Qt officiel ne peut pas être associé à un compilateur UCRT64 : il faut le Qt de MSYS2.
 
 ### MSYS2 introuvable
 
@@ -227,7 +243,7 @@ $env:MSYS2_ROOT = "D:\msys64"
 
 ## 9. Compiler sans VS Code
 
-Pour compiler au terminal, ouvrir **MSYS2 MINGW64**, aller dans le dossier du
+Pour compiler au terminal, ouvrir **MSYS2 UCRT64**, aller dans le dossier du
 projet, puis lancer :
 
 ```bash

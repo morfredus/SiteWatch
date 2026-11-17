@@ -21,7 +21,7 @@ La méthode officielle repose sur **MSYS2**, **MinGW** et **VS Code**.
 L'installation des dépendances s'effectue avec une seule commande :
 
 ```bash
-pacman -S --needed mingw-w64-x86_64-{gcc,cmake,ninja,qt6-base,qt6-charts,libssh2,zlib,nlohmann-json}
+pacman -S --needed mingw-w64-ucrt-x86_64-{gcc,cmake,ninja,qt6-base,qt6-charts,libssh2,zlib,nlohmann-json}
 ```
 
 Compilation :

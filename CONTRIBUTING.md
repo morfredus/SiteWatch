@@ -12,10 +12,10 @@ The full details are in the [README](README.md) and in
 simplest path is **MSYS2 / MinGW**:
 
 ```bash
-# in the "MSYS2 MINGW64" shell
-pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-charts \
-  mingw-w64-x86_64-libssh2 mingw-w64-x86_64-zlib mingw-w64-x86_64-nlohmann-json
+# in the "MSYS2 UCRT64" shell (MINGW64 is deprecated)
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+  mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-charts \
+  mingw-w64-ucrt-x86_64-libssh2 mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-nlohmann-json
 
 cd /c/path/to/SiteWatch
 cmake --preset mingw

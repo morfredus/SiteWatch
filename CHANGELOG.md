@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.32.4] - 2026-11-18
+
+### Changed
+
+- Build documentation (`docs/fr/BUILD_FOR_BEGINNERS.md`, `docs/fr/COMPILATION.md`, `CONTRIBUTING.md`) moved from MSYS2 `MINGW64` to `UCRT64` (shell, `mingw-w64-ucrt-x86_64-*` packages, `PATH` and `QT_ROOT`), with a new troubleshooting entry for a crashing `rcc` or an executable that does not start (mixed environments).
+
 ## [1.32.3] - 2026-11-18
 
 ### Fixed
