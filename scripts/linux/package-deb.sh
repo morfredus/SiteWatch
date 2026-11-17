@@ -172,6 +172,17 @@ else
     esac
 fi
 
+# Le pilote SQL de Qt (plugin « sqldrivers/qsqlite ») est lui aussi charge par dlopen :
+# ldd et les .shlibs ne le voient pas, donc ni la detection auto ni la detection croisee
+# ne l'ajoutent. Sans lui, le stockage GitHub (SQLite) echoue avec « Driver not loaded ».
+# Ignore si --depends force la liste : l'appelant garde alors la main.
+if [ -z "$DEPENDS_OVERRIDE" ]; then
+    case ", $DEPENDS," in
+        *", libqt6sql6-sqlite,"*) : ;;
+        *) DEPENDS="$DEPENDS, libqt6sql6-sqlite" ;;
+    esac
+fi
+
 # --- Arborescence du paquet ------------------------------------------------
 # Preparer l'arborescence du paquet dans le systeme de fichiers NATIF (ext4 sous
 # WSL, ou le disque du Pi), JAMAIS sur /mnt/c : DrvFs force le mode 777 sur les

@@ -143,6 +143,9 @@ fi
 # QMAKE aide le greffon Qt à localiser l'installation Qt du système.
 export APPIMAGE_EXTRACT_AND_RUN=1
 export VERSION
+# Pilote SQL de Qt (qsqlite) : charge par dlopen, donc non garanti par le greffon ;
+# sans lui le stockage GitHub echoue avec « Driver not loaded ».
+export EXTRA_QT_PLUGINS="sqldrivers"
 if command -v qmake6 >/dev/null 2>&1; then export QMAKE="$(command -v qmake6)"
 elif command -v qmake  >/dev/null 2>&1; then export QMAKE="$(command -v qmake)"
 fi

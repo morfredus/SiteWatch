@@ -2,6 +2,13 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.32.1] - 2026-11-17
+
+### Fixed
+
+- **Windows package: GitHub storage unavailable ("Driver not loaded").** The packaging script did not copy the `sqldrivers` plugin folder, so the installer and the ZIP shipped without `qsqlite.dll` and the SQLite-backed GitHub store could not open. The folder is now included.
+- Linux packages: the Debian package now depends on `libqt6sql6-sqlite` (the SQL driver is loaded at run time, so the automatic dependency detection missed it), and the AppImage asks its Qt plugin to bundle `sqldrivers`.
+
 ## [1.32.0] - 2026-11-16
 
 ### Added

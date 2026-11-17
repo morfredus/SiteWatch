@@ -36,7 +36,8 @@ Copy-Item (Join-Path $build "SiteWatch.exe") $dist
 Copy-Item (Join-Path $build "*.dll") $dist
 
 # Dossiers de plugins Qt
-foreach ($d in 'platforms','styles','imageformats','tls','networkinformation','generic','iconengines') {
+# sqldrivers : sans qsqlite.dll, le stockage GitHub (SQLite) echoue avec "Driver not loaded".
+foreach ($d in 'platforms','styles','imageformats','tls','networkinformation','generic','iconengines','sqldrivers') {
     $src = Join-Path $build $d
     if (Test-Path $src) { Copy-Item $src $dist -Recurse }
 }
