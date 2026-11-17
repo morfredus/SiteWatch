@@ -207,7 +207,9 @@ if(WIN32)
         HINTS "${Qt6_DIR}/../../../bin" "$ENV{QT_ROOT}/bin")
     if(WINDEPLOYQT_EXE)
         add_custom_command(TARGET SiteWatch POST_BUILD
-            COMMAND "${WINDEPLOYQT_EXE}" --no-translations --compiler-runtime "$<TARGET_FILE:SiteWatch>"
+            # --force : sans lui, windeployqt garde une DLL deja presente dont la date est plus recente,
+            # meme si elle vient d'un autre environnement MSYS2 (mingw64 / ucrt64) que le compilateur.
+            COMMAND "${WINDEPLOYQT_EXE}" --no-translations --compiler-runtime --force "$<TARGET_FILE:SiteWatch>"
             COMMENT "Deploiement des DLL Qt a cote de l'executable")
     endif()
 endif()
@@ -362,6 +364,7 @@ if(WIN32 AND NOT MSVC)
         find_program(_sitewatch_cxx NAMES "${CMAKE_CXX_COMPILER}" g++.exe)
     endif()
     get_filename_component(SITEWATCH_COMPILER_BIN "${_sitewatch_cxx}" DIRECTORY)
+    sitewatch_msys_path("${SITEWATCH_COMPILER_BIN}" SITEWATCH_TOOLCHAIN_BIN)
     get_filename_component(SITEWATCH_MINGW_ROOT "${SITEWATCH_COMPILER_BIN}" DIRECTORY)
     get_filename_component(SITEWATCH_MSYS_ROOT "${SITEWATCH_MINGW_ROOT}" DIRECTORY)
     find_program(SITEWATCH_MSYS_BASH bash.exe
@@ -372,7 +375,7 @@ if(WIN32 AND NOT MSVC)
             COMMAND "${CMAKE_COMMAND}" -E env
                 "PATH=${SITEWATCH_MSYS_ROOT}/usr/bin;${SITEWATCH_COMPILER_BIN}"
                 --
-                "${SITEWATCH_MSYS_BASH}" "${SITEWATCH_DEPLOY_SCRIPT}" "${SITEWATCH_TARGET_DIR}"
+                "${SITEWATCH_MSYS_BASH}" "${SITEWATCH_DEPLOY_SCRIPT}" "${SITEWATCH_TARGET_DIR}" "${SITEWATCH_TOOLCHAIN_BIN}"
             VERBATIM
             COMMENT "Copie des DLL MinGW a cote de l'executable")
     else()
