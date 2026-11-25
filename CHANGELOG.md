@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.32.5] - 2026-11-18
+
+### Changed
+
+- `docs/fr/INSTALL_LINUX.md`: troubleshooting entry for "Stockage GitHub indisponible : Driver not loaded" (Qt SQLite driver, declared by the `.deb` since 1.32.1).
+
 ## [1.32.4] - 2026-11-18
 
 ### Changed

@@ -311,6 +311,20 @@ sudo apt install libxcb-cursor0
 Le paquet `.deb` déclare désormais cette dépendance : après un
 `sudo apt install ./sitewatch_*.deb`, apt l'installe automatiquement.
 
+### « Stockage GitHub indisponible : Driver not loaded »
+
+L'onglet GitHub (et l'historique) stocke ses données dans SQLite. Ce message signale que le
+pilote SQLite de Qt est absent : c'est un plugin chargé à l'exécution, que la détection
+automatique des dépendances ne voit pas.
+
+```bash
+sudo apt install libqt6sql6-sqlite
+```
+
+Le paquet `.deb` déclare cette dépendance depuis la version 1.32.1 : après un
+`sudo apt install ./sitewatch_*.deb`, apt l'installe automatiquement. Une AppImage embarque
+le pilote.
+
 ### La commande `sitewatch` n'est pas trouvée après `install.sh`
 
 En installation utilisateur, le programme est dans `~/.local/bin`, qui n'est pas
