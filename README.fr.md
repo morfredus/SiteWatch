@@ -1,6 +1,6 @@
 # SiteWatch
 
-[![Version](https://img.shields.io/badge/version-1.32.5-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.33.0-blue)](CHANGELOG.md)
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
@@ -219,6 +219,19 @@ Les rapports de bugs, suggestions et contributions sont les bienvenus. Merci de
 consulter [`CONTRIBUTING.md`](CONTRIBUTING.md) avant de proposer une Pull
 Request, et d'utiliser les **Issues GitHub** pour signaler un problème ou
 proposer une évolution.
+
+## Intégration continue
+
+Des workflows GitHub Actions vivent dans `.github/workflows/` (générés par le script morfTools
+`gen-ci-workflows.py`) :
+
+- **`ci.yml`** : à chaque pull request (et push sur `main`/`dev`), compile et lance les tests sous
+  Ubuntu 24.04 (Qt 6.4), Linux arm64 et Windows (MSYS2 UCRT64). Les changements de documentation seule l'ignorent et un run périmé est annulé
+  par un commit plus récent.
+- **`packages.yml`** : à chaque push sur `main` ou en lancement manuel (*Actions > Packages >
+  Run workflow*), construit le `.deb` amd64, le `.deb` arm64 et les paquets Windows. Les paquets sont des artefacts du workflow conservés
+  14 jours ; les releases sont publiées par l'outillage morfSystem, qui prend les paquets du run
+  du commit publié et ne compile en local que ce qui manque.
 
 ## Licence
 
