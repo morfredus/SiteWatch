@@ -2,6 +2,12 @@
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/).
 
+## [1.33.1] - 2026-11-26
+
+### Fixed
+
+- Vendored morfUpdate resynchronised to 0.10.1 (version file only; no behaviour change).
+
 ## [1.33.0] - 2026-11-26
 
 ### Added
